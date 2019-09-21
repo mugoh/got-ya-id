@@ -1,29 +1,29 @@
-use actix_web::{get, middleware, web, App, HttpRequest, HttpResponse, HttpServer, Responder};
+use actix_web::{middleware, web, App, HttpServer};
+use env_logger;
 use listenfd::ListenFd;
-use std::io;
+use std::{env, io};
 
-use got_ya_id::apps::user;
+use got_ya_id::apps::api;
 
 fn main() -> io::Result<()> {
     let mut listen_fd = ListenFd::from_env();
 
-    let mut server = HttpServer::new(|| {
+    env::set_var("RUST_LOG", "actix-web=info");
+    env_logger::init();
+
+    let mut app = HttpServer::new(|| {
         App::new()
+            .configure(api::api)
             .wrap(middleware::NormalizePath)
-            .service(rooute)
-            .service(web::resource("/auth").route(web::post().to(user::views::register_user)))
+            .wrap(middleware::Logger::default())
+            .data(web::JsonConfig::default().limit(8192))
     });
 
-    server = if let Some(listener) = listen_fd.take_tcp_listener(0).unwrap() {
-        server.listen(listener)?
+    app = if let Some(listener) = listen_fd.take_tcp_listener(0).unwrap() {
+        app.listen(listener)?
     } else {
-        server.bind("127.0.0.1:8888")?
+        app.bind("127.0.0.1:8888")?
     };
 
-    server.run()
-}
-
-#[get("/aha")]
-fn rooute(_req: HttpRequest) -> impl Responder {
-    HttpResponse::Ok().body("Aha!")
+    app.run()
 }
