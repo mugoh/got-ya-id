@@ -1,0 +1,50 @@
+//! Handles views for User items
+//!
+
+use crate::apps::auth::validate;
+use crate::apps::user::models::User;
+use actix_web::{http, web, HttpResponse};
+use jsonwebtoken as jwt;
+use jwt::{decode, encode, Header, Validation};
+use validator::Validate;
+
+/// Registers a new user
+///
+/// # method
+///
+///
+/// # Returns
+/// JSON of received User data
+pub fn register_user(data: web::Json<User>) -> HttpResponse {
+    println!("Data: {:#?}", data);
+
+    // jwt
+    let s = data.0.email.unwrap().clone();
+    let payload = validate::Claims {
+        sub: s.to_owned(),
+        company: "ACME".to_owned(),
+        exp: 10000000000,
+    };
+    let key = "secret";
+
+    let mut header = Header::default();
+    header.kid = Some("secretssec".to_owned());
+    let token = match encode(&header, &payload, key.as_ref()) {
+        Ok(t) => t,
+        Err(e) => e.to_string(), // println!("{:?}", e),
+    };
+    println!("{:?}", token);
+
+    let t_item = match decode::<validate::Claims>(&token, key.as_ref(), &Validation::default()) {
+        Ok(c) => c,
+        Err(e) => panic!(e), // println!("{:?}", e),
+    };
+    println!("{:#?}", t_item.claims);
+    println!("{:?}", t_item.header);
+
+    if let Err(err) = data.validate() {
+        return HttpResponse::build(http::StatusCode::BAD_REQUEST).json(err);
+        // Filter json where message is not null
+    };
+    HttpResponse::build(http::StatusCode::CREATED).json(data.0)
+}
