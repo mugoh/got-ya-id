@@ -23,11 +23,12 @@ pub fn register_user(data: web::Json<User>) -> HttpResponse {
     let _claims = validate::decode_auth_token(&token);
 
     if let Err(err) = data.validate() {
-        let res = response::JsonErrResponse::new(http::StatusCode::BAD_REQUEST.to_string(), err);
+        let res: response::JsonErrResponse<_> =
+            response::JsonErrResponse::new(http::StatusCode::BAD_REQUEST.to_string(), err);
         return HttpResponse::build(http::StatusCode::BAD_REQUEST).json(&res);
         // Filter json where message is not null
     };
-    let res = response::JsonResponse::new(
+    let res: response::JsonResponse<_> = response::JsonResponse::new(
         http::StatusCode::CREATED.to_string(),
         format!(
             "Success. An activation link sent to {}",
