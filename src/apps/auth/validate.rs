@@ -1,6 +1,6 @@
 //! User authentication
 
-use std::{error, process};
+use std::{env, error, process};
 
 use crate::apps::user::models::User;
 use crate::config::config;
@@ -28,12 +28,11 @@ pub fn encode_jwt_token(user: User) -> Result<String, Box<dyn error::Error>> {
     };
 
     // ENV Configuration
-    /*let conf = config::get_env_config().unwrap_or_else(|err| {
+    let conf = config::get_env_config().unwrap_or_else(|err| {
         eprintln!("Error: Missing required ENV Variable\n{:#?}", err);
         process::exit(78);
-    });*/
-    let conf = config::get_env_config();
-    let key = &conf.unwrap().secret_key;
+    });
+    let key = &conf.secret_key;
 
     let mut header = Header::default();
     header.kid = Some("secretssec".to_owned());
@@ -61,13 +60,10 @@ pub fn encode_jwt_token(user: User) -> Result<String, Box<dyn error::Error>> {
 /// - If the token decoding fails
 ///
 pub fn decode_auth_token(token: &String) -> Result<Claims, Box<dyn error::Error>> {
-    // ENV Configuration
-    /*let conf = config::get_env_config().unwrap_or_else(|err| {
-        eprintln!("Error: Missing required ENV Variable\n{:#?}", err);
+    let key = env::var("secret_key").unwrap_or_else(|er| {
+        eprintln!("Error: Missing required ENV Variable\n{:#?}", er);
         process::exit(78);
-    });*/
-    let conf = config::get_env_config().unwrap();
-    let key = &conf.secret_key;
+    });
 
     let decoded_token = match decode::<Claims>(&token, key.as_ref(), &Validation::default()) {
         Ok(c) => c,
