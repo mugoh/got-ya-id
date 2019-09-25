@@ -6,6 +6,10 @@ use crate::apps::core::response;
 use crate::apps::user::models::User;
 
 use actix_web::{http, web, HttpResponse};
+use lazy_static;
+use log::debug;
+use tera::{self, Context, Tera};
+use url::Url;
 use validator::Validate;
 
 /// Registers a new user
@@ -21,6 +25,20 @@ pub fn register_user(data: web::Json<User>) -> HttpResponse {
     let user_ = data.0.clone();
     let token = validate::encode_jwt_token(user_).unwrap();
     let _claims = validate::decode_auth_token(&token);
+    let path = format!(r"http://{:?}", &token);
+    let path = Url::parse(&path).unwrap();
+
+    // Mail
+    let context: Context = get_context(&data.0, &path.to_string());
+    match TEMPLATE.render("email_activation.html", &context) {
+        Ok(_) => (),
+        Err(e) => {
+            debug!("{}", e);
+            for er in e.iter().skip(1) {
+                debug!("Reason: {}", er);
+            }
+        }
+    };
 
     if let Err(err) = data.validate() {
         let res: response::JsonErrResponse<_> =
@@ -38,4 +56,25 @@ pub fn register_user(data: web::Json<User>) -> HttpResponse {
     );
 
     HttpResponse::build(http::StatusCode::CREATED).json(&res)
+}
+
+lazy_static! {
+    /// Lazily Compiles Templates
+    static ref TEMPLATE: Tera = {
+        let mut tera = tera::compile_templates!("src/templates/*");
+        tera.autoescape_on(vec!["html", ".sql"]);
+        tera
+    };
+}
+
+/// Returns the context holding the template variables
+///
+/// # Returns
+/// - tera::Context
+fn get_context(data: &User, path: &String) -> Context {
+    let mut context = Context::new();
+
+    context.insert("username", &data.username);
+    context.insert("link", path);
+    context
 }
