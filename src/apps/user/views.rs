@@ -2,14 +2,16 @@
 //!
 
 use crate::apps::auth::validate;
-use crate::apps::core::response;
 use crate::apps::user::models::User;
+use crate::core::mail;
+use crate::core::response;
 
-use actix_web::{http, web, HttpResponse};
 use lazy_static;
 use log::debug;
-use tera::{self, Context, Tera};
 use url::Url;
+
+use actix_web::{http, web, HttpResponse};
+use tera::{self, Context, Tera};
 use validator::Validate;
 
 /// Registers a new user
@@ -31,9 +33,18 @@ pub fn register_user(data: web::Json<User>) -> HttpResponse {
     // Mail
     let context: Context = get_context(&data.0, &path.to_string());
     match TEMPLATE.render("email_activation.html", &context) {
-        Ok(_) => (),
+        Ok(s) => {
+            println!("{}", s);
+            let mut mail = mail::Mail::new(
+                &data.0.email.clone().unwrap(),
+                &data.0.username.clone().unwrap(),
+                "Email activation".to_string(),
+                &s,
+            );
+            mail.send().unwrap();
+        }
+
         Err(e) => {
-            debug!("{}", e);
             for er in e.iter().skip(1) {
                 debug!("Reason: {}", er);
             }

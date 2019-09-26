@@ -2,8 +2,10 @@
 use lettre_email::Email;
 
 use lettre::smtp::authentication::Credentials;
-use lettre::{SmtpClient, SmtpTransport, Transport};
-use std::{env, io};
+use lettre::{smtp, SmtpClient, SmtpTransport, Transport};
+use std::{env, process};
+
+use log::debug;
 
 /// Enables sending of email
 ///
@@ -21,7 +23,7 @@ pub struct Mail {
 
 /// Returns a Mail struct
 impl Mail {
-    pub fn new(to_addr: String, to_name: String, subject: String, content: String) -> Mail {
+    pub fn new(to_addr: &String, to_name: &String, subject: String, content: &String) -> Mail {
         // ENV
         //let SMTP_CLIENT;
         //let MAIL_USERNAME;
@@ -31,13 +33,20 @@ impl Mail {
             vec!["SMTP_CLIENT", "MAIL_ADDR", "MAIL_USERNAME", "MAIL_PASS"],
             &mut mail_vars,
         );
-        let email = Email::builder()
+        let email = match Email::builder()
             .to((to_addr, to_name))
             .from(mail_vars[1].clone())
             .subject(subject)
             .alternative(content, "".to_string())
             .build()
-            .unwrap();
+        {
+            Ok(e) => e,
+            Err(er) => {
+                println!("Unable to create Email\nReason: {:?}", er);
+                debug!("{:?}", er);
+                process::exit(1);
+            }
+        };
 
         let creds = Credentials::new(mail_vars[2].clone(), mail_vars[3].clone());
         let mailer = SmtpClient::new_simple(
@@ -51,20 +60,24 @@ impl Mail {
     }
 
     /// Sends the email
-    pub fn send(&mut self) -> Result<bool, io::Error> {
+    pub fn send(&mut self) -> Result<smtp::response::Response, smtp::error::Error> {
         let status = match self.mailer.send(self.email.clone().into()) {
-            Ok(_) => Ok(()),
-            Err(e) => Result::Err(format!("Couldn't send email , {}", e)),
+            Ok(s) => Ok(s),
+            Err(e) => Result::Err(e),
         };
 
-        Ok(status.is_ok())
+        // Ok(status.is_ok())
+        status
     }
 }
 
 /// Retrieves ENV Variable given the Keys
 pub fn get_env_var<'a>(keys: Vec<&'a str>, values: &mut Vec<String>) -> () {
     for key in keys.iter() {
-        let val = env::var(key).unwrap();
+        let val = env::var(key.to_string().to_lowercase()).unwrap_or_else(|er| {
+            println!("{:#?}", er);
+            process::exit(1);
+        });
         values.push(val);
     }
 }
