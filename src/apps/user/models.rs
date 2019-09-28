@@ -10,7 +10,7 @@ use crate::apps::user::utils::{validate_name, validate_pass};
 
 /// User Object
 /// Holds user data
-#[derive(Debug, Clone, Validate, Serialize, Deserialize)]
+#[derive(Debug, Clone, Queryable, Validate, Serialize, Deserialize)]
 pub struct User {
     #[validate(length(min = 5), custom = "validate_name")]
     pub username: Option<String>,

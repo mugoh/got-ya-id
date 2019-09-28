@@ -29,6 +29,6 @@ pub fn connect_to_db() -> PgConnection {
         db_vars.get(&"db_port").unwrap(),
         db_vars.get(&"db_name").unwrap()
     );
-    let db_url = env::var("database_url").expect("Database Url missing");
+    // let db_url = env::var("database_url").expect("Database Url missing");
     PgConnection::establish(&db_url).expect(&format!("Error connecting to {}", &db_url))
 }
