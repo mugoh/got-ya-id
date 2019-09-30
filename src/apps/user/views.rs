@@ -2,7 +2,7 @@
 //!
 
 use crate::apps::auth::validate;
-use crate::apps::user::models::User;
+use crate::apps::user::models::NewUser;
 use crate::core::mail;
 use crate::core::response;
 
@@ -23,7 +23,7 @@ use validator::Validate;
 /// - On Sucess: JSONResponse
 /// - On ERROR: JSONErrResponse
 ///
-pub fn register_user(data: web::Json<User>) -> HttpResponse {
+pub fn register_user(data: web::Json<NewUser>) -> HttpResponse {
     let user_ = data.0.clone();
     let token = validate::encode_jwt_token(user_).unwrap();
     let _claims = validate::decode_auth_token(&token);
@@ -82,7 +82,7 @@ lazy_static! {
 ///
 /// # Returns
 /// - tera::Context
-fn get_context(data: &User, path: &String) -> Context {
+fn get_context(data: &NewUser, path: &String) -> Context {
     let mut context = Context::new();
 
     context.insert("username", &data.username);

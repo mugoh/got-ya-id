@@ -1,0 +1,3 @@
+[print_schema]
+file = "src/diesel_cfg/schema.rs"
+with_docs = true

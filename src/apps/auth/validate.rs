@@ -2,7 +2,7 @@
 
 use std::{env, error, process};
 
-use crate::apps::user::models::User;
+use crate::apps::user::models::NewUser;
 use crate::config::config;
 
 use jsonwebtoken as jwt;
@@ -19,7 +19,7 @@ pub struct Claims {
 }
 
 /// Encodes a JWT token with user details {email, username}
-pub fn encode_jwt_token(user: User) -> Result<String, Box<dyn error::Error>> {
+pub fn encode_jwt_token(user: NewUser) -> Result<String, Box<dyn error::Error>> {
     let payload = Claims {
         sub: user.email.unwrap().to_owned(),
         username: user.username.unwrap().to_owned(),
