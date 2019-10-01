@@ -7,7 +7,7 @@ use crate::core::mail;
 use crate::core::response;
 
 use lazy_static;
-use log::debug;
+use log::error;
 use url::Url;
 
 use actix_web::{http, web, HttpResponse};
@@ -30,23 +30,25 @@ pub fn register_user(data: web::Json<NewUser>) -> HttpResponse {
     let path = format!(r"http://{:?}", &token);
     let path = Url::parse(&path).unwrap();
 
+    let user = data.save();
+    println!("{:?}", user);
+    std::process::exit(2);
     // Mail
     let context: Context = get_context(&data.0, &path.to_string());
     match TEMPLATE.render("email_activation.html", &context) {
         Ok(s) => {
-            println!("{}", s);
             let mut mail = mail::Mail::new(
                 &data.0.email.clone().unwrap(),
                 &data.0.username.clone().unwrap(),
                 "Email activation".to_string(),
                 &s,
             );
-            mail.send().unwrap();
+            // mail.send().unwrap();
         }
 
         Err(e) => {
             for er in e.iter().skip(1) {
-                debug!("Reason: {}", er);
+                error!("Reason: {}", er);
             }
         }
     };

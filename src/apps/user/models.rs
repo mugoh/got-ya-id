@@ -1,59 +1,38 @@
 //! This module holds items related to data manipulation
 //! for the User Object
 
-use crate::diesel_cfg::schema::users;
+use crate::apps::user::utils::{validate_name, validate_pass};
+use crate::diesel_cfg::{config::connect_to_db, schema::users};
+
 use serde::{Deserialize, Serialize};
 use validator::Validate;
 use validator_derive::Validate;
 
-use crate::apps::user::utils::{validate_name, validate_pass};
+use chrono::prelude::*;
+use chrono::NaiveDateTime;
+use diesel::{self, pg::PgConnection, prelude::*};
 
 /// User Object
 /// Holds user data
-#[derive(Debug, Clone, Validate, Serialize, Deserialize)]
-pub struct User_ {
-    #[validate(length(min = 5), custom = "validate_name")]
-    pub username: Option<String>,
-    #[validate(
-        length(min = 8, message = "Password should be at least 8 characters long"),
-        custom = "validate_pass"
-    )]
-    password: Option<String>,
-    #[validate(
-        length(
-            min = 5,
-            message = "Name should be at least 5 characters and contain letters only"
-        ),
-        custom = "validate_name"
-    )]
-    first_name: Option<String>,
-    #[validate(
-        length(
-            min = 5,
-            message = "Name should be at least 5 characters and contain letters only"
-        ),
-        custom = "validate_name"
-    )]
-    last_name: Option<String>,
-    #[validate(
-        length(
-            min = 5,
-            message = "Name should be at least 5 characters and contain letters only"
-        ),
-        custom = "validate_name"
-    )]
-    middle_name: Option<String>,
-    #[validate(email(message = "Email format not invented yet"))]
-    pub email: Option<String>,
-    #[validate(length(min = 5, code = "phone", message = "Invalid phone number"))]
+#[derive(Queryable, Debug, Clone, Validate)]
+pub struct User {
+    id: i32,
+    pub username: String,
+    pub email: String,
+    password: String,
     phone: Option<String>,
+    first_name: Option<String>,
+    middle_name: Option<String>,
+    last_name: Option<String>,
+    created_at: NaiveDateTime,
+    is_active: bool,
+    is_verified: bool,
 }
 
 /// Temporary holds new User data
 /// User Record for new User entries
-#[derive(Insertable)]
+#[derive(Debug, Clone, Validate, Serialize, Deserialize, Insertable)]
 #[table_name = "users"]
-#[derive(Debug, Clone, Validate, Serialize, Deserialize)]
 pub struct NewUser {
     #[validate(length(min = 5), custom = "validate_name")]
     pub username: Option<String>,
@@ -71,6 +50,19 @@ pub struct NewUser {
     )]
     #[validate(email(message = "Email format not invented yet"))]
     pub email: Option<String>,
+}
+
+impl NewUser {
+    /// Saves a new user record to the db
+    ///
+    /// # Returns
+    /// User
+    pub fn save(&self) -> User {
+        diesel::insert_into(users::table)
+            .values(self)
+            .get_result(&connect_to_db())
+            .expect("Error saving user")
+    }
 }
 
 /*
