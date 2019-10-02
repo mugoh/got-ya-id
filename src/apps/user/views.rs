@@ -23,14 +23,29 @@ use validator::Validate;
 /// - On Sucess: JSONResponse
 /// - On ERROR: JSONErrResponse
 ///
-pub fn register_user(data: web::Json<NewUser>) -> HttpResponse {
+pub fn register_user(mut data: web::Json<NewUser>) -> HttpResponse {
     let user_ = data.0.clone();
     let token = validate::encode_jwt_token(user_).unwrap();
     let _claims = validate::decode_auth_token(&token);
     let path = format!(r"http://{:?}", &token);
     let path = Url::parse(&path).unwrap();
 
-    let user = data.save();
+    if let Err(err) = data.validate() {
+        let res: response::JsonErrResponse<_> =
+            response::JsonErrResponse::new(http::StatusCode::BAD_REQUEST.to_string(), err);
+        return HttpResponse::build(http::StatusCode::BAD_REQUEST).json(&res);
+        // Filter json where message is not null
+    };
+
+    let user = match data.save() {
+        Ok(saved_user) => saved_user,
+        Err(e) => {
+            let res: response::JsonErrResponse<_> =
+                response::JsonErrResponse::new("409".to_string(), e);
+            return HttpResponse::build(http::StatusCode::CONFLICT).json(&res);
+        }
+    };
+
     println!("{:?}", user);
     std::process::exit(2);
     // Mail
@@ -38,8 +53,8 @@ pub fn register_user(data: web::Json<NewUser>) -> HttpResponse {
     match TEMPLATE.render("email_activation.html", &context) {
         Ok(s) => {
             let mut mail = mail::Mail::new(
-                &data.0.email.clone().unwrap(),
-                &data.0.username.clone().unwrap(),
+                &data.0.email.clone(),
+                &data.0.username.clone(),
                 "Email activation".to_string(),
                 &s,
             );
@@ -53,17 +68,11 @@ pub fn register_user(data: web::Json<NewUser>) -> HttpResponse {
         }
     };
 
-    if let Err(err) = data.validate() {
-        let res: response::JsonErrResponse<_> =
-            response::JsonErrResponse::new(http::StatusCode::BAD_REQUEST.to_string(), err);
-        return HttpResponse::build(http::StatusCode::BAD_REQUEST).json(&res);
-        // Filter json where message is not null
-    };
     let res: response::JsonResponse<_> = response::JsonResponse::new(
         http::StatusCode::CREATED.to_string(),
         format!(
             "Success. An activation link sent to {}",
-            &data.0.email.clone().unwrap()
+            &data.0.email.clone()
         ),
         data.0.clone(),
     );

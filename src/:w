@@ -52,49 +52,29 @@ impl NewUser {
     ///
     /// # Returns
     /// User
-    pub fn save(&mut self) -> Result<User, String> {
-        match self.is_unique() {
-            Ok(_) => (),
-            Err(e) => {
-                return Err(format!(
-                    "{key} Oopsy! {field} already in use",
-                    key = e.0,
-                    field = e.1
-                ))
-            }
-        }
+    pub fn save(&mut self) -> Result<User, &'static str> {
+        /*let present_user = users
+        .filter(email.eq(&self.email))
+        .or_filter(username.eq(&self.username))
+        .select((email, username))
+        .get_results::<Option<String>>(&connect_to_db)
+        .unwrap();*/
+        let present_user = users
+            .filter(email.eq(&self.email))
+            .select(email)
+            .first::<String>(&connect_to_db());
+        println!("{:?}", present_user);
         match hash(&self.password, DEFAULT_COST) {
             Ok(h) => self.password = h,
             Err(e) => {
                 error!("{}", &format!("{:?}", e));
-                return Err("Failed to hash password".to_string());
+                return Err("Failed to hash password");
             }
         };
         Ok(diesel::insert_into(users::table)
             .values(&*self) // diesel::Insertable unimplemented for &mut
             .get_result(&connect_to_db())
             .expect("Error saving user"))
-    }
-
-    /// Checks if the Email and Username given
-    /// are present
-    fn is_unique(&self) -> Result<(), (String, String)> {
-        let present_user = users
-            .filter(email.eq(&self.email))
-            .or_filter(username.eq(&self.username))
-            .select((email, username))
-            .get_results::<(String, String)>(&connect_to_db())
-            .unwrap();
-
-        for rec in &present_user {
-            let (email_, username_) = rec;
-            if email_.eq(&self.email) {
-                return Err(("Email: ".to_string(), email_.to_string()));
-            } else if username_.eq(&self.username) {
-                return Err(("Username: ".to_string(), username_.to_string()));
-            }
-        }
-        Ok(())
     }
 }
 

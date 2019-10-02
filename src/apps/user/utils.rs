@@ -15,7 +15,7 @@ pub fn validate_name(name: &str) -> Result<(), ValidationError> {
         static ref NAME_PATTERN: Regex = Regex::new(r"^[a-zA-Z]+$").unwrap();
     }
     if !NAME_PATTERN.is_match(name) {
-        return Err(ValidationError::new("Name should contain letters only"));
+        return Err(ValidationError::new("Name should only contain letters"));
     }
     Ok(())
 }
@@ -30,10 +30,12 @@ pub fn validate_name(name: &str) -> Result<(), ValidationError> {
 /// If the validation fails
 pub fn validate_pass(pass: &str) -> Result<(), ValidationError> {
     lazy_static! {
-        static ref PASSWORD: Regex = Regex::new(r"^.{1,25}$").unwrap();
+        static ref PASSWORD: Regex = Regex::new(r"^.{6,25}$").unwrap();
     }
     if !PASSWORD.is_match(pass) {
-        return Err(ValidationError::new("Password too short"));
+        return Err(ValidationError::new(
+            "Password should contain:\n At least 6 characters",
+        ));
     }
     Ok(())
 }

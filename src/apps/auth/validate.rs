@@ -21,8 +21,8 @@ pub struct Claims {
 /// Encodes a JWT token with user details {email, username}
 pub fn encode_jwt_token(user: NewUser) -> Result<String, Box<dyn error::Error>> {
     let payload = Claims {
-        sub: user.email.unwrap().to_owned(),
-        username: user.username.unwrap().to_owned(),
+        sub: user.email.to_owned(),
+        username: user.username.to_owned(),
         company: "ACME".to_owned(),
         exp: 10000000000,
     };
