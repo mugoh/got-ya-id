@@ -8,9 +8,15 @@ pub fn api(cfg: &mut web::ServiceConfig) {
     cfg.service(
         web::scope("/api")
             .service(
-                web::resource("/auth")
+                web::scope("/auth")
+                .service(
+                    web::resource("")
                     .route(web::post().to(user::views::register_user))
                    // .route(web::get().to(|| "")),
+            )
+            .service(
+                web::resource("/login")
+                .route(web::post().to_async(user::views::login))),
             )
             .service(web::resource("/").route(web::get().to(|| "Aha")))
             .default_service(

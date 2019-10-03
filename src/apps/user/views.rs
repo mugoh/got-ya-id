@@ -2,7 +2,7 @@
 //!
 
 use crate::apps::auth::validate;
-use crate::apps::user::models::NewUser;
+use crate::apps::user::models::{NewUser, SignInUser};
 use crate::core::mail;
 use crate::core::response;
 
@@ -78,6 +78,19 @@ pub fn register_user(mut data: web::Json<NewUser>) -> HttpResponse {
     );
 
     HttpResponse::build(http::StatusCode::CREATED).json(&res)
+}
+
+/// Logs in registered user
+///
+/// # method: POST
+///
+pub fn login(user: web::Json<SignInUser>) -> HttpResponse {
+    let u = user
+        .0
+        .validate()
+        .map(|u| u)
+        .map_err(|e| response::JsonErrResponse::new("400".to_string(), e));
+    HttpResponse::build(http::StatusCode::OK).json(u)
 }
 
 lazy_static! {

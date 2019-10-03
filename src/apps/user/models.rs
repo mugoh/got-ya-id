@@ -2,7 +2,7 @@
 //! for the User Object
 
 use crate::apps::user::utils::validate_name;
-use crate::diesel_cfg::{config::connect_to_db, schema::users, schema::users::dsl::*};
+use crate::diesel_cfg::{config::connect_to_db, schema::users};
 
 use serde::{Deserialize, Serialize};
 use validator::Validate;
@@ -79,6 +79,8 @@ impl NewUser {
     /// Checks if the Email and Username given
     /// are present
     fn is_unique(&self) -> Result<(), (String, String)> {
+        use crate::diesel_cfg::schema::users::dsl::*;
+
         let present_user = users
             .filter(email.eq(&self.email))
             .or_filter(username.eq(&self.username))
@@ -110,4 +112,13 @@ impl User {
     fn verify_pass<'a>(&self, pass: &'a str) -> bool {
         verify(pass, &self.password).unwrap()
     }
+}
+
+/// Holds Sign-In user details
+#[derive(Deserialize, Serialize, Validate)]
+pub struct SignInUser {
+    #[validate(email(message = "Oops! Email format not invented yet"))]
+    email: Option<String>,
+    username: Option<String>,
+    password: String,
 }
