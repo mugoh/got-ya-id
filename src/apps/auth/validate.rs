@@ -39,7 +39,7 @@ pub fn encode_jwt_token(user: NewUser) -> Result<String, Box<dyn error::Error>> 
 
     match encode(&header, &payload, key.as_ref()) {
         Ok(t) => Ok(t),
-        Err(e) => Result::Err(Box::new(e)), // println!("{:?}", e),
+        Err(e) => Result::Err(Box::new(e)),
     }
 }
 

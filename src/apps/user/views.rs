@@ -7,10 +7,11 @@ use crate::core::mail;
 use crate::core::response;
 
 use lazy_static;
-use log::error;
+use log::{debug, error};
 use url::Url;
 
 use actix_web::{http, web, HttpResponse};
+use serde_json::json;
 use tera::{self, Context, Tera};
 use validator::Validate;
 
@@ -85,12 +86,43 @@ pub fn register_user(mut data: web::Json<NewUser>) -> HttpResponse {
 /// # method: POST
 ///
 pub fn login(user: web::Json<SignInUser>) -> HttpResponse {
-    let u = user
-        .0
-        .validate()
-        .map(|u| u)
-        .map_err(|e| response::JsonErrResponse::new("400".to_string(), e));
-    HttpResponse::build(http::StatusCode::OK).json(u)
+    if let Err(err) = user.validate() {
+        let res = response::JsonErrResponse::new("400".to_string(), err);
+        return HttpResponse::build(http::StatusCode::BAD_REQUEST).json(&res);
+    };
+    if user.has_credentials() {
+        let res =
+            response::JsonErrResponse::new("400".to_string(), "Oh-uh, provide a username or email");
+        return HttpResponse::build(http::StatusCode::BAD_REQUEST).json(&res);
+    }
+    let res = match user.sign_in() {
+        Ok(cred) => match user.create_token(&cred) {
+            Ok(s) => response::JsonResponse::new(
+                http::StatusCode::OK.to_string(),
+                "Login Success".to_string(),
+                json!(
+                    { "user": &cred,
+                      "token": &s
+                    }
+                ),
+            ),
+            Err(e) => {
+                debug!("{:?}", e);
+                let e = response::JsonErrResponse::new("500".to_string(), e.to_string());
+                return HttpResponse::build(http::StatusCode::INTERNAL_SERVER_ERROR).json(e);
+            }
+        },
+        Err(_) => {
+            return HttpResponse::build(http::StatusCode::UNAUTHORIZED).json(
+                response::JsonErrResponse::new(
+                    "401".to_string(),
+                    "Could not find details that match you. Just try again.",
+                ),
+            )
+        }
+    };
+
+    HttpResponse::build(http::StatusCode::OK).json(res)
 }
 
 lazy_static! {
