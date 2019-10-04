@@ -66,7 +66,6 @@ impl Mail {
             Err(e) => Result::Err(e),
         };
 
-        // Ok(status.is_ok())
         status
     }
 }
@@ -81,16 +80,3 @@ pub fn get_env_var<'a>(keys: Vec<&'a str>, values: &mut Vec<String>) -> () {
         values.push(val);
     }
 }
-
-/*
- *
- * fn g() {
-    let mut a = Mail::new(
-        "".to_string(),
-        "".to_string(),
-        "".to_string(),
-        "".to_string(),
-    );
-    a.mailer.send(a.email.into());
-}
-*/

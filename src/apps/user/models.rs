@@ -14,7 +14,7 @@ use validator_derive::Validate;
 use bcrypt::{hash, verify, DEFAULT_COST};
 use chrono::NaiveDateTime;
 use diesel::{self, prelude::*};
-use log::error;
+use log::{debug, error};
 
 use jsonwebtoken as jwt;
 use jwt::{encode, Header};
@@ -115,58 +115,8 @@ impl User {
     /// # Returns
     ///
     /// bool: True -> Verified, False -> Fail
-    fn verify_pass<'a>(&self, pass: &'a str) -> bool {
-        verify(pass, &self.password).unwrap()
-    }
-}
-
-/// Holds Sign-In user details
-#[derive(Deserialize, Serialize, Validate)]
-pub struct SignInUser {
-    #[validate(email(message = "Oops! Email format not invented yet"))]
-    email: Option<String>,
-    username: Option<String>,
-    password: String,
-}
-
-impl SignInUser {
-    /// Signs in User
-    ///
-    /// - Checks if user is registered
-    pub fn sign_in(&self) -> Result<String, diesel::result::Error> {
-        use crate::diesel_cfg::schema::users::dsl::*;
-
-        let (key, identity) = if self.email.is_some() {
-            ("email", &self.email)
-        } else {
-            ("username", &self.username)
-        };
-
-        let query = match &key {
-            &"email" => users
-                .filter(email.eq(self.email.clone().unwrap()))
-                .select(email)
-                .first::<String>(&connect_to_db()),
-            _ => users
-                .filter(username.eq(self.username.clone().unwrap()))
-                .select(username)
-                .first::<String>(&connect_to_db()),
-        };
-        query
-    }
-
-    /// Verifies the given Sign In detail contains
-    /// either a Username or an Email
-    ///
-    /// # Returns
-    /// bool
-    ///
-    /// - True: For at least 1 is_some() true evaluation
-    /// - False: is_none() for both email and username
-    pub fn has_credentials(&self) -> bool {
-        vec![&self.username, &self.email]
-            .iter()
-            .all(|&x| x.is_none())
+    pub fn verify_pass<'a>(&self, pass: &'a str) -> Result<bool, ()> {
+        verify(pass, &self.password).map_err(|e| debug!("{:?}", e))
     }
 
     /// Creates an authorization token encoded with the
@@ -190,6 +140,61 @@ impl SignInUser {
             Ok(t) => Ok(t),
             Err(e) => Result::Err(Box::new(e)),
         }
+    }
+}
+
+/// Holds Sign-In user details
+#[derive(Deserialize, Serialize, Validate)]
+pub struct SignInUser {
+    #[validate(email(message = "Oops! Email format not invented yet"))]
+    email: Option<String>,
+    username: Option<String>,
+    password: String,
+}
+
+impl SignInUser {
+    /// Signs in User
+    ///
+    /// - Checks if user is registered
+    pub fn sign_in(&self) -> Result<Vec<User>, diesel::result::Error> {
+        use crate::diesel_cfg::schema::users::dsl::*;
+
+        let (key, identity) = if self.email.is_some() {
+            ("email", &self.email)
+        } else {
+            ("username", &self.username)
+        };
+
+        let query = match &key {
+            &"email" => users
+                .filter(email.eq(identity.clone().unwrap()))
+                // .select(email)
+                .load::<User>(&connect_to_db()),
+            _ => users
+                .filter(username.eq(identity.clone().unwrap()))
+                // .select(username)
+                .load::<User>(&connect_to_db()),
+        };
+        query
+    }
+
+    /// Verifies the given Sign In detail contains
+    /// either a Username or an Email
+    ///
+    /// # Returns
+    /// bool
+    ///
+    /// - True: For at least 1 is_some() true evaluation
+    /// - False: is_none() for both email and username
+    pub fn has_credentials(&self) -> bool {
+        vec![&self.username, &self.email]
+            .iter()
+            .all(|&x| x.is_none())
+    }
+
+    /// Retreives the password field given on sign in
+    pub fn get_password(&self) -> &String {
+        &self.password
     }
 }
 
