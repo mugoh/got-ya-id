@@ -5,6 +5,7 @@ use std::{env, error, process};
 use crate::apps::user::models::NewUser;
 use crate::config::config;
 
+use chrono::{prelude::*, Duration};
 use jsonwebtoken as jwt;
 use jwt::{decode, encode, Header, Validation};
 use serde_derive::{Deserialize, Serialize};
@@ -24,7 +25,7 @@ pub fn encode_jwt_token(user: NewUser) -> Result<String, Box<dyn error::Error>> 
         sub: user.email.to_owned(),
         username: user.username.to_owned(),
         company: "ACME".to_owned(),
-        exp: 10000000000,
+        exp: (Utc::now() + Duration::hours(36)).timestamp() as usize,
     };
 
     // ENV Configuration
@@ -67,7 +68,7 @@ pub fn decode_auth_token(token: &String) -> Result<Claims, Box<dyn error::Error>
 
     let decoded_token = match decode::<Claims>(&token, key.as_ref(), &Validation::default()) {
         Ok(c) => c,
-        Err(e) => return Result::Err(Box::new(e)), // println!("{:?}", e),
+        Err(e) => return Result::Err(Box::new(e)),
     };
     Ok(decoded_token.claims)
 }

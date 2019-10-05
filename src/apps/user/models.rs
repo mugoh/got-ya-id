@@ -12,7 +12,7 @@ use validator::Validate;
 use validator_derive::Validate;
 
 use bcrypt::{hash, verify, DEFAULT_COST};
-use chrono::NaiveDateTime;
+use chrono::{prelude::*, Duration, NaiveDateTime};
 use diesel::{self, prelude::*};
 use log::{debug, error};
 
@@ -124,7 +124,7 @@ impl User {
     pub fn create_token(&self, user_cred: &String) -> Result<String, Box<dyn error::Error>> {
         let payload = Claims {
             company: user_cred.to_owned(),
-            exp: 10000000000,
+            exp: (Utc::now() + Duration::seconds(75)).timestamp() as usize,
         };
 
         // ENV Configuration
