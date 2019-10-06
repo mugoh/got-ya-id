@@ -137,6 +137,23 @@ pub fn login(user: web::Json<SignInUser>) -> HttpResponse {
     HttpResponse::build(http::StatusCode::OK).json(res)
 }
 
+/// Verifies a user's account.
+/// The user is retrived from the token passed in the URL Path
+pub fn verify_user(path: web::Path::<String>) ->HttpResponse {
+    match validate::decode_auth_token(path) {
+        Ok(t) => {
+            let status = http::StatusCode::OK;
+            let res = response::JsonResponse::new(status.to_sting();
+            },
+        format!("Success. The account {} has been verified.", t.sub)),
+        Err(e) => {
+            let status = http::StatusCode::FORBIDDEN;
+            let res = response::JsonErrResponse::new(status.to_string(),"Account verification failed");
+    },
+    Http::build(status).json(&res)
+
+}
+
 lazy_static! {
     /// Lazily Compiles Templates
     static ref TEMPLATE: Tera = {
