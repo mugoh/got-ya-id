@@ -139,19 +139,25 @@ pub fn login(user: web::Json<SignInUser>) -> HttpResponse {
 
 /// Verifies a user's account.
 /// The user is retrived from the token passed in the URL Path
-pub fn verify_user(path: web::Path::<String>) ->HttpResponse {
-    match validate::decode_auth_token(path) {
+pub fn verify(path: web::Path<String>) -> HttpResponse {
+    let status;
+    let res;
+    match validate::decode_auth_token(&path) {
         Ok(t) => {
-            let status = http::StatusCode::OK;
-            let res = response::JsonResponse::new(status.to_sting();
-            },
-        format!("Success. The account {} has been verified.", t.sub)),
+            status = http::StatusCode::OK;
+            let res = response::JsonResponse::new(
+                status.to_string(),
+                format!("Success. The account {} has been verified.", t.sub),
+                "",
+            );
+        }
         Err(e) => {
-            let status = http::StatusCode::FORBIDDEN;
-            let res = response::JsonErrResponse::new(status.to_string(),"Account verification failed");
-    },
-    Http::build(status).json(&res)
-
+            status = http::StatusCode::FORBIDDEN;
+            let res =
+                response::JsonErrResponse::new(status.to_string(), "Account verification failed");
+        }
+    };
+    HttpResponse::build(status).json(&res)
 }
 
 lazy_static! {

@@ -1,6 +1,7 @@
 //! This module holds items related to data manipulation
 //! for the User Object
 
+use crate::apps::auth::validate;
 use crate::apps::user::utils::validate_name;
 use crate::config::config;
 use crate::diesel_cfg::{config::connect_to_db, schema::users};
@@ -140,6 +141,25 @@ impl User {
             Ok(t) => Ok(t),
             Err(e) => Result::Err(Box::new(e)),
         }
+    }
+
+    /// Decodes the auth token representing a user
+    /// to return an user object with a verified account
+    pub fn verify_user(user_key: &String) -> Result<User, Box<dyn std::error::Error>> {
+        use crate::diesel_cfg::schema::users::dsl::*;
+        let user = match validate::decode_auth_token(user_key) {
+            Ok(user_detail) => user_detail.sub,
+            Err(e) => {
+                // return (status code, e)
+                return Result::Err(Box::new(e));
+            }
+        };
+        let user = diesel::update(users.filter(email.eq(&user)))
+            .set(is_verified.eq(true))
+            .get_result::<User>(&connect_to_db())
+            .unwrap();
+
+        Ok(user)
     }
 }
 

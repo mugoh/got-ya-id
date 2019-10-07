@@ -3,6 +3,10 @@
 //! is processed
 use serde::{Deserialize, Serialize};
 
+trait Response {
+    fn close(&self);
+}
+
 /// Response to User on Success
 /// Deserialized to JSON
 #[derive(Deserialize, Serialize, Debug)]

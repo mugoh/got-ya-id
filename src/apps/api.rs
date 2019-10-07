@@ -9,17 +9,16 @@ pub fn api(cfg: &mut web::ServiceConfig) {
         web::scope("/api")
             .service(
                 web::scope("/auth")
-                .service(
-                    web::resource("")
-                    .route(web::post().to(user::views::register_user))
-                   // .route(web::get().to(|| "")),
-            )
-            .service(
-                web::resource("/login")
-                .route(web::post().to_async(user::views::login))),
-            .service(
-                web::resource("/verify/{token}")
-                .route(web::get().to_async(user::views::verify_user))),
+                    .service(
+                        web::resource("").route(web::post().to(user::views::register_user)), // .route(web::get().to(|| "")),
+                    )
+                    .service(
+                        web::resource("/login").route(web::post().to_async(user::views::login)),
+                    )
+                    .service(
+                        web::resource("/verify/{token}")
+                            .route(web::get().to_async(user::views::verify)),
+                    ),
             )
             .service(web::resource("/").route(web::get().to(|| "Aha")))
             .default_service(
