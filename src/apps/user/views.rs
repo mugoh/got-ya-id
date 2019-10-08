@@ -2,7 +2,7 @@
 //!
 
 use crate::apps::auth::validate;
-use crate::apps::user::models::{NewUser, SignInUser};
+use crate::apps::user::models::{NewUser, SignInUser, User};
 use crate::core::mail;
 use crate::core::response;
 
@@ -28,7 +28,9 @@ pub fn register_user(mut data: web::Json<NewUser>) -> HttpResponse {
     let user_ = data.0.clone();
     let token = validate::encode_jwt_token(user_).unwrap();
     let _claims = validate::decode_auth_token(&token);
-    let path = format!(r"http://{:?}", &token);
+
+    // -> Extract host info from req Headers
+    let path = format!(r"http://localhost:8888/api/verify/{}", &token);
     let path = Url::parse(&path).unwrap();
 
     if let Err(err) = data.validate() {
@@ -95,6 +97,14 @@ pub fn login(user: web::Json<SignInUser>) -> HttpResponse {
     }
     let res = match user.sign_in() {
         Ok(usr_vec) => {
+            if usr_vec.is_empty() {
+                return HttpResponse::build(http::StatusCode::UNAUTHORIZED).json(
+                    response::JsonErrResponse::new(
+                        http::StatusCode::UNAUTHORIZED.to_string(),
+                        "Could not find details that match you. Just try again.",
+                    ),
+                );
+            }
             let usr = &usr_vec[0];
             if !usr.verify_pass(user.get_password()).unwrap() {
                 let status = http::StatusCode::UNAUTHORIZED;
@@ -124,11 +134,14 @@ pub fn login(user: web::Json<SignInUser>) -> HttpResponse {
                 }
             }
         }
-        Err(_) => {
+        Err(e) => {
             return HttpResponse::build(http::StatusCode::UNAUTHORIZED).json(
                 response::JsonErrResponse::new(
                     http::StatusCode::UNAUTHORIZED.to_string(),
-                    "Could not find details that match you. Just try again.",
+                    format!(
+                        "Could not find details that match you. Just try again. : {}",
+                        e
+                    ),
                 ),
             );
         }
@@ -140,24 +153,27 @@ pub fn login(user: web::Json<SignInUser>) -> HttpResponse {
 /// Verifies a user's account.
 /// The user is retrived from the token passed in the URL Path
 pub fn verify(path: web::Path<String>) -> HttpResponse {
-    let status;
-    let res;
-    match validate::decode_auth_token(&path) {
-        Ok(t) => {
-            status = http::StatusCode::OK;
+    match User::verify_user(&path) {
+        Ok(user) => {
             let res = response::JsonResponse::new(
-                status.to_string(),
-                format!("Success. The account {} has been verified.", t.sub),
-                "",
+                http::StatusCode::OK.to_string(),
+                format!("Success. Account of email {} verified", user.email),
+                json!({
+                    "username": &user.username,
+                    "email": &user.email,
+                    "is_verified": &user.is_verified
+                }),
             );
+            return HttpResponse::build(http::StatusCode::OK).json(&res);
         }
         Err(e) => {
-            status = http::StatusCode::FORBIDDEN;
-            let res =
-                response::JsonErrResponse::new(status.to_string(), "Account verification failed");
+            let res = response::JsonErrResponse::new(
+                http::StatusCode::FORBIDDEN.to_string(),
+                format!("Account verification failed: {}", e),
+            );
+            return HttpResponse::build(http::StatusCode::FORBIDDEN).json(&res);
         }
     };
-    HttpResponse::build(status).json(&res)
 }
 
 lazy_static! {

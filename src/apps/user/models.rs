@@ -35,7 +35,7 @@ pub struct User {
     created_at: NaiveDateTime,
     updated_at: NaiveDateTime,
     is_active: bool,
-    is_verified: bool,
+    pub is_verified: bool,
 }
 
 /// Temporary holds new User data
@@ -145,13 +145,13 @@ impl User {
 
     /// Decodes the auth token representing a user
     /// to return an user object with a verified account
-    pub fn verify_user(user_key: &String) -> Result<User, Box<dyn std::error::Error>> {
+    pub fn verify_user(user_key: &String) -> Result<User, Box<dyn error::Error>> {
         use crate::diesel_cfg::schema::users::dsl::*;
         let user = match validate::decode_auth_token(user_key) {
             Ok(user_detail) => user_detail.sub,
             Err(e) => {
                 // return (status code, e)
-                return Result::Err(Box::new(e));
+                return Err(e.into());
             }
         };
         let user = diesel::update(users.filter(email.eq(&user)))
