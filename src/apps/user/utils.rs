@@ -1,6 +1,9 @@
 use lazy_static;
 use regex::Regex;
+use tera::Context;
 use validator::ValidationError;
+
+use crate::apps::user::models::{NewUser, User};
 
 /// Validates name
 /// - Ensures the name input is composed of alphabet characters
@@ -38,4 +41,26 @@ pub fn validate_pass(pass: &str) -> Result<(), ValidationError> {
         ));
     }
     Ok(())
+}
+
+/// Returns the context holding the template variables
+///
+/// # Returns
+/// - tera::Context
+pub fn get_context(data: &NewUser, path: &String) -> Context {
+    let mut context = Context::new();
+
+    context.insert("username", &data.username);
+    context.insert("link", path);
+    context
+}
+
+/// Template holding context for password reset
+/// Receives a User ref
+pub fn get_reset_context(data: &User, path: &String) -> Context {
+    let mut context = Context::new();
+
+    context.insert("username", &data.username);
+    context.insert("link", path);
+    context
 }

@@ -54,6 +54,14 @@ pub struct NewUser {
     pub email: String,
 }
 
+/// Holds data passed on Password-reset request
+#[derive(Debug, Serialize, Deserialize, Validate)]
+pub struct PassResetData {
+    #[validate(email(message = "Email format not invented yet"))]
+    pub email: String,
+    pub password: String,
+}
+
 impl NewUser {
     /// Saves a new user record to the db
     ///
@@ -160,6 +168,26 @@ impl User {
             .unwrap();
 
         Ok(user)
+    }
+
+    /// Finds a user by email
+    ///
+    /// # Returns
+    ///
+    /// ## Result
+    /// OK -> User object that matches the given email
+    /// ERR -> String
+    pub fn find_by_email(given_email: &String) -> Result<Vec<User>, String> {
+        use crate::diesel_cfg::schema::users::dsl::{email, users};
+
+        let user = users
+            .filter(email.eq(given_email))
+            .load::<User>(&connect_to_db())
+            .unwrap();
+        match user.is_empty() {
+            false => Ok(user),
+            _ => Err(format!("User of email {} nonexistent", given_email)),
+        }
     }
 }
 

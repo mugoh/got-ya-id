@@ -1,8 +1,9 @@
 //! Handles views for User items
 //!
 
+use super::utils::{get_context, get_reset_context};
 use crate::apps::auth::validate;
-use crate::apps::user::models::{NewUser, SignInUser, User};
+use crate::apps::user::models::{NewUser, PassResetData, SignInUser, User};
 use crate::core::mail;
 use crate::core::response;
 
@@ -176,6 +177,64 @@ pub fn verify(path: web::Path<String>) -> HttpResponse {
     };
 }
 
+/// Sends a Password Reset Email
+///
+/// # method
+/// ## POST
+pub fn send_reset_email(data: web::Json<PassResetData>) -> HttpResponse {
+    if let Err(err) = data.validate() {
+        let res = response::JsonErrResponse::new("400".to_string(), err);
+        return HttpResponse::build(http::StatusCode::BAD_REQUEST).json(&res);
+    };
+    let user = match User::find_by_email(&data.email) {
+        Ok(usr) => {
+            if !&usr[0].verify_pass(data.password.as_str()).unwrap() {
+                let status = http::StatusCode::UNAUTHORIZED;
+                return HttpResponse::build(status).json(err_response(
+                    status.to_string(),
+                    "Could not find details that match you. Just try again.",
+                ));
+            }
+            usr
+        }
+        Err(_) => {
+            let status = http::StatusCode::UNAUTHORIZED;
+            return HttpResponse::build(status).json(err_response(
+                status.to_string(),
+                "Could not find details that match you. Just try again.",
+            ));
+        }
+    };
+    //
+    let user = &user[0];
+    let token = user.create_token(&user.email).unwrap();
+    let context: Context = get_reset_context(&user, &format!("http://{}", token));
+    match TEMPLATE.render("email_activation.html", &context) {
+        Ok(s) => {
+            let mut mail = mail::Mail::new(
+                &user.email,
+                &user.username,
+                "Password Reset".to_string(),
+                &s,
+            );
+            mail.send().unwrap();
+        }
+
+        Err(e) => {
+            for er in e.iter().skip(1) {
+                error!("Reason: {}", er);
+            }
+        }
+    };
+    let res = response::JsonResponse::new(
+        http::StatusCode::CREATED.to_string(),
+        format!("Success. A password reset link sent to {}", &user.email),
+        json!({"email": &user.email, "username": &user.username}),
+    );
+
+    HttpResponse::build(http::StatusCode::CREATED).json(&res)
+}
+
 lazy_static! {
     /// Lazily Compiles Templates
     static ref TEMPLATE: Tera = {
@@ -185,14 +244,7 @@ lazy_static! {
     };
 }
 
-/// Returns the context holding the template variables
-///
-/// # Returns
-/// - tera::Context
-fn get_context(data: &NewUser, path: &String) -> Context {
-    let mut context = Context::new();
-
-    context.insert("username", &data.username);
-    context.insert("link", path);
-    context
+/// Gives Err Json Response
+fn err_response<T>(status: String, msg: T) -> response::JsonErrResponse<T> {
+    response::JsonErrResponse::new(status, msg)
 }
