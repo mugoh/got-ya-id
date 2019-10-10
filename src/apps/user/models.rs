@@ -59,7 +59,13 @@ pub struct NewUser {
 pub struct PassResetData {
     #[validate(email(message = "Email format not invented yet"))]
     pub email: String,
+}
+
+/// Holds Account Password reset data
+#[derive(Debug, Serialize, Deserialize, Validate)]
+pub struct ResetPassData {
     pub password: String,
+    pass_confirmation: String,
 }
 
 impl NewUser {
@@ -168,6 +174,29 @@ impl User {
             .unwrap();
 
         Ok(user)
+    }
+
+    /// Alters the existing account password to match
+    /// the string passed as a new password.
+    pub fn reset_pass(token: &String, new_password: &String) -> Result<(), Box<dyn error::Error>> {
+        use crate::diesel_cfg::schema::users::dsl::*;
+
+        let user = match validate::decode_auth_token(token) {
+            Ok(usr) => usr.company,
+            Err(e) => return Err(e.into()),
+        };
+        let pass_hash = match hash(new_password, DEFAULT_COST) {
+            Ok(h) => h,
+            Err(e) => {
+                error!("{}", &format!("{:?}", e));
+                return Err(e.into());
+            }
+        };
+        diesel::update(users.filter(email.eq(&user)))
+            .set(password.eq(pass_hash))
+            .get_result::<User>(&connect_to_db())
+            .unwrap();
+        Ok(())
     }
 
     /// Finds a user by email

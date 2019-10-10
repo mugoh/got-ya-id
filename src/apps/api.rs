@@ -18,6 +18,14 @@ pub fn api(cfg: &mut web::ServiceConfig) {
                     .service(
                         web::resource("/verify/{token}")
                             .route(web::get().to_async(user::views::verify)),
+                    )
+                    .service(
+                        web::resource("/password/reset/{token}")
+                            .route(web::post().to_async(user::views::reset_password)),
+                    )
+                    .service(
+                        web::resource("/password/request")
+                            .route(web::post().to_async(user::views::send_reset_email)),
                     ),
             )
             .service(web::resource("/").route(web::get().to(|| "Aha")))

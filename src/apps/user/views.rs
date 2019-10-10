@@ -3,7 +3,7 @@
 
 use super::utils::{get_context, get_reset_context};
 use crate::apps::auth::validate;
-use crate::apps::user::models::{NewUser, PassResetData, SignInUser, User};
+use crate::apps::user::models::{NewUser, PassResetData, ResetPassData, SignInUser, User};
 use crate::core::mail;
 use crate::core::response;
 
@@ -187,16 +187,7 @@ pub fn send_reset_email(data: web::Json<PassResetData>) -> HttpResponse {
         return HttpResponse::build(http::StatusCode::BAD_REQUEST).json(&res);
     };
     let user = match User::find_by_email(&data.email) {
-        Ok(usr) => {
-            if !&usr[0].verify_pass(data.password.as_str()).unwrap() {
-                let status = http::StatusCode::UNAUTHORIZED;
-                return HttpResponse::build(status).json(err_response(
-                    status.to_string(),
-                    "Could not find details that match you. Just try again.",
-                ));
-            }
-            usr
-        }
+        Ok(usr) => usr,
         Err(_) => {
             let status = http::StatusCode::UNAUTHORIZED;
             return HttpResponse::build(status).json(err_response(
@@ -205,16 +196,16 @@ pub fn send_reset_email(data: web::Json<PassResetData>) -> HttpResponse {
             ));
         }
     };
-    //
     let user = &user[0];
     let token = user.create_token(&user.email).unwrap();
-    let context: Context = get_reset_context(&user, &format!("http://{}", token));
-    match TEMPLATE.render("email_activation.html", &context) {
+    let path = format!("http://{}", token);
+    let context: Context = get_reset_context(&user, &path);
+    match TEMPLATE.render("password_reset.html", &context) {
         Ok(s) => {
             let mut mail = mail::Mail::new(
                 &user.email,
                 &user.username,
-                "Password Reset".to_string(),
+                "Account password reset".to_string(),
                 &s,
             );
             mail.send().unwrap();
@@ -229,10 +220,39 @@ pub fn send_reset_email(data: web::Json<PassResetData>) -> HttpResponse {
     let res = response::JsonResponse::new(
         http::StatusCode::CREATED.to_string(),
         format!("Success. A password reset link sent to {}", &user.email),
-        json!({"email": &user.email, "username": &user.username}),
+        json!({"email": &user.email, "username": &user.username, "link": &path}),
     );
 
     HttpResponse::build(http::StatusCode::CREATED).json(&res)
+}
+
+/// Allows reset of user account passwords
+///
+/// # Method
+/// ## PUT
+///
+/// # url
+/// `auth/password/reset/{token}`
+///
+pub fn reset_password(data: web::Json<ResetPassData>, path: web::Path<String>) -> HttpResponse {
+    match User::reset_pass(&path, &data.password) {
+        Ok(_) => {
+            let res = response::JsonResponse::new(
+                http::StatusCode::OK.to_string(),
+                "Success. Account password changed".to_string(),
+                json!({"Password": &data.0.password }),
+            );
+
+            HttpResponse::build(http::StatusCode::CREATED).json(&res)
+        }
+        Err(e) => {
+            let status = http::StatusCode::UNAUTHORIZED;
+            HttpResponse::build(status).json(err_response(
+                status.to_string(),
+                format!("Failed to reset password: {:?}", e),
+            ))
+        }
+    }
 }
 
 lazy_static! {
