@@ -64,8 +64,10 @@ pub struct PassResetData {
 /// Holds Account Password reset data
 #[derive(Debug, Serialize, Deserialize, Validate)]
 pub struct ResetPassData {
+    #[validate(length(min = 5, message = "Give your password at least 5 characters"))]
     pub password: String,
-    pass_confirmation: String,
+    #[validate(must_match = "password")] // Can't give error message given on failed match
+    password_conf: String,
 }
 
 impl NewUser {
@@ -140,6 +142,7 @@ impl User {
         let payload = Claims {
             company: user_cred.to_owned(),
             exp: (Utc::now() + Duration::seconds(75)).timestamp() as usize,
+            sub: "login".to_string(),
         };
 
         // ENV Configuration
@@ -162,7 +165,7 @@ impl User {
     pub fn verify_user(user_key: &String) -> Result<User, Box<dyn error::Error>> {
         use crate::diesel_cfg::schema::users::dsl::*;
         let user = match validate::decode_auth_token(user_key) {
-            Ok(user_detail) => user_detail.sub,
+            Ok(user_detail) => user_detail.company,
             Err(e) => {
                 // return (status code, e)
                 return Err(e.into());
@@ -280,4 +283,5 @@ impl SignInUser {
 struct Claims {
     pub company: String,
     pub exp: usize,
+    sub: String,
 }

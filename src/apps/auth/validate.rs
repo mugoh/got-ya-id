@@ -14,7 +14,6 @@ use serde_derive::{Deserialize, Serialize};
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Claims {
     pub sub: String,
-    pub username: String,
     pub company: String,
     pub exp: usize,
 }
@@ -22,9 +21,8 @@ pub struct Claims {
 /// Encodes a JWT token with user details {email, username}
 pub fn encode_jwt_token(user: NewUser) -> Result<String, Box<dyn error::Error>> {
     let payload = Claims {
-        sub: user.email.to_owned(),
-        username: user.username.to_owned(),
-        company: "ACME".to_owned(),
+        company: user.email.to_owned(),
+        sub: "REG".to_owned(),
         exp: (Utc::now() + Duration::hours(36)).timestamp() as usize,
     };
 
@@ -52,7 +50,6 @@ pub fn encode_jwt_token(user: NewUser) -> Result<String, Box<dyn error::Error>> 
 ///
 /// struct Claims {
 ///    pub sub: String,
-///    pub username: String,
 ///    pub company: String,
 ///    pub exp: usize,
 /// }

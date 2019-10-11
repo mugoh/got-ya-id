@@ -31,8 +31,8 @@ pub fn register_user(mut data: web::Json<NewUser>) -> HttpResponse {
     let _claims = validate::decode_auth_token(&token);
 
     // -> Extract host info from req Headers
-    let path = format!(r"http://localhost:8888/api/verify/{}", &token);
-    let path = Url::parse(&path).unwrap();
+    let path = format!(r#"http://localhost:8888/api/auth/verify/{}"#, &token);
+    let path = Url::parse(&path).unwrap().to_string();
 
     if let Err(err) = data.validate() {
         let res: response::JsonErrResponse<_> =
@@ -51,7 +51,7 @@ pub fn register_user(mut data: web::Json<NewUser>) -> HttpResponse {
     };
 
     // Mail
-    let context: Context = get_context(&data.0, &path.to_string());
+    let context: Context = get_context(&data.0, &path);
     match TEMPLATE.render("email_activation.html", &context) {
         Ok(s) => {
             let mut mail = mail::Mail::new(
@@ -76,7 +76,7 @@ pub fn register_user(mut data: web::Json<NewUser>) -> HttpResponse {
             "Success. An activation link sent to {}",
             &data.0.email.clone()
         ),
-        json!({"email": &data.0.email, "username": &data.0.username}),
+        json!({"email": &data.0.email, "username": &data.0.username, "token": &token}),
     );
 
     HttpResponse::build(http::StatusCode::CREATED).json(&res)
@@ -154,11 +154,12 @@ pub fn login(user: web::Json<SignInUser>) -> HttpResponse {
 /// Verifies a user's account.
 /// The user is retrived from the token passed in the URL Path
 pub fn verify(path: web::Path<String>) -> HttpResponse {
+    println!("{}", path);
     match User::verify_user(&path) {
         Ok(user) => {
             let res = response::JsonResponse::new(
                 http::StatusCode::OK.to_string(),
-                format!("Success. Account of email {} verified", user.email),
+                format!("Success. Account of user {} verified", user.email),
                 json!({
                     "username": &user.username,
                     "email": &user.email,
@@ -188,17 +189,15 @@ pub fn send_reset_email(data: web::Json<PassResetData>) -> HttpResponse {
     };
     let user = match User::find_by_email(&data.email) {
         Ok(usr) => usr,
-        Err(_) => {
-            let status = http::StatusCode::UNAUTHORIZED;
-            return HttpResponse::build(status).json(err_response(
-                status.to_string(),
-                "Could not find details that match you. Just try again.",
-            ));
+        Err(e) => {
+            let status = http::StatusCode::NOT_FOUND;
+            return HttpResponse::build(status)
+                .json(err_response(status.to_string(), format!("{}", e)));
         }
     };
     let user = &user[0];
     let token = user.create_token(&user.email).unwrap();
-    let path = format!("http://{}", token);
+    let path = format!("http://api/auth/{}", token);
     let context: Context = get_reset_context(&user, &path);
     match TEMPLATE.render("password_reset.html", &context) {
         Ok(s) => {
@@ -218,32 +217,37 @@ pub fn send_reset_email(data: web::Json<PassResetData>) -> HttpResponse {
         }
     };
     let res = response::JsonResponse::new(
-        http::StatusCode::CREATED.to_string(),
+        http::StatusCode::OK.to_string(),
         format!("Success. A password reset link sent to {}", &user.email),
-        json!({"email": &user.email, "username": &user.username, "link": &path}),
+        json!({"email": &user.email, "username": &user.username, "link": &path, "token": token}),
     );
 
-    HttpResponse::build(http::StatusCode::CREATED).json(&res)
+    HttpResponse::build(http::StatusCode::OK).json(&res)
 }
 
 /// Allows reset of user account passwords
 ///
 /// # Method
-/// ## PUT
+/// ## PATCH
 ///
 /// # url
 /// `auth/password/reset/{token}`
 ///
 pub fn reset_password(data: web::Json<ResetPassData>, path: web::Path<String>) -> HttpResponse {
+    if let Err(err) = data.validate() {
+        let res = response::JsonErrResponse::new("400".to_string(), err);
+        return HttpResponse::build(http::StatusCode::BAD_REQUEST).json(&res);
+    };
+
     match User::reset_pass(&path, &data.password) {
         Ok(_) => {
             let res = response::JsonResponse::new(
                 http::StatusCode::OK.to_string(),
                 "Success. Account password changed".to_string(),
-                json!({"Password": &data.0.password }),
+                "",
             );
 
-            HttpResponse::build(http::StatusCode::CREATED).json(&res)
+            HttpResponse::build(http::StatusCode::OK).json(&res)
         }
         Err(e) => {
             let status = http::StatusCode::UNAUTHORIZED;
@@ -259,7 +263,7 @@ lazy_static! {
     /// Lazily Compiles Templates
     static ref TEMPLATE: Tera = {
         let mut tera = tera::compile_templates!("src/templates/*");
-        tera.autoescape_on(vec!["html", ".sql"]);
+        tera.autoescape_on(vec![".sql"]);
         tera
     };
 }
