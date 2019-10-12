@@ -2,6 +2,7 @@
 //! for the User Object
 
 use crate::apps::auth::validate;
+use crate::apps::profiles::models::NewProfile;
 use crate::apps::user::utils::validate_name;
 use crate::config::config;
 use crate::diesel_cfg::{config::connect_to_db, schema::users};
@@ -24,7 +25,7 @@ use jwt::{encode, Header};
 /// Holds user data
 #[derive(Queryable, Debug, Clone, Validate)]
 pub struct User {
-    id: i32,
+    pub id: i32,
     pub username: String,
     pub email: String,
     password: String,
@@ -93,10 +94,12 @@ impl NewUser {
                 return Err("Failed to hash password".to_string());
             }
         };
-        Ok(diesel::insert_into(users::table)
+        let usr = diesel::insert_into(users::table)
             .values(&*self) // diesel::Insertable unimplemented for &mut
-            .get_result(&connect_to_db())
-            .expect("Error saving user"))
+            .get_result::<User>(&connect_to_db())
+            .expect("Error saving user");
+        NewProfile::new(usr.id, None);
+        Ok(usr)
     }
 
     /// Checks if the Email and Username given
