@@ -1,9 +1,12 @@
 //! This module holds items related to data manipulation
 //! for the User Object
 
+use super::utils::{naive_date_format, validate_email, validate_name};
+
+use std::borrow::Cow;
+
 use crate::apps::auth::validate;
 use crate::apps::profiles::models::NewProfile;
-use crate::apps::user::utils::validate_name;
 use crate::config::config;
 use crate::diesel_cfg::{config::connect_to_db, schema::users};
 
@@ -23,17 +26,15 @@ use jwt::{encode, Header};
 
 /// User Object
 /// Holds user data
-#[derive(Queryable, Debug, Clone, Validate)]
+#[derive(Queryable, Serialize, Deserialize, Identifiable, Debug, Clone, Validate)]
 pub struct User {
     pub id: i32,
     pub username: String,
     pub email: String,
     password: String,
-    phone: Option<String>,
-    first_name: Option<String>,
-    middle_name: Option<String>,
-    last_name: Option<String>,
+    #[serde(with = "naive_date_format")]
     created_at: NaiveDateTime,
+    #[serde(with = "naive_date_format")]
     updated_at: NaiveDateTime,
     is_active: bool,
     pub is_verified: bool,
@@ -43,27 +44,30 @@ pub struct User {
 /// User Record for new User entries
 #[derive(Debug, Clone, Validate, Serialize, Deserialize, Insertable)]
 #[table_name = "users"]
-pub struct NewUser {
+#[serde(deny_unknown_fields)]
+pub struct NewUser<'b> {
     #[validate(
         length(min = 5, message = "Make username at least 5 letters long"),
         custom = "validate_name"
     )]
-    pub username: String,
+    pub username: Cow<'b, str>,
     #[validate(length(min = 6, message = "Insecure password. Give it at least 6 characters"))]
-    password: String,
+    password: Cow<'b, str>,
     #[validate(email(message = "Email format not invented yet"))]
-    pub email: String,
+    pub email: Cow<'b, str>,
 }
 
 /// Holds data passed on Password-reset request
 #[derive(Debug, Serialize, Deserialize, Validate)]
-pub struct PassResetData {
+#[serde(deny_unknown_fields)]
+pub struct PassResetData<'a> {
     #[validate(email(message = "Email format not invented yet"))]
-    pub email: String,
+    pub email: Cow<'a, str>,
 }
 
 /// Holds Account Password reset data
 #[derive(Debug, Serialize, Deserialize, Validate)]
+#[serde(deny_unknown_fields)]
 pub struct ResetPassData {
     #[validate(length(min = 5, message = "Give your password at least 5 characters"))]
     pub password: String,
@@ -71,7 +75,7 @@ pub struct ResetPassData {
     password_conf: String,
 }
 
-impl NewUser {
+impl<'a> NewUser<'a> {
     /// Saves a new user record to the db
     ///
     /// # Returns
@@ -88,7 +92,7 @@ impl NewUser {
             }
         }
         match hash(&self.password, DEFAULT_COST) {
-            Ok(h) => self.password = h,
+            Ok(h) => self.password = Cow::Owned(h),
             Err(e) => {
                 error!("{}", &format!("{:?}", e));
                 return Err("Failed to hash password".to_string());
@@ -98,7 +102,7 @@ impl NewUser {
             .values(&*self) // diesel::Insertable unimplemented for &mut
             .get_result::<User>(&connect_to_db())
             .expect("Error saving user");
-        NewProfile::new(usr.id, None);
+        NewProfile::new(usr.id, None)?;
         Ok(usr)
     }
 
@@ -221,21 +225,25 @@ impl User {
             .unwrap();
         match user.is_empty() {
             false => Ok(user),
-            _ => Err(format!("User of email {} nonexistent", given_email)),
+            _ => Err(format!("User of email {} non-existent", given_email)),
         }
     }
 }
 
 /// Holds Sign-In user details
 #[derive(Deserialize, Serialize, Validate)]
-pub struct SignInUser {
-    #[validate(email(message = "Oops! Email format not invented yet"))]
-    email: Option<String>,
-    username: Option<String>,
-    password: String,
+pub struct SignInUser<'a> {
+    // #[validate(email(message = "Oops! Email format not invented yet"))]
+
+    // Email validation Panicks with :: ->
+    /* the trait bound `std::borrow::Cow<'_, str>: std::convert::From<&std::borrow::Cow<'_, str>>` is not satisfied */
+    #[validate(custom = "validate_email")]
+    email: Option<Cow<'a, str>>,
+    username: Option<Cow<'a, str>>,
+    password: Cow<'a, str>,
 }
 
-impl SignInUser {
+impl<'a> SignInUser<'a> {
     /// Signs in User
     ///
     /// - Checks if user is registered
@@ -276,8 +284,8 @@ impl SignInUser {
     }
 
     /// Retreives the password field given on sign in
-    pub fn get_password(&self) -> &String {
-        &self.password
+    pub fn get_password(&self) -> &str {
+        self.password.as_ref()
     }
 }
 

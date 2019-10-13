@@ -1,9 +1,10 @@
 //! Handles views for User items
 //!
 
+use super::models::{NewUser, PassResetData, ResetPassData, SignInUser, User};
 use super::utils::{get_context, get_reset_context};
+
 use crate::apps::auth::validate;
-use crate::apps::user::models::{NewUser, PassResetData, ResetPassData, SignInUser, User};
 use crate::core::mail;
 use crate::core::response;
 
@@ -55,8 +56,8 @@ pub fn register_user(mut data: web::Json<NewUser>) -> HttpResponse {
     match TEMPLATE.render("email_activation.html", &context) {
         Ok(s) => {
             let mut mail = mail::Mail::new(
-                &data.0.email.clone(),
-                &data.0.username.clone(),
+                &data.0.email.to_mut(),
+                &data.0.username.to_mut(),
                 "Email activation".to_string(),
                 &s,
             );
@@ -182,12 +183,12 @@ pub fn verify(path: web::Path<String>) -> HttpResponse {
 ///
 /// # method
 /// ## POST
-pub fn send_reset_email(data: web::Json<PassResetData>) -> HttpResponse {
+pub fn send_reset_email(mut data: web::Json<PassResetData>) -> HttpResponse {
     if let Err(err) = data.validate() {
         let res = response::JsonErrResponse::new("400".to_string(), err);
         return HttpResponse::build(http::StatusCode::BAD_REQUEST).json(&res);
     };
-    let user = match User::find_by_email(&data.email) {
+    let user = match User::find_by_email(&data.email.to_mut()) {
         Ok(usr) => usr,
         Err(e) => {
             let status = http::StatusCode::NOT_FOUND;

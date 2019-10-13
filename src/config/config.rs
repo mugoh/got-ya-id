@@ -2,7 +2,7 @@
 //!
 
 use envy;
-use serde::{self, Deserialize};
+use serde::Deserialize;
 use std::error;
 
 /// Holds Env variables deserialized to a struct

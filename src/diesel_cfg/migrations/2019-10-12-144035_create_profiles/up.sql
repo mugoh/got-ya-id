@@ -2,8 +2,11 @@
 CREATE TABLE profiles (
     id SERIAL PRIMARY KEY,
     user_id INTEGER REFERENCES users(id) ON DELETE CASCADE NOT NULL ,
-    institution VARCHAR,
-    phone VARCHAR,
+    phone VARCHAR(15),
+    first_name VARCHAR(20),
+    middle_name VARCHAR(20),
+    last_name VARCHAR(20),
+    institution VARCHAR(100),
     avatar VARCHAR,
     found_ids INTEGER
 );
