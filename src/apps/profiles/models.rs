@@ -2,12 +2,12 @@
 
 use crate::apps::user::models::User;
 use crate::diesel::RunQueryDsl;
-use crate::diesel_cfg::{config::connect_to_db, schema::profiles};
+use crate::diesel_cfg::{config::connect_to_db, schema, schema::profiles};
 
-use diesel::{self};
+use diesel::{self, prelude::*};
 use serde::{Deserialize, Serialize};
 
-use std::borrow::Cow;
+use std::{borrow::Cow, error};
 
 /// Holds the User Profile Record
 #[derive(Queryable, Identifiable, Associations, Deserialize, Default, Serialize, Debug)]
@@ -27,8 +27,13 @@ pub struct Profile<'a> {
 
 impl<'a> Profile<'a> {
     /// Finds a given profile by its Primary Key
-    pub fn find_by_key(pk: u32) -> () {
-        //
+    pub fn find_by_key(pk: i32) -> Result<Vec<Profile<'a>>, Box<dyn error::Error>> {
+        use schema::profiles::dsl::*;
+        let query = profiles.find(pk).load(&connect_to_db())?;
+        if query.is_empty() {
+            return Err(format!("User of ID {} non-existent", pk).into());
+        }
+        Ok(query)
     }
 }
 

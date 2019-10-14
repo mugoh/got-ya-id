@@ -155,7 +155,6 @@ pub fn login(user: web::Json<SignInUser>) -> HttpResponse {
 /// Verifies a user's account.
 /// The user is retrived from the token passed in the URL Path
 pub fn verify(path: web::Path<String>) -> HttpResponse {
-    println!("{}", path);
     match User::verify_user(&path) {
         Ok(user) => {
             let res = response::JsonResponse::new(

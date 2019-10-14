@@ -30,7 +30,7 @@ pub fn api(cfg: &mut web::ServiceConfig) {
             )
             .service(web::scope("/user").service(
                 //
-                web::resource("/profile").route(web::post().to(profiles::views::get_profile)),
+                web::resource("/profile/{id}").route(web::get().to(profiles::views::get_profile)),
             ))
             .service(web::resource("/").route(web::get().to(|| "Aha")))
             .default_service(
