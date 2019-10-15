@@ -15,13 +15,12 @@ use std::{borrow::Cow, error};
 pub struct Profile<'a> {
     id: i32,
     user_id: i32,
-    phone: Option<Cow<'a, str>>,
-    first_name: Option<Cow<'a, str>>,
-    middle_name: Option<Cow<'a, str>>,
-    last_name: Option<Cow<'a, str>>,
-    #[serde(borrow)]
-    institution: Option<Cow<'a, str>>,
-    avatar: Option<Cow<'a, str>>,
+    phone: Option<String>,
+    first_name: Option<String>,
+    middle_name: Option<String>,
+    last_name: Option<String>,
+    institution: Option<String>,
+    avatar: Option<String>,
     found_ids: Option<Cow<'a, i32>>,
 }
 
