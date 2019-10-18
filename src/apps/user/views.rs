@@ -56,11 +56,12 @@ pub fn register_user(mut data: web::Json<NewUser>) -> HttpResponse {
     match TEMPLATE.render("email_activation.html", &context) {
         Ok(s) => {
             let mut mail = mail::Mail::new(
-                &data.0.email.to_mut(),
-                &data.0.username.to_mut(),
-                "Email activation".to_string(),
-                &s,
-            );
+                &data.0.email,
+                &data.0.username,
+                "Email activation",
+                s.as_str(),
+            )
+            .unwrap();
             mail.send().unwrap();
         }
 
@@ -204,9 +205,11 @@ pub fn send_reset_email(mut data: web::Json<PassResetData>) -> HttpResponse {
             let mut mail = mail::Mail::new(
                 &user.email,
                 &user.username,
-                "Account password reset".to_string(),
-                &s,
-            );
+                "Account password reset",
+                s.as_str(),
+            )
+            .unwrap();
+
             mail.send().unwrap();
         }
 
@@ -222,7 +225,7 @@ pub fn send_reset_email(mut data: web::Json<PassResetData>) -> HttpResponse {
         json!({"email": &user.email, "username": &user.username, "link": &path, "token": token}),
     );
 
-    HttpResponse::build(http::StatusCode::OK).json(&res)
+    HttpResponse::Created().json(&res)
 }
 
 /// Allows reset of user account passwords

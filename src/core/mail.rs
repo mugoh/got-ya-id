@@ -23,7 +23,12 @@ pub struct Mail {
 
 /// Returns a Mail struct
 impl Mail {
-    pub fn new(to_addr: &String, to_name: &String, subject: String, content: &String) -> Mail {
+    pub fn new<'a>(
+        to_addr: &'a str,
+        to_name: &'a str,
+        subject: &'a str,
+        content: &'a str,
+    ) -> Result<Mail, &'static str> {
         // ENV
         //let SMTP_CLIENT;
         //let MAIL_USERNAME;
@@ -35,38 +40,39 @@ impl Mail {
         );
         let email = match Email::builder()
             .to((to_addr, to_name))
-            .from(mail_vars[1].clone())
+            .from(mail_vars[1].as_str())
             .subject(subject)
-            .alternative(content, "".to_string())
+            .html(content)
             .build()
         {
             Ok(e) => e,
+
             Err(er) => {
-                println!("Unable to create Email\nReason: {:?}", er);
                 debug!("{:?}", er);
-                process::exit(1);
+                return Err("Unable to create email");
             }
         };
 
-        let creds = Credentials::new(mail_vars[2].clone(), mail_vars[3].clone());
+        let creds = Credentials::new(
+            mail_vars.get(2).unwrap().into(),
+            mail_vars.get(3).unwrap().into(),
+        );
         let mailer = SmtpClient::new_simple(
-            &mail_vars[0], //smtpclient//
+            mail_vars[0].as_ref(), //smtpclient//
         )
         .unwrap()
         .credentials(creds)
         .transport();
 
-        Mail { email, mailer }
+        Ok(Mail { email, mailer })
     }
 
     /// Sends the email
     pub fn send(&mut self) -> Result<smtp::response::Response, smtp::error::Error> {
-        let status = match self.mailer.send(self.email.clone().into()) {
+        match self.mailer.send(self.email.clone().into()) {
             Ok(s) => Ok(s),
             Err(e) => Result::Err(e),
-        };
-
-        status
+        }
     }
 }
 
@@ -74,7 +80,7 @@ impl Mail {
 pub fn get_env_var<'a>(keys: Vec<&'a str>, values: &mut Vec<String>) -> () {
     for key in keys.iter() {
         let val = env::var(key.to_string().to_lowercase()).unwrap_or_else(|er| {
-            println!("{:#?}", er);
+            debug!("Error configuring mail -> {:#?}", er);
             process::exit(1);
         });
         values.push(val);

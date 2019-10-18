@@ -81,22 +81,27 @@ where
 /// Constructs a HttpResponse
 ///
 /// # Arguments
-/// ##data: Hashmap<&'static str, &'static str>
+/// ## data: Hashmap<&'static str, &'static str>
 ///     - message: Response message during 2** status (Success) response
 ///             Ignored for Error responses
 ///     - status:
 ///         Status code. e.g "200"
-/// ##body: T
+///
+/// ## body: T
 ///     The data to be contained in the success reponse
-///     
 ///     - It ought to be JSON Serializable
 ///
-/// ##err: Option<&'a str>
+/// ## err: Option<&'a str>
 ///     The error to hold in the response for
-///     `error` type HttpResponses
+///     error type HttpResponses
 ///
 /// # Returns
-///  Result<HttpResponse, ~dyn Err>
+///  Result:
+///
+///  ```
+///  #- Ok: HttpResponse
+///  #- Err: dyn std::error::Error
+///  ```
 pub fn respond<'a, T>(
     data: HashMap<&'static str, &'static str>,
     body: Option<T>,
