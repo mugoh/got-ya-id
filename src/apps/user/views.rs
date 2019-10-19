@@ -53,20 +53,15 @@ pub fn register_user(mut data: web::Json<NewUser>) -> HttpResponse {
 
     // Mail
     let context: Context = get_context(&data.0, &path);
-    match TEMPLATE.render("email_activation.html", &context) {
+    match TEMPLATE.render("email_activation.html", context) {
         Ok(s) => {
-            let mut mail = mail::Mail::new(
-                &data.0.email,
-                &data.0.username,
-                "Email activation",
-                s.as_str(),
-            )
-            .unwrap();
+            let mut mail =
+                mail::Mail::new(&data.0.email, &data.0.username, "Email activation", &s).unwrap();
             mail.send().unwrap();
         }
 
         Err(e) => {
-            for er in e.iter().skip(1) {
+            for er in e.iter() {
                 error!("Reason: {}", er);
             }
         }
@@ -200,7 +195,7 @@ pub fn send_reset_email(mut data: web::Json<PassResetData>) -> HttpResponse {
     let token = user.create_token(&user.email).unwrap();
     let path = format!("http://api/auth/{}", token);
     let context: Context = get_reset_context(&user, &path);
-    match TEMPLATE.render("password_reset.html", &context) {
+    match TEMPLATE.render("password_reset.html", context) {
         Ok(s) => {
             let mut mail = mail::Mail::new(
                 &user.email,
@@ -265,7 +260,7 @@ pub fn reset_password(data: web::Json<ResetPassData>, path: web::Path<String>) -
 lazy_static! {
     /// Lazily Compiles Templates
     static ref TEMPLATE: Tera = {
-        let mut tera = tera::compile_templates!("src/templates/*");
+        let mut tera = tera::compile_templates!("src/templates/**/*");
         tera.autoescape_on(vec![".sql"]);
         tera
     };

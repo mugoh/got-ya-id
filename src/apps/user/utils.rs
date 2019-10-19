@@ -66,21 +66,21 @@ pub fn validate_pass(pass: &str) -> Result<(), ValidationError> {
 ///
 /// # Returns
 /// - tera::Context
-pub fn get_context(data: &NewUser, path: &String) -> Context {
+pub fn get_context<'a>(data: &NewUser, path: &'a str) -> Context {
     let mut context = Context::new();
 
-    context.insert("username", &data.username);
-    context.insert("link", path);
+    context.add("username", &data.username);
+    context.add("link", &path);
     context
 }
 
 /// Template holding context for password reset
 /// Receives a User ref
-pub fn get_reset_context(data: &User, path: &String) -> Context {
+pub fn get_reset_context<'a>(data: &User, path: &'a str) -> Context {
     let mut context = Context::new();
 
-    context.insert("username", &data.username);
-    context.insert("link", path);
+    context.add("username", &data.username);
+    context.add("link", &path);
     context
 }
 
