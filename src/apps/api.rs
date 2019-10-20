@@ -28,9 +28,16 @@ pub fn api(cfg: &mut web::ServiceConfig) {
                             .route(web::post().to_async(user::views::send_reset_email)),
                     ),
             )
-            .service(web::scope("/user").service(
-                //
-                web::resource("/profile/{id}").route(web::get().to(profiles::views::get_profile)),
+            .service(
+                web::scope("/user")
+                    .service(
+                        web::resource("{id}/profile")
+                            .route(web::get().to(profiles::views::get_profile)),
+                    )
+                    .service(web::resource("{id}").route(web::get().to(user::views::get_user))),
+            )
+            .service(web::scope("/users").service(
+                web::resource("/profiles").route(web::get().to(profiles::views::get_all_profiles)),
             ))
             .service(web::resource("/").route(web::get().to(|| "Aha")))
             .default_service(

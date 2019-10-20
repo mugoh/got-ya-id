@@ -6,7 +6,7 @@ use super::utils::{naive_date_format, validate_email, validate_name};
 use std::borrow::Cow;
 
 use crate::apps::auth::validate;
-use crate::apps::profiles::models::NewProfile;
+use crate::apps::profiles::models::{NewProfile, Profile};
 use crate::config::config;
 use crate::diesel_cfg::{config::connect_to_db, schema::users};
 
@@ -27,6 +27,7 @@ use jwt::{encode, Header};
 /// User Object
 /// Holds user data
 #[derive(Queryable, Serialize, Deserialize, Identifiable, Debug, Clone, Validate)]
+#[table_name = "users"]
 pub struct User {
     pub id: i32,
     pub username: String,
@@ -228,6 +229,53 @@ impl User {
             _ => Err(format!("User of email {} non-existent", given_email)),
         }
     }
+
+    /// Finds a User by Primary key
+    ///
+    /// # Returns
+    /// The user object and corresponding Profile
+    ///
+    pub fn find_by_pk<'a>(pk: i32) -> Result<(User, Option<Profile<'a>>), Box<dyn error::Error>> {
+        //
+        use crate::diesel_cfg::schema::users::dsl::*;
+        let user = users.find(pk).get_result::<User>(&connect_to_db())?;
+        let mut usr_profile = Profile::belonging_to(&user).load::<Profile>(&connect_to_db())?;
+        if usr_profile.is_empty() {
+            Err(format!("User of ID {id} non existent", id = pk))?
+        }
+        Ok((user, usr_profile.pop()))
+    }
+
+    /// Retrieves all existing User profiles
+    ///
+    /// ``Moved to profiles::retrieve_all (separate retrieval of profiles)``
+    ///
+    /// # Arguments
+    ///
+    /// ## with_profile: Option<u8>
+    ///  Return each User Object with its corresponding Profile
+    ///     WARNING ->
+    /// If Some(u8), a second query will be done for ALL user profiles
+    pub fn retrieve_all<'a>(with_profile: Option<u8>) -> Result<Vec<User>, Box<dyn error::Error>> {
+        use crate::diesel_cfg::schema::users::dsl::*;
+        let user_vec = users.load::<User>(&connect_to_db()).unwrap();
+
+        match with_profile {
+            Some(_) => {
+                Err("Unimplemented")?;
+                let mut res: std::collections::HashMap<usize, (&User, Profile)> =
+                    std::collections::HashMap::new();
+                for (i, usr) in user_vec.iter().enumerate() {
+                    let profile = Profile::belonging_to(usr)
+                        .first::<Profile<'a>>(&connect_to_db())
+                        .unwrap();
+                    res.insert(i, (usr, profile));
+                }
+            }
+            _ => (),
+        }
+        Ok(user_vec)
+    }
 }
 
 /// Holds Sign-In user details
@@ -289,7 +337,7 @@ impl<'a> SignInUser<'a> {
     }
 }
 
-/// JWT Authorization
+/// Holds JWT Authorization Claims
 #[derive(Debug, Serialize, Deserialize)]
 struct Claims {
     pub company: String,

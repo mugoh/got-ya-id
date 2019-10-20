@@ -2,22 +2,25 @@
 //!
 
 use super::models::{NewUser, PassResetData, ResetPassData, SignInUser, User};
-use super::utils::{get_context, get_reset_context};
+use super::utils::{err_response, get_context, get_reset_context, TEMPLATE};
 
 use crate::apps::auth::validate;
 use crate::core::mail;
-use crate::core::response;
+use crate::core::response::{self, err, respond};
+use crate::hashmap;
 
-use lazy_static;
 use log::{debug, error};
+use tera::{self, Context};
 use url::Url;
 
 use actix_web::{http, web, HttpResponse};
 use serde_json::json;
-use tera::{self, Context, Tera};
 use validator::Validate;
 
 /// Registers a new user
+///
+/// # url
+/// ## `auth`
 ///
 /// # methods
 /// - ## POST
@@ -82,6 +85,9 @@ pub fn register_user(mut data: web::Json<NewUser>) -> HttpResponse {
 /// Logs in registered user
 ///
 /// # method: POST
+///
+/// # url
+/// ## `auth/login`
 ///
 pub fn login(user: web::Json<SignInUser>) -> HttpResponse {
     if let Err(err) = user.validate() {
@@ -150,6 +156,13 @@ pub fn login(user: web::Json<SignInUser>) -> HttpResponse {
 
 /// Verifies a user's account.
 /// The user is retrived from the token passed in the URL Path
+///
+/// # url
+/// ## `auth/verify/{token}`
+///
+/// # Method
+/// ## GET
+///
 pub fn verify(path: web::Path<String>) -> HttpResponse {
     match User::verify_user(&path) {
         Ok(user) => {
@@ -176,7 +189,10 @@ pub fn verify(path: web::Path<String>) -> HttpResponse {
 
 /// Sends a Password Reset Email
 ///
-/// # method
+/// # url
+/// ## `auth/password/request`
+///
+/// # Method
 /// ## POST
 pub fn send_reset_email(mut data: web::Json<PassResetData>) -> HttpResponse {
     if let Err(err) = data.validate() {
@@ -225,11 +241,14 @@ pub fn send_reset_email(mut data: web::Json<PassResetData>) -> HttpResponse {
 
 /// Allows reset of user account passwords
 ///
-/// # Method
-/// ## PATCH
+/// This is path accessible from the password reset link
+/// sent to the registered user email
 ///
 /// # url
-/// `auth/password/reset/{token}`
+/// ## `auth/password/reset/{token}`
+///
+/// # Method
+/// ## PATCH
 ///
 pub fn reset_password(data: web::Json<ResetPassData>, path: web::Path<String>) -> HttpResponse {
     if let Err(err) = data.validate() {
@@ -257,16 +276,13 @@ pub fn reset_password(data: web::Json<ResetPassData>, path: web::Path<String>) -
     }
 }
 
-lazy_static! {
-    /// Lazily Compiles Templates
-    static ref TEMPLATE: Tera = {
-        let mut tera = tera::compile_templates!("src/templates/**/*");
-        tera.autoescape_on(vec![".sql"]);
-        tera
+pub fn get_user(id: web::Path<i32>) -> HttpResponse {
+    let res = match User::find_by_pk(*id) {
+        Ok((usr, profile)) => {
+            let data = hashmap!["status" => "200", "message" => "Success. User and User profile retrieved"];
+            respond(data, Some((usr, profile)), None).unwrap()
+        }
+        Err(e) => err("404", e.to_string()),
     };
-}
-
-/// Gives Err Json Response
-fn err_response<T>(status: String, msg: T) -> response::JsonErrResponse<T> {
-    response::JsonErrResponse::new(status, msg)
+    res
 }

@@ -34,6 +34,15 @@ impl<'a> Profile<'a> {
         }
         Ok(query)
     }
+
+    /// Retrieves all existing User profiles
+    ///
+    pub fn retrieve_all<'b>() -> Result<Vec<Profile<'b>>, Box<dyn error::Error>> {
+        use crate::diesel_cfg::schema::profiles::dsl::*;
+        let prof_vec = profiles.load::<Profile<'b>>(&connect_to_db())?;
+
+        Ok(prof_vec)
+    }
 }
 
 /// Holds a new User Profile Record
