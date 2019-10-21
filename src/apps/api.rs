@@ -32,7 +32,8 @@ pub fn api(cfg: &mut web::ServiceConfig) {
                 web::scope("/user")
                     .service(
                         web::resource("{id}/profile")
-                            .route(web::get().to(profiles::views::get_profile)),
+                            .route(web::get().to(profiles::views::get_profile))
+                            .route(web::put().to(profiles::views::update_profile)),
                     )
                     .service(web::resource("{id}").route(web::get().to(user::views::get_user))),
             )

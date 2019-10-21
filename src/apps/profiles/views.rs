@@ -1,6 +1,6 @@
 //! Holds View-related functions for the Profile Module
 
-use super::models::Profile;
+use super::models::{Profile, UpdtProfile};
 
 use crate::core::response::{err, respond};
 use crate::hashmap;
@@ -42,5 +42,28 @@ pub fn get_all_profiles() -> HttpResponse {
             respond(data, Some(vec), None).unwrap()
         }
         Err(e) => err("500", e.to_string()),
+    }
+}
+
+/// Updates the details of an existing User profile
+///
+/// # url
+/// ## `/user/{id}/profile`
+///
+/// # Method
+///     PUT
+///
+pub fn update_profile(data: web::Json<UpdtProfile>, id: web::Path<i32>) -> HttpResponse {
+    match Profile::find_by_key(*id) {
+        Ok(p_vec) => {
+            let profile = &p_vec[0];
+            let resp_data = hashmap!["status" => "200", "message" => "Success. Profile updated"];
+
+            match profile.update(data.0) {
+                Ok(p) => respond(resp_data, Some(p), None).unwrap(),
+                Err(e) => err("500", e.to_string()),
+            }
+        }
+        Err(e) => return err("404", e.to_string()),
     }
 }
