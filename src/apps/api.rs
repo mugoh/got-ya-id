@@ -26,6 +26,10 @@ pub fn api(cfg: &mut web::ServiceConfig) {
                     .service(
                         web::resource("/password/request")
                             .route(web::post().to_async(user::views::send_reset_email)),
+                    )
+                    .service(
+                        web::resource("/activate")
+                            .route(web::patch().to_async(user::views::change_activation_status)),
                     ),
             )
             .service(

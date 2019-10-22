@@ -26,18 +26,19 @@ use jwt::{encode, Header};
 
 /// User Object
 /// Holds user data
-#[derive(Queryable, Serialize, Deserialize, Identifiable, Debug, Clone, Validate)]
+#[derive(Queryable, Serialize, AsChangeset, Deserialize, Identifiable, Debug, Clone, Validate)]
 #[table_name = "users"]
 pub struct User {
     pub id: i32,
     pub username: String,
     pub email: String,
+    #[serde(skip_deserializing)]
     password: String,
     #[serde(with = "naive_date_format")]
     created_at: NaiveDateTime,
     #[serde(with = "naive_date_format")]
     updated_at: NaiveDateTime,
-    is_active: bool,
+    pub is_active: bool,
     pub is_verified: bool,
 }
 
@@ -217,7 +218,7 @@ impl User {
     /// ## Result
     /// OK -> User object that matches the given email
     /// ERR -> String
-    pub fn find_by_email(given_email: &String) -> Result<Vec<User>, String> {
+    pub fn find_by_email<'a>(given_email: &'a str) -> Result<Vec<User>, String> {
         use crate::diesel_cfg::schema::users::dsl::{email, users};
 
         let user = users
@@ -226,7 +227,7 @@ impl User {
             .unwrap();
         match user.is_empty() {
             false => Ok(user),
-            _ => Err(format!("User of email {} non-existent", given_email)),
+            _ => Err(format!("User of email {} non-existent", given_email).into()),
         }
     }
 
@@ -275,6 +276,16 @@ impl User {
             _ => (),
         }
         Ok(user_vec)
+    }
+
+    /// Alters an account activation status
+    /// Activates or Deactivates a User account
+    pub fn alter_activation_status(&self) -> Result<User, Box<dyn error::Error>> {
+        //
+        use crate::diesel_cfg::schema::users::dsl::*;
+        Ok(diesel::update(&*self)
+            .set(is_active.eq(!self.is_active))
+            .get_result::<User>(&connect_to_db())?)
     }
 }
 
@@ -343,4 +354,12 @@ struct Claims {
     pub company: String,
     pub exp: usize,
     sub: String,
+}
+
+/// Json Request data with Email field only
+#[derive(Deserialize, Validate)]
+#[serde(deny_unknown_fields)]
+pub struct UserEmail<'a> {
+    #[validate(email(message = "Email format not invented yet"))]
+    pub email: Cow<'a, str>,
 }

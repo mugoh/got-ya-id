@@ -1,7 +1,7 @@
 //! Handles views for User items
 //!
 
-use super::models::{NewUser, PassResetData, ResetPassData, SignInUser, User};
+use super::models::{NewUser, PassResetData, ResetPassData, SignInUser, User, UserEmail};
 use super::utils::{err_response, get_context, get_reset_context, TEMPLATE};
 
 use crate::apps::auth::validate;
@@ -110,6 +110,13 @@ pub fn login(user: web::Json<SignInUser>) -> HttpResponse {
                 );
             }
             let usr = &usr_vec[0];
+
+            if !usr.is_active {
+                return HttpResponse::Forbidden().json(response::JsonErrResponse::new(
+                    http::StatusCode::FORBIDDEN.to_string(),
+                    &format!("Account associated with email {} is deactivated", usr.email),
+                ));
+            }
             if !usr.verify_pass(user.get_password()).unwrap() {
                 let status = http::StatusCode::UNAUTHORIZED;
                 return HttpResponse::build(status).json(response::JsonErrResponse::new(
@@ -285,4 +292,36 @@ pub fn get_user(id: web::Path<i32>) -> HttpResponse {
         Err(e) => err("404", e.to_string()),
     };
     res
+}
+
+/// Activates or Deactivates User accounts
+///
+/// The activation status is updated to !current_activation_status
+/// (Opposite bool of the current)
+///
+/// # url
+/// ## `/auth/deactivate`
+///
+/// # method
+///  PATCH
+pub fn change_activation_status(mut data: web::Json<UserEmail>) -> HttpResponse {
+    if let Err(err) = data.validate() {
+        let res = response::JsonErrResponse::new("400".to_string(), err);
+        return HttpResponse::build(http::StatusCode::BAD_REQUEST).json(&res);
+    };
+    match User::find_by_email(data.email.to_mut()) {
+        Ok(vec) => {
+            let user = &vec[0];
+            match user.alter_activation_status() {
+                Ok(usr) => {
+                    let data =
+                        hashmap!["status" => "200", "message" => "User activation status changed"];
+                    let body = json!({"email": usr.email,  "username": usr.username, "is_active": usr.is_active});
+                    respond(data, Some(body), None).unwrap()
+                }
+                Err(e) => err("500", e.to_string()),
+            }
+        }
+        Err(e) => err("500", e.to_string()),
+    }
 }
