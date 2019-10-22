@@ -1,10 +1,20 @@
 use lazy_static;
 use regex::Regex;
-use tera::Context;
+use tera::{self, Context, Tera};
 use validator::ValidationError;
 
 use super::models::{NewUser, User};
 
+use crate::apps::core::response;
+
+lazy_static! {
+    /// Lazily Compiled Templates
+    pub static ref TEMPLATE: Tera = {
+        let mut tera = tera::compile_templates!("src/templates/**/*");
+        tera.autoescape_on(vec![".sql"]);
+        tera
+    };
+}
 /// Validates name
 /// - Ensures the name input is composed of alphabet characters
 ///  only
@@ -66,21 +76,21 @@ pub fn validate_pass(pass: &str) -> Result<(), ValidationError> {
 ///
 /// # Returns
 /// - tera::Context
-pub fn get_context(data: &NewUser, path: &String) -> Context {
+pub fn get_context<'a>(data: &NewUser, path: &'a str) -> Context {
     let mut context = Context::new();
 
-    context.insert("username", &data.username);
-    context.insert("link", path);
+    context.add("username", &data.username);
+    context.add("link", &path);
     context
 }
 
 /// Template holding context for password reset
 /// Receives a User ref
-pub fn get_reset_context(data: &User, path: &String) -> Context {
+pub fn get_reset_context<'a>(data: &User, path: &'a str) -> Context {
     let mut context = Context::new();
 
-    context.insert("username", &data.username);
-    context.insert("link", path);
+    context.add("username", &data.username);
+    context.add("link", &path);
     context
 }
 
@@ -120,4 +130,11 @@ pub mod naive_date_format {
         let s = String::deserialize(deserializer)?;
         NaiveDateTime::parse_from_str(&s, FORMAT).map_err(serde::de::Error::custom)
     }
+}
+
+/// Creates a Err Json Response
+/// using the given arguments
+///
+pub fn err_response<T>(status: String, msg: T) -> response::JsonErrResponse<T> {
+    response::JsonErrResponse::new(status, msg)
 }

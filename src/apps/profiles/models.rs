@@ -10,7 +10,9 @@ use serde::{Deserialize, Serialize};
 use std::{borrow::Cow, error};
 
 /// Holds the User Profile Record
-#[derive(Queryable, Identifiable, Associations, Deserialize, Default, Serialize, Debug)]
+#[derive(
+    Queryable, Identifiable, AsChangeset, Associations, Deserialize, Default, Serialize, Debug,
+)]
 #[belongs_to(User)]
 pub struct Profile<'a> {
     id: i32,
@@ -34,6 +36,26 @@ impl<'a> Profile<'a> {
         }
         Ok(query)
     }
+
+    /// Retrieves all existing User profiles
+    ///
+    pub fn retrieve_all<'b>() -> Result<Vec<Profile<'b>>, Box<dyn error::Error>> {
+        use crate::diesel_cfg::schema::profiles::dsl::*;
+        let prof_vec = profiles.load::<Profile<'b>>(&connect_to_db())?;
+
+        Ok(prof_vec)
+    }
+
+    /// Updates a Profile record with the new
+    /// data
+    pub fn update(&self, new_data: UpdtProfile) -> Result<Profile, diesel::result::Error> {
+        //
+        //new_data.save_changes::<Profile>(&connect_to_db())
+
+        diesel::update(&*self)
+            .set(new_data)
+            .get_result::<Profile>(&connect_to_db())
+    }
 }
 
 /// Holds a new User Profile Record
@@ -42,7 +64,12 @@ impl<'a> Profile<'a> {
 #[serde(deny_unknown_fields)]
 pub struct NewProfile<'a> {
     user_id: i32,
+    phone: Option<Cow<'a, str>>,
+    first_name: Option<Cow<'a, str>>,
+    middle_name: Option<Cow<'a, str>>,
+    last_name: Option<Cow<'a, str>>,
     institution: Option<Cow<'a, str>>,
+    avatar: Option<Cow<'a, str>>,
 }
 
 impl<'a> NewProfile<'a> {
@@ -70,4 +97,16 @@ impl<'a> NewProfile<'a> {
             Ok(None)
         }
     }
+}
+
+/// Updatable profile object
+#[derive(AsChangeset, Serialize, Deserialize)]
+#[table_name = "profiles"]
+pub struct UpdtProfile<'a> {
+    phone: Option<Cow<'a, str>>,
+    first_name: Option<Cow<'a, str>>,
+    middle_name: Option<Cow<'a, str>>,
+    last_name: Option<Cow<'a, str>>,
+    institution: Option<Cow<'a, str>>,
+    avatar: Option<Cow<'a, str>>,
 }

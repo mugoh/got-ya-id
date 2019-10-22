@@ -24,11 +24,13 @@ body {
     margin-left: auto;
     margin-right: auto;
 }
+
 #act {
     width: 100%;
     text-align: center;
 }
-#.activate-link {
+
+#activate-link {
     text-decoration: None;
 }
 

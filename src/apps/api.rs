@@ -26,11 +26,23 @@ pub fn api(cfg: &mut web::ServiceConfig) {
                     .service(
                         web::resource("/password/request")
                             .route(web::post().to_async(user::views::send_reset_email)),
+                    )
+                    .service(
+                        web::resource("/activate")
+                            .route(web::patch().to_async(user::views::change_activation_status)),
                     ),
             )
-            .service(web::scope("/user").service(
-                //
-                web::resource("/profile/{id}").route(web::get().to(profiles::views::get_profile)),
+            .service(
+                web::scope("/user")
+                    .service(
+                        web::resource("{id}/profile")
+                            .route(web::get().to(profiles::views::get_profile))
+                            .route(web::put().to(profiles::views::update_profile)),
+                    )
+                    .service(web::resource("{id}").route(web::get().to(user::views::get_user))),
+            )
+            .service(web::scope("/users").service(
+                web::resource("/profiles").route(web::get().to(profiles::views::get_all_profiles)),
             ))
             .service(web::resource("/").route(web::get().to(|| "Aha")))
             .default_service(
