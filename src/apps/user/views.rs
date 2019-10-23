@@ -11,9 +11,8 @@ use crate::hashmap;
 
 use log::{debug, error};
 use tera::{self, Context};
-use url::Url;
 
-use actix_web::{http, web, HttpResponse};
+use actix_web::{http, web, HttpRequest, HttpResponse};
 use serde_json::json;
 use validator::Validate;
 
@@ -29,14 +28,14 @@ use validator::Validate;
 /// - On Sucess: JSONResponse
 /// - On ERROR: JSONErrResponse
 ///
-pub fn register_user(mut data: web::Json<NewUser>) -> HttpResponse {
+pub fn register_user(mut data: web::Json<NewUser>, req: HttpRequest) -> HttpResponse {
     let user_ = data.0.clone();
     let token = validate::encode_jwt_token(user_).unwrap();
     let _claims = validate::decode_auth_token(&token);
 
     // -> Extract host info from req Headers
-    let path = format!(r#"http://localhost:8888/api/auth/verify/{}"#, &token);
-    let path = Url::parse(&path).unwrap().to_string();
+    let host = format!("{:?}", req.headers().get("host").unwrap());
+    let path = get_url(&host, "api/auth/verify", &token);
 
     if let Err(err) = data.validate() {
         let res: response::JsonErrResponse<_> =
@@ -201,7 +200,7 @@ pub fn verify(path: web::Path<String>) -> HttpResponse {
 ///
 /// # Method
 /// ## POST
-pub fn send_reset_email(mut data: web::Json<PassResetData>) -> HttpResponse {
+pub fn send_reset_email(mut data: web::Json<PassResetData>, req: HttpRequest) -> HttpResponse {
     if let Err(err) = data.validate() {
         let res = response::JsonErrResponse::new("400".to_string(), err);
         return HttpResponse::build(http::StatusCode::BAD_REQUEST).json(&res);
@@ -216,7 +215,8 @@ pub fn send_reset_email(mut data: web::Json<PassResetData>) -> HttpResponse {
     };
     let user = &user[0];
     let token = user.create_token(&user.email).unwrap();
-    let path = format!("http://api/auth/{}", token);
+    let host = format!("{:?}", req.headers().get("host").unwrap());
+    let path = get_url(&host, "api/auth", &token);
     let context: Context = get_reset_context(&user, &path);
     match TEMPLATE.render("password_reset.html", context) {
         Ok(s) => {
@@ -324,4 +324,27 @@ pub fn change_activation_status(mut data: web::Json<UserEmail>) -> HttpResponse 
         }
         Err(e) => err("500", e.to_string()),
     }
+}
+
+/// Builds a complete URI from the arguments given
+///
+/// # Arguments
+/// ## host: str
+///     - The host part of the URL
+///
+/// ## path: str
+///     - Path of the request
+///
+/// ## id: str
+///     - Parameter to append to complete the url path
+fn get_url<'a>(host: &'a str, path: &'a str, id: &'a str) -> String {
+    //
+    format!(
+        r#"https://{host}/{path}/{id}"#,
+        host = host,
+        path = path,
+        id = id
+    )
+    .replace("\"", "")
+    // HeaderValue can't be formatted to str
 }
