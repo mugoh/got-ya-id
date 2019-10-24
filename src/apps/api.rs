@@ -48,7 +48,7 @@ pub fn api(cfg: &mut web::ServiceConfig) {
             .default_service(
                 // 404 GET
                 web::resource("")
-                    .route(web::get().to(|| " Not Found"))
+                    .route(web::get().to(|| "Oopsy! Coudn't find what you were looking for"))
                     // None GET
                     .route(
                         web::route()

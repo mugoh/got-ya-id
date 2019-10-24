@@ -138,3 +138,26 @@ pub mod naive_date_format {
 pub fn err_response<T>(status: String, msg: T) -> response::JsonErrResponse<T> {
     response::JsonErrResponse::new(status, msg)
 }
+
+/// Builds a complete URI from the arguments given
+///
+/// # Arguments
+/// ## host: str
+///     - The host part of the URL
+///
+/// ## path: str
+///     - Path of the request
+///
+/// ## id: str
+///     - Parameter to append to complete the url path
+pub fn get_url<'a>(host: &'a str, path: &'a str, id: &'a str) -> String {
+    //
+    format!(
+        r#"https://{host}/{path}/{id}"#,
+        host = host,
+        path = path,
+        id = id
+    )
+    .replace("\"", "")
+    // HeaderValue can't be formatted to str
+}

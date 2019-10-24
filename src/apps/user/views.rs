@@ -2,7 +2,7 @@
 //!
 
 use super::models::{NewUser, PassResetData, ResetPassData, SignInUser, User, UserEmail};
-use super::utils::{err_response, get_context, get_reset_context, TEMPLATE};
+use super::utils::{err_response, get_context, get_reset_context, get_url, TEMPLATE};
 
 use crate::apps::auth::validate;
 use crate::core::mail;
@@ -316,35 +316,17 @@ pub fn change_activation_status(mut data: web::Json<UserEmail>) -> HttpResponse 
                 Ok(usr) => {
                     let data =
                         hashmap!["status" => "200", "message" => "User activation status changed"];
-                    let body = json!({"email": usr.email,  "username": usr.username, "is_active": usr.is_active});
+                    let body = json!({
+                        "email": usr.email,
+                        "username": usr.username,
+                        "is_active": usr.is_active
+                    });
+
                     respond(data, Some(body), None).unwrap()
                 }
                 Err(e) => err("500", e.to_string()),
             }
         }
-        Err(e) => err("500", e.to_string()),
+        Err(e) => err("404", e.to_string()),
     }
-}
-
-/// Builds a complete URI from the arguments given
-///
-/// # Arguments
-/// ## host: str
-///     - The host part of the URL
-///
-/// ## path: str
-///     - Path of the request
-///
-/// ## id: str
-///     - Parameter to append to complete the url path
-fn get_url<'a>(host: &'a str, path: &'a str, id: &'a str) -> String {
-    //
-    format!(
-        r#"https://{host}/{path}/{id}"#,
-        host = host,
-        path = path,
-        id = id
-    )
-    .replace("\"", "")
-    // HeaderValue can't be formatted to str
 }

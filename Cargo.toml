@@ -21,13 +21,13 @@ env_logger = "0.6.2"
 futures = "0.1.29"
 jsonwebtoken = "6"
 envy = "0.4"
-tera = "0.7.2"
+tera = "0.7"
 url = "2.1.0"
 lettre = "0.9"
 lettre_email = "0.9"
 diesel = { version = "1.4.3", features = ["postgres", "chrono"] }
 dotenv = "0.14.1"
-chrono = "0.4"
+chrono = { version = "0.4", features = ["serde", "rustc-serialize"]  }
 bcrypt = "0.1"
 
 [dev-dependencies]

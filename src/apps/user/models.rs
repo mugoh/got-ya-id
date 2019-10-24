@@ -35,7 +35,7 @@ pub struct User {
     #[serde(skip_deserializing)]
     password: String,
     #[serde(with = "naive_date_format")]
-    created_at: NaiveDateTime,
+    pub created_at: NaiveDateTime,
     #[serde(with = "naive_date_format")]
     updated_at: NaiveDateTime,
     pub is_active: bool,
@@ -150,7 +150,7 @@ impl User {
     pub fn create_token(&self, user_cred: &String) -> Result<String, Box<dyn error::Error>> {
         let payload = Claims {
             company: user_cred.to_owned(),
-            exp: (Utc::now() + Duration::seconds(75)).timestamp() as usize,
+            exp: (Utc::now() + Duration::hours(720)).timestamp() as usize,
             sub: "login".to_string(),
         };
 
