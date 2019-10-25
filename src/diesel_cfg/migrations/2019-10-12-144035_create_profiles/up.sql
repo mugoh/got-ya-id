@@ -7,7 +7,7 @@ CREATE TABLE profiles (
     middle_name VARCHAR(20),
     last_name VARCHAR(20),
     institution VARCHAR(100),
-    avatar VARCHAR,
+    about TEXT,
     found_ids INTEGER
 );
 
