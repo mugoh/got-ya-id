@@ -30,7 +30,8 @@ dotenv = "0.14.1"
 chrono = { version = "0.4", features = ["serde", "rustc-serialize"]  }
 bcrypt = "0.1"
 actix-multipart = "0.1.4"
-# pyo3 = "0.8.1"
+pyo3 = "0.8.2" 
+
 
 [dev-dependencies]
 actix-http-test = "0.2.5"
