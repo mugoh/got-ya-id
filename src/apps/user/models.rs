@@ -204,6 +204,7 @@ impl User {
                 return Err(e.into());
             }
         };
+
         diesel::update(users.filter(email.eq(&user)))
             .set(password.eq(pass_hash))
             .get_result::<User>(&connect_to_db())
