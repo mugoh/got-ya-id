@@ -1,25 +1,25 @@
 //! Common functions for the Profiles module
 
-use futures::future::{err, Either};
+use futures::future::{err, lazy, Either};
 use futures::{Future, Stream};
 
 use actix_multipart::{Field, MultipartError};
-use actix_web::{error as act_err, web, Error};
+use actix_rt::System;
+use actix_web::{client, error as act_err, web, Error};
 
+use dotenv::dotenv;
 use serde::{Deserialize, Serialize};
 
-use std::{error, fs::File, io::Write};
+use std::{env, error, fs::File, io::Write};
 
 use crate::core::py_interface::create_py_mod;
 
 // use crate::core::py_interface::create_py_mod;
 
 /// Extracts the Multipart Field from the multipart object
-pub fn extract_multipart_field<'a>(
-    field: Field,
-) -> impl Future<Item = (i64, String), Error = Error> {
+pub fn extract_multipart_field<'a>(field: Field) -> impl Future<Item = i64, Error = Error> {
     //
-    // dotenv().ok();
+    dotenv().ok();
 
     let (file, file_path) = match make_temp_file() {
         Ok(f) => f,
@@ -33,18 +33,16 @@ pub fn extract_multipart_field<'a>(
                 //
                 web::block(move || {
                     //
-                    //let upload_url =
-                    //   env::var("UPLOAD_URL").expect("ENV Err: Missing static image upload URL");
+                    let upload_url =
+                        env::var("UPLOAD_URL").expect("ENV Err: Missing static image upload URL");
 
                     file.write_all(bytes.as_ref()).map_err(|e| {
                         println!("File.write failed: {:?}", e);
                         MultipartError::Payload(act_err::PayloadError::Io(e))
                     })?;
                     acc += bytes.len() as i64;
+                    // println!("bytes: {:?}", bytes);
 
-                    // Sending base64 fails with "url format not recognized"
-                    // From the response, The base64 string is taken as a url and not as a serialized bytes
-                    // array as would be expected to work.
                     /*
                     System::new("upload")
                         .block_on(lazy(|| {
@@ -78,9 +76,9 @@ pub fn extract_multipart_field<'a>(
                 })
             })
             .map(|(_, acc)| {
-                let path = create_py_mod(file_path).expect("Initiating file send failed");
+                create_py_mod(file_path).expect("Initiating file send failed");
 
-                (acc, path)
+                acc
             })
             .map_err(|e| {
                 println!("Saving file failed: {:?}", e);
@@ -99,7 +97,6 @@ fn make_temp_file<'a>() -> Result<(File, String), Box<dyn error::Error>> {
     Ok((f, f_path))
 }
 
-/// Holds the fields to include in the file upload body
 #[derive(Serialize, Deserialize, Debug)]
 struct UploadData {
     #[serde(with = "base_64")]

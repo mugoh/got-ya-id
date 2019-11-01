@@ -93,7 +93,11 @@ pub fn upload_avatar(multipart: Multipart) -> impl Future<Item = HttpResponse, E
         .map(|field| extract_multipart_field(field).into_stream())
         .flatten()
         .collect()
-        .map(|f_size| HttpResponse::Ok().json(f_size))
+        .map(|upload_response| // [byte_size, url]
+        {
+            let _file_url = &upload_response[1];
+            HttpResponse::Ok().json(&upload_response[0])
+        })
         .map_err(|e| {
             log_error!("File upload failed: {:?}", e);
             e
