@@ -1,0 +1,5 @@
+update user access level: admin, moderator, normal_user
+
+users can flag off ID pictures
+
+## [b] pass reset - unwrapping db result - should return error as response instead

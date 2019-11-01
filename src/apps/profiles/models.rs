@@ -22,7 +22,7 @@ pub struct Profile<'a> {
     middle_name: Option<String>,
     last_name: Option<String>,
     institution: Option<String>,
-    avatar: Option<String>,
+    about: Option<String>,
     found_ids: Option<Cow<'a, i32>>,
 }
 
@@ -69,7 +69,7 @@ pub struct NewProfile<'a> {
     middle_name: Option<Cow<'a, str>>,
     last_name: Option<Cow<'a, str>>,
     institution: Option<Cow<'a, str>>,
-    avatar: Option<Cow<'a, str>>,
+    about: Option<Cow<'a, str>>,
 }
 
 impl<'a> NewProfile<'a> {
@@ -108,5 +108,5 @@ pub struct UpdtProfile<'a> {
     middle_name: Option<Cow<'a, str>>,
     last_name: Option<Cow<'a, str>>,
     institution: Option<Cow<'a, str>>,
-    avatar: Option<Cow<'a, str>>,
+    about: Option<Cow<'a, str>>,
 }

@@ -1,11 +1,16 @@
 //! Holds View-related functions for the Profile Module
 
 use super::models::{Profile, UpdtProfile};
+use super::utils::extract_multipart_field;
 
 use crate::core::response::{err, respond};
 use crate::hashmap;
 
-use actix_web::{web, HttpResponse};
+use actix_multipart::Multipart;
+use actix_web::{error, web, Error, HttpResponse};
+
+use futures::{Future, Stream};
+use log::error as log_error;
 
 /// Retrieves the profile matching the given user ID
 ///
@@ -66,4 +71,35 @@ pub fn update_profile(data: web::Json<UpdtProfile>, id: web::Path<i32>) -> HttpR
         }
         Err(e) => return err("404", e.to_string()),
     }
+}
+
+/// Uploads a file for use as the user's avatar
+///
+/// # url
+/// ## `user/{id}/profile/avatar`
+///
+/// # Arguments
+///
+/// ## multipart
+/// - The mulitpart type of the request data containing the
+///   upload file
+///
+/// # Method
+///     POST
+pub fn upload_avatar(multipart: Multipart) -> impl Future<Item = HttpResponse, Error = Error> {
+    //
+    multipart
+        .map_err(error::ErrorInternalServerError)
+        .map(|field| extract_multipart_field(field).into_stream())
+        .flatten()
+        .collect()
+        .map(|upload_response| // [byte_size, url]
+        {
+            let _file_url = &upload_response[1];
+            HttpResponse::Ok().json(&upload_response[0])
+        })
+        .map_err(|e| {
+            log_error!("File upload failed: {:?}", e);
+            e
+        })
 }

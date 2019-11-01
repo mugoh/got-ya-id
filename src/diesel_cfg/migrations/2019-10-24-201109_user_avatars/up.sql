@@ -1,0 +1,6 @@
+-- Your SQL goes here
+CREATE TABLE AVATARS (
+    id SERIAL PRIMARY KEY,
+    url VARCHAR(1024)
+    user_id REFERENCES users(id) ON DELETE CASCADE NOT NULL,
+)
