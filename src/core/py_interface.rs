@@ -3,6 +3,8 @@
 use pyo3::{prelude::PyResult, Python};
 use serde::{Deserialize, Serialize};
 
+use std::{borrow::Cow, collections::HashMap};
+
 /// Creates a Python module object
 ///
 /// Python is used to call the Cloudinary API
@@ -39,19 +41,57 @@ fn upload_static<'a>(py: Python, file_: &'a str) -> PyResult<String> {
     let script = fs::read_to_string("src/core/upload")?;
 
     let loaded_mod = PyModule::from_code(py, &script, "upload", "upload")?;
-    Ok(loaded_mod
+    let res = loaded_mod
         .call("upload", (file_,), None)?
         .as_ref()
-        .to_string())
+        .to_string();
+
+    let res = res.replace("{", "").replace("'", "\"").replace("}", "");
+    let res = res.split(",").collect::<Vec<&str>>();
+    let mut res_map = std::collections::HashMap::new();
+
+    for item in &res {
+        let key_value = item.splitn(2, ":").collect::<Vec<&str>>();
+        res_map.insert(
+            key_value[0]
+                .trim_matches(|x: char| x.is_whitespace())
+                .replace("\"", ""),
+            key_value[1]
+                .trim_matches(|x: char| x.is_whitespace())
+                .replace("\"", ""),
+        );
+    }
+
+    Ok(res_map.get("secure_url").unwrap().to_owned())
 }
 
 /// Holds the key, value response from the sent upload request
 #[derive(Serialize, Debug, Deserialize)]
-// Desrialize PyDict into struct
-pub struct UploadResponse {
-    public_id: String,
-    //created_at: Option<String>, // Serialize/de chrono datetime
-    secure_url: String,
-    format: Option<String>,
-    url: Option<String>,
+// Deserialize PyDict into struct
+pub struct UploadResponse<'a> {
+    public_id: Cow<'a, str>,
+    created_at: Cow<'a, str>,
+    secure_url: Cow<'a, str>,
+    format: Cow<'a, str>,
+    url: Cow<'a, str>,
+    tags: Cow<'a, str>,
+}
+
+impl<'a> UploadResponse<'a> {
+    /// Creates a new upload response instance
+    ///
+    /// # Arguments
+    /// ## map_data: _Hashmap<str, str>_
+    /// - Key, value pairs from which to extract the field and
+    /// equivalent values
+    pub fn new<'b>(map_data: HashMap<&'b str, &'b str>) -> UploadResponse<'b> {
+        UploadResponse {
+            public_id: Cow::Borrowed(map_data.get("public_id").unwrap()),
+            created_at: Cow::Borrowed(map_data.get("created_at").unwrap()),
+            secure_url: Cow::Borrowed(map_data.get("secure_url").unwrap()),
+            format: Cow::Borrowed(map_data.get("format").unwrap()),
+            url: Cow::Borrowed(map_data.get("url").unwrap()),
+            tags: Cow::Borrowed(map_data.get("tags").unwrap()),
+        }
+    }
 }

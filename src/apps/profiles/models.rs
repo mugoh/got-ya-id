@@ -2,7 +2,7 @@
 
 use crate::apps::user::models::User;
 use crate::diesel::RunQueryDsl;
-use crate::diesel_cfg::{config::connect_to_db, schema, schema::profiles};
+use crate::diesel_cfg::{config::connect_to_db, schema, schema::avatars, schema::profiles};
 
 use diesel::{self, prelude::*};
 use serde::{Deserialize, Serialize};
@@ -109,4 +109,22 @@ pub struct UpdtProfile<'a> {
     last_name: Option<Cow<'a, str>>,
     institution: Option<Cow<'a, str>>,
     about: Option<Cow<'a, str>>,
+}
+
+/// User Profile Avatar struct
+#[derive(Queryable, Identifiable, AsChangeset, Associations, Deserialize, Serialize, Debug)]
+#[belongs_to(User)]
+pub struct Avatar<'a> {
+    id: i32,
+    user_id: i32,
+    url: Option<Cow<'a, str>>,
+    //file_object: Option<UploadResponse>,
+}
+
+/// Insertible profile avatar data
+#[derive(Insertable, Deserialize, Serialize, Debug)]
+#[table_name = "avatars"]
+pub struct NewAvatar<'a> {
+    url: Option<Cow<'a, str>>,
+    user_id: i32,
 }

@@ -11,4 +11,4 @@ def upload(loc_file):
     """
         Uploads the given media file to the cloudinary storage
     """
-    return c_uploader(loc_file).get('secure_url')
+    return c_uploader(loc_file)
