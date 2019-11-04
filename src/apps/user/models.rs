@@ -6,7 +6,7 @@ use super::utils::{naive_date_format, validate_email, validate_name};
 use std::borrow::Cow;
 
 use crate::apps::auth::validate;
-use crate::apps::profiles::models::{NewProfile, Profile};
+use crate::apps::profiles::models::{Avatar, NewProfile, Profile};
 use crate::config::config;
 use crate::diesel_cfg::{config::connect_to_db, schema::users};
 
@@ -287,6 +287,19 @@ impl User {
         Ok(diesel::update(&*self)
             .set(is_active.eq(!self.is_active))
             .get_result::<User>(&connect_to_db())?)
+    }
+
+    /// Alters the avatar table associated with the user profile
+    /// to match the given url field
+    pub fn save_avatar<'b>(&self, avatar_url: &'b str) -> Result<Avatar, diesel::result::Error> {
+        use crate::diesel_cfg::schema::avatars::dsl::*;
+
+        let avatar = Avatar::belonging_to(self)
+            .load::<Avatar>(&connect_to_db())
+            .expect("Error retreiving avatar");
+        Ok(diesel::update(&avatar[0])
+            .set(url.eq(avatar_url))
+            .get_result::<Avatar>(&connect_to_db())?)
     }
 }
 

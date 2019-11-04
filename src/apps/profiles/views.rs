@@ -3,6 +3,7 @@
 use super::models::{Profile, UpdtProfile};
 use super::utils::extract_multipart_field;
 
+use crate::apps::user::models::User;
 use crate::core::response::{err, respond};
 use crate::hashmap;
 
@@ -80,14 +81,23 @@ pub fn update_profile(data: web::Json<UpdtProfile>, id: web::Path<i32>) -> HttpR
 ///
 /// # Arguments
 ///
+/// ## id
+/// - ID of the user the avatar should belong it
+///
 /// ## multipart
 /// - The mulitpart type of the request data containing the
 ///   upload file
 ///
 /// # Method
 ///     POST
-pub fn upload_avatar(multipart: Multipart) -> impl Future<Item = HttpResponse, Error = Error> {
-    //
+pub fn upload_avatar(
+    id: web::Path<i32>,
+    multipart: Multipart,
+) -> impl Future<Item = HttpResponse, Error = Error> {
+    let mut p: Option<User> = None;
+    User::find_by_pk(*id)
+        .map(|user_data| p = Some(user_data.0))
+        .map_err(|e| HttpResponse::NotFound().json(e.to_string()));
     multipart
         .map_err(error::ErrorInternalServerError)
         .map(|field| extract_multipart_field(field).into_stream())
@@ -96,7 +106,7 @@ pub fn upload_avatar(multipart: Multipart) -> impl Future<Item = HttpResponse, E
         .map(|upload_response| // [byte_size, url]
         {
             let _file_url = &upload_response[0].1;
-            HttpResponse::Ok().json(&upload_response[0].0)
+            HttpResponse::Ok().json(p.unwrap().save_avatar(_file_url).unwrap())
         })
         .map_err(|e| {
             log_error!("File upload failed: {:?}", e);

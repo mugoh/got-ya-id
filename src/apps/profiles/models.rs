@@ -128,3 +128,18 @@ pub struct NewAvatar<'a> {
     url: Option<Cow<'a, str>>,
     user_id: i32,
 }
+
+impl<'a> NewAvatar<'a> {
+    /// Creates a new user profile avatar
+    pub fn new<'b>(user_id: i32) -> Result<Avatar<'b>, diesel::result::Error> {
+        //
+        let avatar = NewAvatar {
+            url: Some(Cow::Borrowed("default_avatar_url")),
+            user_id,
+        };
+
+        diesel::insert_into(avatars::table)
+            .values(avatar)
+            .get_result::<Avatar>(&connect_to_db())
+    }
+}
