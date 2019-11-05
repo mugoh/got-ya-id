@@ -6,6 +6,7 @@ use crate::diesel_cfg::{config::connect_to_db, schema, schema::avatars, schema::
 
 use diesel::{self, prelude::*};
 use serde::{Deserialize, Serialize};
+use serde_json::{json, value};
 
 use std::{borrow::Cow, error};
 
@@ -28,13 +29,27 @@ pub struct Profile<'a> {
 
 impl<'a> Profile<'a> {
     /// Finds a given profile by its Primary Key
-    pub fn find_by_key(pk: i32) -> Result<Vec<Profile<'a>>, Box<dyn error::Error>> {
+    ///
+    /// # Returns
+    ///
+    /// (
+    ///   [Profile],
+    ///   {avatar: url_to_profile avatar}
+    ///  )
+    pub fn find_by_key(pk: i32) -> Result<(Vec<Profile<'a>>, value::Value), Box<dyn error::Error>> {
+        use schema::avatars::dsl::*;
         use schema::profiles::dsl::*;
-        let query = profiles.find(pk).load(&connect_to_db())?;
-        if query.is_empty() {
+        let profile = profiles.find(pk).load(&connect_to_db())?;
+        if profile.is_empty() {
             return Err(format!("User of ID {} non-existent", pk).into());
         }
-        Ok(query)
+        let av = json!({"avatar": avatars
+            .find(pk)
+            .first::<Avatar>(&connect_to_db())?
+            .url
+            .unwrap()
+            .into_owned()});
+        Ok((profile, av))
     }
 
     /// Retrieves all existing User profiles
@@ -81,7 +96,10 @@ impl<'a> NewProfile<'a> {
     /// - profile: Option<u32>
     ///     If Some returns the created user Profile object.
     ///     None(default): Nothing is returned
-    pub fn new<'b>(user_id: i32, profile: Option<u32>) -> Result<Option<Profile<'b>>, String> {
+    pub fn new<'b>(
+        user_id: i32,
+        profile: Option<u32>,
+    ) -> Result<Option<(Profile<'b>, Avatar<'b>)>, String> {
         let new_profile = NewProfile {
             user_id,
             ..Default::default()
@@ -90,9 +108,13 @@ impl<'a> NewProfile<'a> {
             .values(new_profile)
             .get_result::<Profile>(&connect_to_db())
             .expect("Error creating user profile");
+        let res_av = match NewAvatar::new(user_id) {
+            Ok(av) => av,
+            Err(e) => Err(e.to_string())?,
+        };
 
         if profile.is_some() {
-            Ok(Some(res))
+            Ok(Some((res, res_av)))
         } else {
             Ok(None)
         }
@@ -133,8 +155,9 @@ impl<'a> NewAvatar<'a> {
     /// Creates a new user profile avatar
     pub fn new<'b>(user_id: i32) -> Result<Avatar<'b>, diesel::result::Error> {
         //
+        let default_avatar = "some default avatar url";
         let avatar = NewAvatar {
-            url: Some(Cow::Borrowed("default_avatar_url")),
+            url: Some(Cow::Borrowed(default_avatar)),
             user_id,
         };
 

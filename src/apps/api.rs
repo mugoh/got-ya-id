@@ -42,7 +42,7 @@ pub fn api(cfg: &mut web::ServiceConfig) {
                     .service(web::resource("/{id}").route(web::get().to(user::views::get_user)))
                     .service(
                         web::resource("/{id}/profile/avatar")
-                            .route(web::post().to_async(profiles::views::upload_avatar)),
+                            .route(web::put().to_async(profiles::views::upload_avatar)),
                     ),
             )
             .service(web::scope("/users").service(

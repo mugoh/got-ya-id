@@ -26,7 +26,7 @@ pub fn get_profile(id: web::Path<i32>) -> HttpResponse {
         Ok(mut prof_vec) => {
             let data = hashmap!["status" => "200",
             "message" => "Success. Profile retreived"];
-            respond(data, Some(prof_vec.pop()), None).unwrap()
+            respond(data, Some(prof_vec.0.pop()), None).unwrap()
         }
         Err(e) => err("404", e.to_string()),
     };
@@ -62,7 +62,7 @@ pub fn get_all_profiles() -> HttpResponse {
 pub fn update_profile(data: web::Json<UpdtProfile>, id: web::Path<i32>) -> HttpResponse {
     match Profile::find_by_key(*id) {
         Ok(p_vec) => {
-            let profile = &p_vec[0];
+            let profile = &p_vec.0[0];
             let resp_data = hashmap!["status" => "200", "message" => "Success. Profile updated"];
 
             match profile.update(data.0) {
@@ -89,7 +89,7 @@ pub fn update_profile(data: web::Json<UpdtProfile>, id: web::Path<i32>) -> HttpR
 ///   upload file
 ///
 /// # Method
-///     POST
+///    PUT
 pub fn upload_avatar(
     id: web::Path<i32>,
     multipart: Multipart,
