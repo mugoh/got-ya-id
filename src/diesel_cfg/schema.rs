@@ -142,7 +142,7 @@ table! {
     }
 }
 
-joinable!(avatars -> profiles (user_id));
+joinable!(avatars -> users (user_id));
 joinable!(profiles -> users (user_id));
 
 allow_tables_to_appear_in_same_query!(
