@@ -22,7 +22,7 @@ futures = "0.1"
 jsonwebtoken = "6"
 envy = "0.4"
 tera = "0.7"
-url = "2.1.0"
+url = "1.2"
 lettre = "0.9"
 lettre_email = "0.9"
 diesel = { version = "1.4.3", features = ["postgres", "chrono"] }

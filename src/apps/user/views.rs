@@ -342,12 +342,14 @@ pub fn change_activation_status(mut data: web::Json<UserEmail>) -> HttpResponse 
 ///
 /// # method
 ///  GET
-pub fn google_auth() -> HttpResponse {
+pub fn google_auth(req: HttpRequest) -> HttpResponse {
     use oauth2::basic::BasicClient;
     use oauth2::prelude::*;
     use oauth2::{
         AuthUrl, AuthorizationCode, ClientId, ClientSecret, CsrfToken, RedirectUrl, Scope, TokenUrl,
     };
+    let host = format!("{:?}", req.headers().get("host").unwrap());
+    let host = Url::from_str(host).unwrap();
 
     let google_client_id = ClientId::new(
         std::env::var("GOOGLE_CLIENT_ID")
@@ -358,11 +360,13 @@ pub fn google_auth() -> HttpResponse {
             .expect("Missing the GOOGLE_CLIENT_SECRET environment variable."),
     );
     let auth_url = AuthUrl::new(
-        url::Url("https://accounts.google.com/o/oauth2/v2/auth".to_string())
+        Url::parse("https://accounts.google.com/o/oauth2/v2/auth")
             .expect("Invalid authorization endpoint URL"),
     );
-    let token_url = TokenUrl::new("https://www.googleapis.com/oauth2/v3/token".to_string())
-        .expect("Invalid token endpoint URL");
+    let token_url = TokenUrl::new(
+        Url::parse("https://www.googleapis.com/oauth2/v3/token")
+            .expect("Invalid token endpoint URL"),
+    );
 
     let client = BasicClient::new(
         google_client_id,
@@ -374,7 +378,8 @@ pub fn google_auth() -> HttpResponse {
     .add_scope(Scope::new("email".to_string()))
     .add_scope(Scope::new("profile".to_string()))
     .set_redirect_url(RedirectUrl::new(
-        Url::parse("http://127.0.0.1:8888/auth/callback").expect("Invalid RedirectUrl"),
+        host.join("/api/auth/callback")
+            .expect("Invalid RedirectUrl"),
     ));
 
     let (auth_url, csrf_token) = client.authorize_url(CsrfToken::new_random);
