@@ -58,9 +58,9 @@ pub fn encode_jwt_token(user: NewUser) -> Result<String, Box<dyn error::Error>> 
 /// - If the token decoding fails
 ///
 pub fn decode_auth_token(token: &String) -> Result<Claims, Box<dyn error::Error>> {
-    let key = env::var("secret_key").unwrap_or_else(|er| {
-        eprintln!("Error: Missing required ENV Variable\n{:#?}", er);
-        process::exit(78);
+    let key = env::var("secret_key").unwrap_or_else(|_er| {
+        eprintln!("Error: Missing required ENV Variable `secret_key`\n");
+        process::exit(0);
     });
 
     let decoded_token = match decode::<Claims>(&token, key.as_ref(), &Validation::default()) {

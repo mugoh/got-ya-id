@@ -8,7 +8,7 @@ use got_ya_id::apps::api;
 fn main() -> io::Result<()> {
     let mut listen_fd = ListenFd::from_env();
 
-    env::set_var("RUST_LOG", "actix_todo=debug, actix-web=info");
+    env::set_var("RUST_LOG", "actix_todo=debug, actix-web=debug");
     env_logger::init();
 
     let mut app = HttpServer::new(|| {

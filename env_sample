@@ -1,0 +1,13 @@
+db_username=''
+db_port=
+db_host=''
+db_pass=''
+db_name=''
+
+
+# DATABASE_URL=postgres://$(db_username):$(db_pass)@$(db_host):$(db_port)/$(db_name)
+DATABASE_URL=
+
+CLOUDINARY_URL=
+
+export secret_key=''
