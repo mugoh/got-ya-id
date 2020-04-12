@@ -16,6 +16,9 @@ pub fn api(cfg: &mut web::ServiceConfig) {
                         web::resource("/login").route(web::post().to_async(user::views::login)),
                     )
                     .service(
+                        web::resource("/google").route(web::post().to(user::views::google_auth)),
+                    )
+                    .service(
                         web::resource("/verify/{token}")
                             .route(web::get().to_async(user::views::verify)),
                     )

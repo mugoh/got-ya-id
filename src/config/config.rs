@@ -15,7 +15,7 @@ pub struct Config {
 
 /// Default ENV value for log
 fn default_log() -> String {
-    String::from("actix-web=info")
+    String::from("actix-web=debug")
 }
 
 /// Returns a Serialized ENV variable Configuration

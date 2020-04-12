@@ -12,6 +12,8 @@ use crate::hashmap;
 use log::{debug, error};
 use tera::{self, Context};
 
+use url::Url;
+
 use actix_web::{http, web, HttpRequest, HttpResponse};
 use serde_json::json;
 use validator::Validate;
@@ -329,4 +331,55 @@ pub fn change_activation_status(mut data: web::Json<UserEmail>) -> HttpResponse 
         }
         Err(e) => err("404", e.to_string()),
     }
+}
+
+/// Oauth authentication
+///
+/// Authenticates user using google-auth
+///
+/// # url
+/// ## `/auth/google`
+///
+/// # method
+///  GET
+pub fn google_auth() -> HttpResponse {
+    use oauth2::basic::BasicClient;
+    use oauth2::prelude::*;
+    use oauth2::{
+        AuthUrl, AuthorizationCode, ClientId, ClientSecret, CsrfToken, RedirectUrl, Scope, TokenUrl,
+    };
+
+    let google_client_id = ClientId::new(
+        std::env::var("GOOGLE_CLIENT_ID")
+            .expect("Missing the GOOGLE_CLIENT_ID environment variable."),
+    );
+    let google_client_secret = ClientSecret::new(
+        std::env::var("GOOGLE_CLIENT_SECRET")
+            .expect("Missing the GOOGLE_CLIENT_SECRET environment variable."),
+    );
+    let auth_url = AuthUrl::new(
+        url::Url("https://accounts.google.com/o/oauth2/v2/auth".to_string())
+            .expect("Invalid authorization endpoint URL"),
+    );
+    let token_url = TokenUrl::new("https://www.googleapis.com/oauth2/v3/token".to_string())
+        .expect("Invalid token endpoint URL");
+
+    let client = BasicClient::new(
+        google_client_id,
+        Some(google_client_secret),
+        auth_url,
+        Some(token_url),
+    )
+    .add_scope(Scope::new("openid".to_string()))
+    .add_scope(Scope::new("email".to_string()))
+    .add_scope(Scope::new("profile".to_string()))
+    .set_redirect_url(RedirectUrl::new(
+        Url::parse("http://127.0.0.1:8888/auth/callback").expect("Invalid RedirectUrl"),
+    ));
+
+    let (auth_url, csrf_token) = client.authorize_url(CsrfToken::new_random);
+
+    println!("Browse to {}", auth_url);
+
+    HttpResponse::build(http::StatusCode::OK).body("Got that")
 }
