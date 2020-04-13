@@ -7,7 +7,7 @@ use std::{
 };
 
 use got_ya_id::apps::api;
-use got_ya_id::apps::user::models::OClient;
+use got_ya_id::apps::user::{models::OClient, utils::create_oauth_client};
 
 fn main() -> io::Result<()> {
     let mut listen_fd = ListenFd::from_env();
@@ -16,7 +16,7 @@ fn main() -> io::Result<()> {
     env_logger::init();
 
     let data = OClient {
-        client: "This is it".to_string(),
+        client: create_oauth_client(),
     };
     let data = Arc::new(Mutex::new(data));
 

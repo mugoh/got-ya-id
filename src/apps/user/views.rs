@@ -16,15 +16,9 @@ use crate::hashmap;
 use log::{debug, error};
 use tera::{self, Context};
 
-use url::Url;
-
 use actix_web::{http, web, HttpRequest, HttpResponse};
 use serde_json::json;
 use validator::Validate;
-
-use oauth2::basic::BasicClient;
-use oauth2::prelude::*;
-use oauth2::{AuthUrl, ClientId, ClientSecret, CsrfToken, RedirectUrl, Scope, TokenUrl};
 
 use std::sync::{Arc, Mutex};
 
@@ -356,6 +350,8 @@ pub fn change_activation_status(mut data: web::Json<UserEmail>) -> HttpResponse 
 /// # method
 ///  GET
 pub fn google_auth(_req: HttpRequest) -> HttpResponse {
+    use oauth2::CsrfToken;
+
     // TODO Retrieve base url for redirect url
     // let host = format!("http://{:?}", req.headers().get("host").unwrap());
     // let host = Url::parse(&host).unwrap();
@@ -396,6 +392,6 @@ pub fn google_auth_callback(
 
         println!("Token: {:?}", token);
     */
-    println!("data: {}", data.get_ref().lock().unwrap().client);
+    println!("data: {:?}", data.get_ref().lock().unwrap().client);
     HttpResponse::build(http::StatusCode::OK).body("OK")
 }
