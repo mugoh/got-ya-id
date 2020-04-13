@@ -357,8 +357,6 @@ pub fn google_auth(_req: HttpRequest, data: web::Data<Arc<Mutex<OClient>>>) -> H
     let client = &data.get_ref().lock().unwrap().client;
     let (auth_url, _csrf_token) = client.authorize_url(CsrfToken::new_random);
 
-    println!("auth_url: {}\n _csrf_token: {:#?}", auth_url, _csrf_token);
-
     let data = hashmap!["status" => "200", "message" => "Authentication success. Browse to the authentication url given"];
     let body = json!({ "auth_url": auth_url.to_string() });
     std::mem::drop(client);
@@ -369,7 +367,9 @@ pub fn google_auth(_req: HttpRequest, data: web::Data<Arc<Mutex<OClient>>>) -> H
 /// Oauth Url Callback
 ///
 ///
-/// Exchanges the Oauth code for a user authenication token
+/// Exchanges the Oauth code for a user authenication token.
+/// This is endpoint is called once the user agrees to grant access
+/// to the app
 ///
 /// # url
 /// ## `/auth/callback`
@@ -384,19 +384,19 @@ pub fn google_auth_callback(
     use oauth2::prelude::*;
     use oauth2::AuthorizationCode;
 
-    println!("code: {}\nstate: {}", info.code, info.state);
     let client = &data.get_ref().lock().unwrap().client;
+    let code = AuthorizationCode::new(info.code.to_string());
 
-    println!("data: {:?}", data.get_ref().lock().unwrap().client);
-    let token = client
-        .exchange_code(AuthorizationCode::new(info.code.to_string()))
-        .unwrap_or_else(|e| {
-            eprintln!("Err: {:?}", e);
+    let token_data = match client.exchange_code(code) {
+        Ok(token) => {
+            let data =
+                hashmap!["status" => "200", "message" => "Success. Authorization token received"];
 
-            std::process::exit(0);
-        });
+            respond(data, Some(token), None).unwrap()
+        }
+        Err(er) => err("403", er.to_string()),
+    };
 
-    println!("Token: {:?}", token);
     std::mem::drop(client);
-    HttpResponse::build(http::StatusCode::OK).body("OK")
+    token_data
 }

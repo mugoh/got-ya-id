@@ -197,6 +197,9 @@ pub fn create_oauth_client() -> oauth2::basic::BasicClient {
     .add_scope(Scope::new("openid".to_string()))
     .add_scope(Scope::new("email".to_string()))
     .add_scope(Scope::new("profile".to_string()))
+    .add_scope(Scope::new(
+        "https://www.googleapis.com/auth/plus.me".to_string(),
+    ))
     .set_redirect_url(RedirectUrl::new(
         // host.join("api/auth/callback")
         //     .expect("Invalid redirect Url"),
