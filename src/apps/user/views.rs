@@ -357,15 +357,17 @@ pub fn google_auth(_req: HttpRequest, data: web::Data<Arc<Mutex<OClient>>>) -> H
     let client = &data.get_ref().lock().unwrap().client;
     let (auth_url, _csrf_token) = client.authorize_url(CsrfToken::new_random);
 
-    HttpResponse::build(http::StatusCode::OK).body("Got that");
+    println!("auth_url: {}\n _csrf_token: {:#?}", auth_url, _csrf_token);
 
     let data = hashmap!["status" => "200", "message" => "Authentication success. Browse to the authentication url given"];
     let body = json!({ "auth_url": auth_url.to_string() });
+    std::mem::drop(client);
 
     respond(data, Some(body), None).unwrap()
 }
 
 /// Oauth Url Callback
+///
 ///
 /// Exchanges the Oauth code for a user authenication token
 ///
@@ -386,8 +388,15 @@ pub fn google_auth_callback(
     let client = &data.get_ref().lock().unwrap().client;
 
     println!("data: {:?}", data.get_ref().lock().unwrap().client);
-    let token = client.exchange_code(AuthorizationCode::new(info.code.to_string()));
+    let token = client
+        .exchange_code(AuthorizationCode::new(info.code.to_string()))
+        .unwrap_or_else(|e| {
+            eprintln!("Err: {:?}", e);
+
+            std::process::exit(0);
+        });
 
     println!("Token: {:?}", token);
+    std::mem::drop(client);
     HttpResponse::build(http::StatusCode::OK).body("OK")
 }
