@@ -4,9 +4,7 @@
 use super::models::{
     NewUser, OClient, OauthInfo, PassResetData, ResetPassData, SignInUser, User, UserEmail,
 };
-use super::utils::{
-    create_oauth_client, err_response, get_context, get_reset_context, get_url, TEMPLATE,
-};
+use super::utils::{err_response, get_context, get_reset_context, get_url, TEMPLATE};
 
 use crate::apps::auth::validate;
 use crate::core::mail;
@@ -349,14 +347,14 @@ pub fn change_activation_status(mut data: web::Json<UserEmail>) -> HttpResponse 
 ///
 /// # method
 ///  GET
-pub fn google_auth(_req: HttpRequest) -> HttpResponse {
+pub fn google_auth(_req: HttpRequest, data: web::Data<Arc<Mutex<OClient>>>) -> HttpResponse {
     use oauth2::CsrfToken;
 
     // TODO Retrieve base url for redirect url
     // let host = format!("http://{:?}", req.headers().get("host").unwrap());
     // let host = Url::parse(&host).unwrap();
 
-    let client = create_oauth_client();
+    let client = &data.get_ref().lock().unwrap().client;
     let (auth_url, _csrf_token) = client.authorize_url(CsrfToken::new_random);
 
     HttpResponse::build(http::StatusCode::OK).body("Got that");
@@ -385,13 +383,11 @@ pub fn google_auth_callback(
     use oauth2::AuthorizationCode;
 
     println!("code: {}\nstate: {}", info.code, info.state);
-    /*
-        let token = client
-            .exchange_code(AuthorizationCode::new(info.code.to_owned()))
-            .unwrap();
+    let client = &data.get_ref().lock().unwrap().client;
 
-        println!("Token: {:?}", token);
-    */
     println!("data: {:?}", data.get_ref().lock().unwrap().client);
+    let token = client.exchange_code(AuthorizationCode::new(info.code.to_string()));
+
+    println!("Token: {:?}", token);
     HttpResponse::build(http::StatusCode::OK).body("OK")
 }
