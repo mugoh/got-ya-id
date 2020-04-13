@@ -335,21 +335,24 @@ pub fn change_activation_status(mut data: web::Json<UserEmail>) -> HttpResponse 
 
 /// Oauth authentication
 ///
-/// Authenticates user using google-auth
+/// Authenticates user using google-auth. This endpoint returns
+/// an authentication url which calls the callback endpoint
+/// `/auth/callback` on success
+///
 ///
 /// # url
 /// ## `/auth/google`
 ///
 /// # method
 ///  GET
-pub fn google_auth(req: HttpRequest) -> HttpResponse {
+pub fn google_auth(_req: HttpRequest) -> HttpResponse {
     use oauth2::basic::BasicClient;
     use oauth2::prelude::*;
-    use oauth2::{
-        AuthUrl, AuthorizationCode, ClientId, ClientSecret, CsrfToken, RedirectUrl, Scope, TokenUrl,
-    };
-    let host = format!("{:?}", req.headers().get("host").unwrap());
-    let host = Url::from_str(host).unwrap();
+    use oauth2::{AuthUrl, ClientId, ClientSecret, CsrfToken, RedirectUrl, Scope, TokenUrl};
+
+    // TODO Retrieve base url for redirect url
+    // let host = format!("https://{:?}/", req.headers().get("host").unwrap());
+    // let host = Url::parse(&host).unwrap();
 
     let google_client_id = ClientId::new(
         std::env::var("GOOGLE_CLIENT_ID")
@@ -378,13 +381,29 @@ pub fn google_auth(req: HttpRequest) -> HttpResponse {
     .add_scope(Scope::new("email".to_string()))
     .add_scope(Scope::new("profile".to_string()))
     .set_redirect_url(RedirectUrl::new(
-        host.join("/api/auth/callback")
-            .expect("Invalid RedirectUrl"),
+        // host.join("api/auth/callback") Add retrieve url
+        Url::parse("https://127.0.0.1:8888/api/auth/callback").expect("Invalid RedirectUrl"),
     ));
 
-    let (auth_url, csrf_token) = client.authorize_url(CsrfToken::new_random);
+    let (auth_url, _csrf_token) = client.authorize_url(CsrfToken::new_random);
 
-    println!("Browse to {}", auth_url);
+    HttpResponse::build(http::StatusCode::OK).body("Got that");
 
-    HttpResponse::build(http::StatusCode::OK).body("Got that")
+    let data = hashmap!["status" => "200", "message" => "Authentication success. Browse to the authentication url given"];
+    let body = json!({ "auth_url": auth_url.to_string() });
+
+    respond(data, Some(body), None).unwrap()
+}
+
+/// Oauth Url Callback
+///
+/// Exchanges the Oauth code for a user authenication token
+///
+/// # url
+/// ## `/auth/callback`
+///
+/// # method
+///  GET
+pub fn google_auth_callback(req: HttpRequest) -> HttpResponse {
+    //
 }
