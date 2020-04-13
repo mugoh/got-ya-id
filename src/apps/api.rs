@@ -19,6 +19,10 @@ pub fn api(cfg: &mut web::ServiceConfig) {
                         web::resource("/google").route(web::get().to(user::views::google_auth)),
                     )
                     .service(
+                        web::resource("/callback")
+                            .route(web::get().to(user::views::google_auth_callback)),
+                    )
+                    .service(
                         web::resource("/verify/{token}")
                             .route(web::get().to_async(user::views::verify)),
                     )

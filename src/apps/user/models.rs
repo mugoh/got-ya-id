@@ -377,3 +377,17 @@ pub struct UserEmail<'a> {
     #[validate(email(message = "Email format not invented yet"))]
     pub email: Cow<'a, str>,
 }
+
+/// Oauth Query Params Struct extractor
+#[derive(Deserialize)]
+pub struct OauthInfo {
+    pub code: String,
+    pub state: String,
+}
+
+/// App Data extractor
+///
+/// Holds the Oauth Client
+pub struct OClient {
+    pub client: oauth2::basic::BasicClient,
+}

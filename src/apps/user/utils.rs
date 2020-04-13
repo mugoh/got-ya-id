@@ -161,3 +161,47 @@ pub fn get_url<'a>(host: &'a str, path: &'a str, id: &'a str) -> String {
     .replace("\"", "")
     // HeaderValue can't be formatted to str
 }
+
+/// Creates an oauth2 BasicClient for use in google-auth
+/// authentication
+pub fn create_oauth_client() -> oauth2::basic::BasicClient {
+    use oauth2::basic::BasicClient;
+    use oauth2::prelude::*;
+    use oauth2::{AuthUrl, ClientId, ClientSecret, RedirectUrl, Scope, TokenUrl};
+
+    use url::Url;
+
+    let google_client_id = ClientId::new(
+        std::env::var("GOOGLE_CLIENT_ID")
+            .expect("Missing the GOOGLE_CLIENT_ID environment variable."),
+    );
+    let google_client_secret = ClientSecret::new(
+        std::env::var("GOOGLE_CLIENT_SECRET")
+            .expect("Missing the GOOGLE_CLIENT_SECRET environment variable."),
+    );
+    let auth_url = AuthUrl::new(
+        Url::parse("https://accounts.google.com/o/oauth2/v2/auth")
+            .expect("Invalid authorization endpoint URL"),
+    );
+    let token_url = TokenUrl::new(
+        Url::parse("https://www.googleapis.com/oauth2/v3/token")
+            .expect("Invalid token endpoint URL"),
+    );
+
+    let client = BasicClient::new(
+        google_client_id,
+        Some(google_client_secret),
+        auth_url,
+        Some(token_url),
+    )
+    .add_scope(Scope::new("openid".to_string()))
+    .add_scope(Scope::new("email".to_string()))
+    .add_scope(Scope::new("profile".to_string()))
+    .set_redirect_url(RedirectUrl::new(
+        // host.join("api/auth/callback")
+        //     .expect("Invalid redirect Url"),
+        Url::parse("http://127.0.0.1:8888/api/auth/callback").expect("Invalid RedirectUrl"),
+    ));
+
+    client
+}
