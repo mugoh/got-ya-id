@@ -117,7 +117,6 @@ pub fn upload_avatar(
         })
 }
 
-/*
 /// Retrieves an avatar url of a user profile
 ///
 /// # url
@@ -125,8 +124,19 @@ pub fn upload_avatar(
 ///
 /// # method
 /// GET
-pub fn retrieve_profile_avatar(
-    id: web::Path<i32>,
-) -> impl Future<Item = HttpResponse, Error = Error> {
-    let user = match User::find_by_pk(*id) {Ok(usr) => usr}
-}*/
+pub fn retrieve_profile_avatar(id: web::Path<i32>) -> HttpResponse {
+    let user = match User::find_by_pk(*id, None) {
+        Ok(usr) => usr.0,
+        Err(e) => return err("404", e.to_string()),
+    };
+
+    match user.get_avatar() {
+        Ok(avatar) => respond(
+            hashmap!["status" => "200", "message" => "Success. Avatar retrieved"],
+            avatar,
+            None,
+        )
+        .unwrap(),
+        Err(e) => err("500", e.to_string()),
+    }
+}

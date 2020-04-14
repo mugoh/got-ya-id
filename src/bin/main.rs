@@ -2,7 +2,7 @@ use actix_web::{middleware, web, App, HttpServer};
 //use env_logger;
 use listenfd::ListenFd;
 use std::{
-    env, io,
+    io,
     sync::{Arc, Mutex},
 };
 

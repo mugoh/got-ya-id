@@ -1,7 +1,7 @@
 //! This module holds items related to data manipulation
 //! for the User Object
 
-use super::utils::{from_timestamp, naive_date_format, validate_email, validate_name};
+use super::utils::{from_timestamp, validate_email, validate_name};
 
 use std::borrow::Cow;
 
@@ -240,8 +240,7 @@ impl User {
     /// # Arguments
     ///
     /// * `pk`  - User primary key
-    /// * `include_profile` - If supplied, return a tuple of the user and the user profile.
-    /// Returns the user profile only if None
+    /// * `include_profile` - If supplied, return a tuple of the user and the user profile. Returns the user instance only if None
     ///
     pub fn find_by_pk<'a>(
         pk: i32,
@@ -250,7 +249,7 @@ impl User {
         //
         use crate::diesel_cfg::schema::users::dsl::*;
         let user = users.find(pk).get_result::<User>(&connect_to_db())?;
-        if include_profile.is_some() {
+        if !include_profile.is_some() {
             return Ok((user, None));
         }
         let mut usr_profile = Profile::belonging_to(&user).load::<Profile>(&connect_to_db())?;
@@ -316,8 +315,6 @@ impl User {
 
     /// Retrieves the Avatar belonging to the user instance
     pub fn get_avatar<'b>(&self) -> Result<Option<Avatar>, diesel::result::Error> {
-        //
-        use crate::diesel_cfg::schema::avatars::dsl::*;
         Ok(Avatar::belonging_to(self)
             .load::<Avatar>(&connect_to_db())?
             .pop())
