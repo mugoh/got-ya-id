@@ -293,7 +293,7 @@ pub fn reset_password(data: web::Json<ResetPassData>, path: web::Path<String>) -
 /// # url
 /// ## `/user/{ID}`
 pub fn get_user(id: web::Path<i32>) -> HttpResponse {
-    match User::find_by_pk(*id) {
+    match User::find_by_pk(*id, Some(1)) {
         Ok((usr, profile)) => {
             let data = hashmap!["status" => "200", "message" => "Success. User and User profile retrieved"];
             println!("{:?}\n\n{:?}", usr, profile);

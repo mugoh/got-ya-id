@@ -237,10 +237,22 @@ impl User {
     /// # Returns
     /// The user object and corresponding Profile
     ///
-    pub fn find_by_pk<'a>(pk: i32) -> Result<(User, Option<Profile<'a>>), Box<dyn error::Error>> {
+    /// # Arguments
+    ///
+    /// * `pk`  - User primary key
+    /// * `include_profile` - If supplied, return a tuple of the user and the user profile.
+    /// Returns the user profile only if None
+    ///
+    pub fn find_by_pk<'a>(
+        pk: i32,
+        include_profile: Option<i32>,
+    ) -> Result<(User, Option<Profile<'a>>), Box<dyn error::Error>> {
         //
         use crate::diesel_cfg::schema::users::dsl::*;
         let user = users.find(pk).get_result::<User>(&connect_to_db())?;
+        if include_profile.is_some() {
+            return Ok((user, None));
+        }
         let mut usr_profile = Profile::belonging_to(&user).load::<Profile>(&connect_to_db())?;
         if usr_profile.is_empty() {
             Err(format!("User of ID {id} non existent", id = pk))?
@@ -300,6 +312,15 @@ impl User {
         Ok(diesel::update(&avatar[0])
             .set(url.eq(avatar_url))
             .get_result::<Avatar>(&connect_to_db())?)
+    }
+
+    /// Retrieves the Avatar belonging to the user instance
+    pub fn get_avatar<'b>(&self) -> Result<Option<Avatar>, diesel::result::Error> {
+        //
+        use crate::diesel_cfg::schema::avatars::dsl::*;
+        Ok(Avatar::belonging_to(self)
+            .load::<Avatar>(&connect_to_db())?
+            .pop())
     }
 }
 

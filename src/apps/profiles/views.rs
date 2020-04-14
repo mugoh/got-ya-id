@@ -94,7 +94,7 @@ pub fn upload_avatar(
     id: web::Path<i32>,
     multipart: Multipart,
 ) -> impl Future<Item = HttpResponse, Error = Error> {
-    futures::future::result(User::find_by_pk(*id))
+    futures::future::result(User::find_by_pk(*id, Some(1)))
         .map(|user_data| user_data.0)
         .map_err(error::ErrorNotFound)
         .and_then(|some_user| {
@@ -116,3 +116,17 @@ pub fn upload_avatar(
                 })
         })
 }
+
+/*
+/// Retrieves an avatar url of a user profile
+///
+/// # url
+/// ## `/user/profile/{user_id}/avatar`
+///
+/// # method
+/// GET
+pub fn retrieve_profile_avatar(
+    id: web::Path<i32>,
+) -> impl Future<Item = HttpResponse, Error = Error> {
+    let user = match User::find_by_pk(*id) {Ok(usr) => usr}
+}*/
