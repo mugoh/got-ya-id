@@ -1,5 +1,5 @@
 use actix_web::{middleware, web, App, HttpServer};
-use env_logger;
+//use env_logger;
 use listenfd::ListenFd;
 use std::{
     env, io,
@@ -12,7 +12,7 @@ use got_ya_id::apps::user::{models::OClient, utils::create_oauth_client};
 fn main() -> io::Result<()> {
     let mut listen_fd = ListenFd::from_env();
 
-    env::set_var("RUST_LOG", "actix_todo=debug, actix-web=debug");
+    // env::set_var("RUST_LOG", "debug");
     env_logger::init();
 
     let data = OClient {

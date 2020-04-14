@@ -292,18 +292,14 @@ pub fn reset_password(data: web::Json<ResetPassData>, path: web::Path<String>) -
 ///
 /// # url
 /// ## `/user/{ID}`
-///
-/// # method
-/// GET
 pub fn get_user(id: web::Path<i32>) -> HttpResponse {
-    let res = match User::find_by_pk(*id) {
+    match User::find_by_pk(*id) {
         Ok((usr, profile)) => {
             let data = hashmap!["status" => "200", "message" => "Success. User and User profile retrieved"];
             respond(data, Some((usr, profile)), None).unwrap()
         }
         Err(e) => err("404", e.to_string()),
-    };
-    res
+    }
 }
 
 /// Activates or Deactivates User accounts

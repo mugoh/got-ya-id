@@ -145,8 +145,4 @@ table! {
 joinable!(avatars -> users (user_id));
 joinable!(profiles -> users (user_id));
 
-allow_tables_to_appear_in_same_query!(
-    avatars,
-    profiles,
-    users,
-);
+allow_tables_to_appear_in_same_query!(avatars, profiles, users,);

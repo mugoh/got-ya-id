@@ -11,3 +11,9 @@ DATABASE_URL=
 CLOUDINARY_URL=
 
 export secret_key=''
+
+# Email Client
+SMTP_CLIENT=
+MAIL_ADDR=
+MAIL_USERNAME
+MAIL_PASS
