@@ -1,7 +1,7 @@
 //! This module holds items related to data manipulation
 //! for the User Object
 
-use super::utils::{naive_date_format, validate_email, validate_name};
+use super::utils::{from_timestamp, naive_date_format, validate_email, validate_name};
 
 use std::borrow::Cow;
 
@@ -34,9 +34,9 @@ pub struct User {
     pub email: String,
     #[serde(skip_deserializing)]
     password: String,
-    #[serde(with = "naive_date_format")]
+    #[serde(deserialize_with = "from_timestamp")]
     pub created_at: NaiveDateTime,
-    #[serde(with = "naive_date_format")]
+    #[serde(deserialize_with = "from_timestamp")]
     updated_at: NaiveDateTime,
     pub is_active: bool,
     pub is_verified: bool,

@@ -296,7 +296,8 @@ pub fn get_user(id: web::Path<i32>) -> HttpResponse {
     match User::find_by_pk(*id) {
         Ok((usr, profile)) => {
             let data = hashmap!["status" => "200", "message" => "Success. User and User profile retrieved"];
-            respond(data, Some((usr, profile)), None).unwrap()
+            println!("{:?}\n\n{:?}", usr, profile);
+            respond(data, Some((usr, profile.unwrap())), None).unwrap()
         }
         Err(e) => err("404", e.to_string()),
     }

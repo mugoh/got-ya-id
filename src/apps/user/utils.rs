@@ -7,7 +7,13 @@ use super::models::{NewUser, User};
 
 use crate::apps::core::response;
 
+use chrono::NaiveDateTime;
+use serde::de;
+use serde::Deserialize;
+use std::fmt;
+
 lazy_static! {
+
     /// Lazily Compiled Templates
     pub static ref TEMPLATE: Tera = {
         let mut tera = tera::compile_templates!("src/templates/**/*");
@@ -207,4 +213,31 @@ pub fn create_oauth_client() -> oauth2::basic::BasicClient {
     ));
 
     client
+}
+
+struct NaiveDateTimeVisitor;
+
+impl<'de> de::Visitor<'de> for NaiveDateTimeVisitor {
+    type Value = NaiveDateTime;
+
+    fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+        write!(formatter, "a string represents chrono::NaiveDateTime")
+    }
+
+    fn visit_str<E>(self, s: &str) -> Result<Self::Value, E>
+    where
+        E: de::Error,
+    {
+        match NaiveDateTime::parse_from_str(s, "%Y-%m-%dT%H:%M:%S.%f") {
+            Ok(t) => Ok(t),
+            Err(_) => Err(de::Error::invalid_value(de::Unexpected::Str(s), &self)),
+        }
+    }
+}
+
+pub fn from_timestamp<'de, D>(d: D) -> Result<NaiveDateTime, D::Error>
+where
+    D: de::Deserializer<'de>,
+{
+    d.deserialize_str(NaiveDateTimeVisitor)
 }
