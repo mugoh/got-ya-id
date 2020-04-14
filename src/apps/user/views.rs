@@ -381,6 +381,7 @@ pub fn google_auth_callback(
     data: web::Data<Arc<Mutex<OClient>>>,
 ) -> HttpResponse {
     //
+
     use oauth2::prelude::*;
     use oauth2::AuthorizationCode;
 
@@ -389,8 +390,8 @@ pub fn google_auth_callback(
 
     let token_data = match client.exchange_code(code) {
         Ok(token) => {
-            let data =
-                hashmap!["status" => "200", "message" => "Success. Authorization token received"];
+            let data = hashmap!["status" => "200",
+            "message" => "Success. Authorization token received"];
 
             respond(data, Some(token), None).unwrap()
         }

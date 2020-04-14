@@ -155,6 +155,7 @@ impl<'a> NewAvatar<'a> {
     /// Creates a new user profile avatar
     pub fn new<'b>(user_id: i32) -> Result<Avatar<'b>, diesel::result::Error> {
         //
+        //TODO Set Default avatar url
         let default_avatar = "some default avatar url";
         let avatar = NewAvatar {
             url: Some(Cow::Borrowed(default_avatar)),
