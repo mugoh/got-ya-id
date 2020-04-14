@@ -25,7 +25,7 @@ lazy_static! {
 /// If the validation fails
 pub fn validate_name(name: &str) -> Result<(), ValidationError> {
     lazy_static! {
-        static ref NAME_PATTERN: Regex = Regex::new(r"^[a-zA-Z]+$").unwrap();
+        static ref NAME_PATTERN: Regex = Regex::new(r"^[a-zA-Z0-9]+$").unwrap();
     }
     if !NAME_PATTERN.is_match(name) {
         return Err(ValidationError::new("Name should only contain letters"));

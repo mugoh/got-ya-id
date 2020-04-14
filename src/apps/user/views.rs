@@ -24,8 +24,9 @@ use std::sync::{Arc, Mutex};
 ///
 /// # url
 /// ## `auth`
+/// /auth
 ///
-/// # methods
+/// # method
 /// - ## POST
 ///
 /// # Returns
@@ -287,6 +288,13 @@ pub fn reset_password(data: web::Json<ResetPassData>, path: web::Path<String>) -
     }
 }
 
+/// Retrieves a user and their profile by ID
+///
+/// # url
+/// ## `/user/{ID}`
+///
+/// # method
+/// GET
 pub fn get_user(id: web::Path<i32>) -> HttpResponse {
     let res = match User::find_by_pk(*id) {
         Ok((usr, profile)) => {
