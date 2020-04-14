@@ -120,7 +120,7 @@ pub fn upload_avatar(
 /// Retrieves an avatar url of a user profile
 ///
 /// # url
-/// ## `/user/profile/{user_id}/avatar`
+/// ## `/user/{user_id}/profile/avatar`
 ///
 /// # method
 /// GET

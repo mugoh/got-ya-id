@@ -227,7 +227,7 @@ impl<'de> de::Visitor<'de> for NaiveDateTimeVisitor {
     where
         E: de::Error,
     {
-        match NaiveDateTime::parse_from_str(s, "%Y-%m-%dT%H:%M:%S.%f") {
+        match NaiveDateTime::parse_from_str(s, "%Y-%m-%dT%H:%M:%S.%f %:z") {
             Ok(t) => Ok(t),
             Err(_) => Err(de::Error::invalid_value(de::Unexpected::Str(s), &self)),
         }
