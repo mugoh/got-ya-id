@@ -12,3 +12,5 @@ extern crate diesel;
 
 #[macro_use]
 extern crate log;
+
+extern crate reqwest;

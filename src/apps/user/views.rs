@@ -16,7 +16,7 @@ use crate::hashmap;
 use log::{debug, error};
 use tera::{self, Context};
 
-use actix_web::{client::Client, http, web, HttpRequest, HttpResponse};
+use actix_web::{http, web, HttpRequest, HttpResponse};
 use serde_json::json;
 use validator::Validate;
 
@@ -427,10 +427,8 @@ pub fn google_auth_callback(
 /// # Arguments
 /// `Authorization: Bearer`
 pub fn register_g_oauth(req: HttpRequest) -> HttpResponse {
-    use actix_http::Error;
-    use actix_rt::System;
-    use awc::Client;
-    use futures::{future::lazy, Future};
+    use serde_json::{Result, Value};
+    use std::collections::HashMap;
 
     let token_hdr = match Authorization::<Bearer>::parse(&req) {
         Ok(auth_header) => auth_header.into_scheme().to_owned().to_string(),
@@ -438,43 +436,20 @@ pub fn register_g_oauth(req: HttpRequest) -> HttpResponse {
     };
 
     let token = &token_hdr.split(' ').collect::<Vec<&str>>()[1];
-    println!("Fetching user data");
 
     // Fetch user profile data
     let profile_url =
         env::var("GOOGLE_PROFILE_URL").expect("Missing the GOOGLE_PROFILE_URL env variable");
 
-    System::new("test").block_on(lazy(|| {
-        Client::new()
-            .get("https://www.rust-lang.org/") // <- Create request builder
-            .header("User-Agent", "Actix-web")
-            .send() // <- Send http request
-            .map_err()
-            .and_then(|mut response| {
-                // <- server http response
-                println!("Response: {:?}", response);
+    let client = reqwest::blocking::Client::new();
+    let resp = client
+        .get(&profile_url)
+        .header("Authorization", format!("Bearer {}", token))
+        .send();
+    println!("res: {:?}", resp);
+    let res = resp.unwrap().text().unwrap();
+    let j_res: Value = serde_json::from_str(&res).unwrap();
 
-                // read response body
-                response
-                    .body()
-                    .from_err()
-                    .map(|body| println!("Downloaded: {:?} bytes", body.len()))
-            })
-    }));
-    /*let client = Client::default();
-    let mut user_data = client
-        .get(profile_url)
-        .header("User-Agent", "got--ya-id")
-        .bearer_auth(token)
-        .send()
-        .await
-        .unwrap();
-    println!("Getting Data");
-
-    let body = user_data.body().await.unwrap();
-    let utf8 = std::str::from_utf8(body.as_ref()).unwrap();
-
-    println!("body: {:?}", utf8);*/
-
-    HttpResponse::build(http::StatusCode::OK).json("ok")
+    println!("{:#?}", j_res);
+    HttpResponse::build(http::StatusCode::OK).json(j_res)
 }
