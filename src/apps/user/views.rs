@@ -427,7 +427,7 @@ pub fn google_auth_callback(
 /// # Arguments
 /// `Authorization: Bearer`
 pub fn register_g_oauth(req: HttpRequest) -> HttpResponse {
-    use serde_json::{Result, Value};
+    use serde_json::Value;
     use std::collections::HashMap;
 
     let token_hdr = match Authorization::<Bearer>::parse(&req) {
@@ -441,15 +441,22 @@ pub fn register_g_oauth(req: HttpRequest) -> HttpResponse {
     let profile_url =
         env::var("GOOGLE_PROFILE_URL").expect("Missing the GOOGLE_PROFILE_URL env variable");
 
-    let client = reqwest::blocking::Client::new();
+    let client = reqwest::blocking::Client::default();
+    let mut headr = reqwest::header::HeaderMap::new();
+    headr.append(
+        reqwest::header::AUTHORIZATION,
+        format!("Bearer {}", token).parse().unwrap(),
+    );
     let resp = client
         .get(&profile_url)
-        .header("Authorization", format!("Bearer {}", token))
+        //  .headers(headr)
+        .bearer_auth(format!("Bearer {}", token))
         .send();
     println!("res: {:?}", resp);
-    let res = resp.unwrap().text().unwrap();
-    let j_res: Value = serde_json::from_str(&res).unwrap();
+    let res = resp.unwrap().json::<HashMap<String, Value>>().unwrap();
+    // let j_res: Value = serde_json::from_str(&res).unwrap();
 
+    let j_res = res;
     println!("{:#?}", j_res);
     HttpResponse::build(http::StatusCode::OK).json(j_res)
 }
