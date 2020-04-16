@@ -1,9 +1,11 @@
 //! Handles views for User items
 //!
+//!
 
 use super::models::{
     NewUser, OClient, OauthInfo, PassResetData, ResetPassData, SignInUser, User, UserEmail,
 };
+
 use super::utils::{err_response, get_context, get_reset_context, get_url, TEMPLATE};
 
 use crate::apps::auth::validate;

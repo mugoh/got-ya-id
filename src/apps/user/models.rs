@@ -40,6 +40,7 @@ pub struct User {
     updated_at: NaiveDateTime,
     pub is_active: bool,
     pub is_verified: bool,
+    pub social_id: Option<String>,
 }
 
 /// Temporary holds new User data
