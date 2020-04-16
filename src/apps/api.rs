@@ -36,7 +36,7 @@ pub fn api(cfg: &mut web::ServiceConfig) {
                     )
                     .service(
                         web::resource("/register/social")
-                            .route(web::get().to_async(user::views::register_g_oauth)),
+                            .route(web::get().to(user::views::register_g_oauth)),
                     )
                     .service(
                         web::resource("/activate")
