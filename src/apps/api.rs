@@ -35,6 +35,10 @@ pub fn api(cfg: &mut web::ServiceConfig) {
                             .route(web::post().to_async(user::views::send_reset_email)),
                     )
                     .service(
+                        web::resource("/register/social")
+                            .route(web::get().to_async(user::views::register_g_oauth)),
+                    )
+                    .service(
                         web::resource("/activate")
                             .route(web::patch().to_async(user::views::change_activation_status)),
                     ),

@@ -20,6 +20,11 @@ use validator::Validate;
 
 use std::sync::{Arc, Mutex};
 
+use actix_web::http::header::Header;
+use actix_web_httpauth::headers::authorization::Authorization;
+use actix_web_httpauth::headers::authorization::Bearer;
+// use actix_web_httpauth::headers::www_authenticate::bearer::Bearer;
+
 /// Registers a new user
 ///
 /// # url
@@ -405,4 +410,24 @@ pub fn google_auth_callback(
 
     std::mem::drop(client);
     token_data
+}
+
+/// Registers users authenticated with google Oauth
+///
+/// # url
+/// `auth/register/social`
+///
+/// # method
+/// get
+///
+/// # Arguments
+/// `Authorization: Bearer`
+pub fn register_g_oauth(req: HttpRequest) -> HttpResponse {
+    let token_hdr = match Authorization::<Bearer>::parse(&req) {
+        Ok(auth_header) => auth_header.into_scheme().to_owned().to_string(),
+        Err(e) => return err("400", e.to_string()),
+    };
+
+    let token = &token_hdr.split(' ').collect::<Vec<&str>>()[1];
+    HttpResponse::build(http::StatusCode::OK).json(token)
 }
