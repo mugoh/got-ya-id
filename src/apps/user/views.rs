@@ -16,11 +16,14 @@ use crate::hashmap;
 use log::{debug, error};
 use tera::{self, Context};
 
-use actix_web::{http, web, HttpRequest, HttpResponse};
+use actix_web::{client::Client, http, web, HttpRequest, HttpResponse};
 use serde_json::json;
 use validator::Validate;
 
-use std::sync::{Arc, Mutex};
+use std::{
+    env,
+    sync::{Arc, Mutex},
+};
 
 use actix_web::http::header::Header;
 use actix_web_httpauth::headers::authorization::Authorization;
@@ -303,7 +306,6 @@ pub fn get_user(id: web::Path<i32>) -> HttpResponse {
     match User::find_by_pk(*id, Some(1)) {
         Ok((usr, profile)) => {
             let data = hashmap!["status" => "200", "message" => "Success. User and User profile retrieved"];
-            println!("{:?}\n\n{:?}", usr, profile);
             respond(data, Some((usr, profile.unwrap())), None).unwrap()
         }
         Err(e) => err("404", e.to_string()),
@@ -425,11 +427,31 @@ pub fn google_auth_callback(
 /// # Arguments
 /// `Authorization: Bearer`
 pub fn register_g_oauth(req: HttpRequest) -> HttpResponse {
+    use futures::future::Future;
+
     let token_hdr = match Authorization::<Bearer>::parse(&req) {
         Ok(auth_header) => auth_header.into_scheme().to_owned().to_string(),
         Err(e) => return err("400", e.to_string()),
     };
 
     let token = &token_hdr.split(' ').collect::<Vec<&str>>()[1];
+
+    // Fetch user profile data
+    let profile_url =
+        env::var("GOOGLE_PROFILE_URL").expect("Missing the GOOGLE_PROFILE_URL env variable");
+
+    let client = Client::default();
+    let mut user_data = client
+        .get(profile_url)
+        .header("User-Agent", "got--ya-id")
+        .bearer_auth(token)
+        .send()
+        .wait()
+        .unwrap();
+    let body = user_data.body().wait().unwrap();
+    let utf8 = std::str::from_utf8(body.as_ref()).unwrap();
+
+    println!("body: {:?}", utf8);
+
     HttpResponse::build(http::StatusCode::OK).json(token)
 }

@@ -60,6 +60,19 @@ pub struct NewUser<'b> {
     pub email: Cow<'b, str>,
 }
 
+/// Holds Sign-In user details
+#[derive(Deserialize, Serialize, Validate)]
+pub struct SignInUser<'a> {
+    // #[validate(email(message = "Oops! Email format not invented yet"))]
+
+    // Email validation Panicks with :: ->
+    /* the trait bound `std::borrow::Cow<'_, str>: std::convert::From<&std::borrow::Cow<'_, str>>` is not satisfied */
+    #[validate(custom = "validate_email")]
+    email: Option<Cow<'a, str>>,
+    username: Option<Cow<'a, str>>,
+    password: Cow<'a, str>,
+}
+
 /// Holds data passed on Password-reset request
 #[derive(Debug, Serialize, Deserialize, Validate)]
 #[serde(deny_unknown_fields)]
@@ -78,6 +91,35 @@ pub struct ResetPassData {
     password_conf: String,
 }
 
+/// Holds JWT Authorization Claims
+#[derive(Debug, Serialize, Deserialize)]
+struct Claims {
+    pub company: String,
+    pub exp: usize,
+    sub: String,
+}
+
+/// Json Request data with Email field only
+#[derive(Deserialize, Validate)]
+#[serde(deny_unknown_fields)]
+pub struct UserEmail<'a> {
+    #[validate(email(message = "Email format not invented yet"))]
+    pub email: Cow<'a, str>,
+}
+
+/// Oauth Query Params Struct extractor
+#[derive(Deserialize)]
+pub struct OauthInfo {
+    pub code: String,
+    pub state: String,
+}
+
+/// App Data extractor
+///
+/// Holds the Oauth Client
+pub struct OClient {
+    pub client: oauth2::basic::BasicClient,
+}
 impl<'a> NewUser<'a> {
     /// Saves a new user record to the db
     ///
@@ -320,19 +362,15 @@ impl User {
             .load::<Avatar>(&connect_to_db())?
             .pop())
     }
-}
 
-/// Holds Sign-In user details
-#[derive(Deserialize, Serialize, Validate)]
-pub struct SignInUser<'a> {
-    // #[validate(email(message = "Oops! Email format not invented yet"))]
-
-    // Email validation Panicks with :: ->
-    /* the trait bound `std::borrow::Cow<'_, str>: std::convert::From<&std::borrow::Cow<'_, str>>` is not satisfied */
-    #[validate(custom = "validate_email")]
-    email: Option<Cow<'a, str>>,
-    username: Option<Cow<'a, str>>,
-    password: Cow<'a, str>,
+    /// Registers a user account using Oauth
+    /// from a third party account
+    ///
+    /// # Arguments
+    ///  `token`: Oauth authentication token
+    pub fn register_as_third_party(&self, _usr_data: &str) {
+        std::todo!()
+    }
 }
 
 impl<'a> SignInUser<'a> {
@@ -379,34 +417,4 @@ impl<'a> SignInUser<'a> {
     pub fn get_password(&self) -> &str {
         self.password.as_ref()
     }
-}
-
-/// Holds JWT Authorization Claims
-#[derive(Debug, Serialize, Deserialize)]
-struct Claims {
-    pub company: String,
-    pub exp: usize,
-    sub: String,
-}
-
-/// Json Request data with Email field only
-#[derive(Deserialize, Validate)]
-#[serde(deny_unknown_fields)]
-pub struct UserEmail<'a> {
-    #[validate(email(message = "Email format not invented yet"))]
-    pub email: Cow<'a, str>,
-}
-
-/// Oauth Query Params Struct extractor
-#[derive(Deserialize)]
-pub struct OauthInfo {
-    pub code: String,
-    pub state: String,
-}
-
-/// App Data extractor
-///
-/// Holds the Oauth Client
-pub struct OClient {
-    pub client: oauth2::basic::BasicClient,
 }
