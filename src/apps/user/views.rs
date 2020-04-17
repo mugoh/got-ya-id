@@ -442,15 +442,15 @@ pub fn register_g_oauth(req: HttpRequest) -> HttpResponse {
         env::var("GOOGLE_PROFILE_URL").expect("Missing the GOOGLE_PROFILE_URL env variable");
 
     let client = reqwest::blocking::Client::default();
-    let mut headr = reqwest::header::HeaderMap::new();
+    let mut headr = reqwest::header::HeaderMap::default();
     headr.append(
         reqwest::header::AUTHORIZATION,
         format!("Bearer {}", token).parse().unwrap(),
     );
     let resp = client
         .get(&profile_url)
-        //  .headers(headr)
-        .bearer_auth(format!("Bearer {}", token))
+        .headers(headr)
+        //   .bearer_auth(format!("Bearer {}", token))
         .send();
     println!("res: {:?}", resp);
     let res = resp.unwrap().json::<HashMap<String, Value>>().unwrap();
