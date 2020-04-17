@@ -8,7 +8,7 @@ use std::borrow::Cow;
 use crate::apps::auth::validate;
 use crate::apps::profiles::models::{Avatar, NewProfile, Profile};
 use crate::config::config;
-use crate::diesel_cfg::{config::connect_to_db, schema::users};
+use crate::diesel_cfg::{config::connect_to_db, schema::oath_users, schema::users};
 
 use std::error;
 
@@ -438,7 +438,7 @@ pub struct GoogleUser {
 /// Service Oauth User Object
 /// Holds user social-authenticated user data
 #[derive(Queryable, Serialize, AsChangeset, Deserialize, Identifiable)]
-#[table_name = "oauth_users"]
+#[table_name = "oath_users"]
 pub struct OauthGgUser {
     pub id: i32,
     pub email: String,
@@ -451,6 +451,9 @@ pub struct OauthGgUser {
     locale: Option<String>,
     acc_id: String,
     pub is_active: bool,
+
+    /// Oauth Account provider
+    provider: String,
 
     #[serde(deserialize_with = "from_timestamp")]
     pub created_at: NaiveDateTime,
@@ -468,17 +471,19 @@ impl OauthGgUser {
         &self,
         usr_data: GoogleUser,
     ) -> Result<(), Box<dyn error::Error>> {
-        use crate::diesel_cfg::schema::users::dsl::*;
+        use crate::diesel_cfg::schema::oath_users::dsl::*;
+        use crate::diesel_cfg::schema::users::dsl::{email as uemail, users};
 
         let present_user_email = users
-            .filter(email.eq(usr_data.email))
-            .select(email)
+            .filter(uemail.eq(usr_data.email))
+            .select(uemail)
             .get_results::<String>(&connect_to_db())?;
 
         if !present_user_email.is_empty() {
             Err("You seem to have an account with this email. Try signing in".to_owned())?
         }
-        let user = diesel::insert_into(users::table)
+        let new_data = (email.eq(usr_data.email),);
+        let user = diesel::insert_into(oath_users::table)
             .values(usr_data)
             .get_result::<User>(&connect_to_db())?;
 
