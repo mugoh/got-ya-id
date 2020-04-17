@@ -475,7 +475,6 @@ impl OauthGgUser {
     ///  - `None` if account id exists
     ///  - `OauthGgUser`: Newly registered account data
     pub fn register_as_third_party(
-        &self,
         usr_data: GoogleUser,
     ) -> Result<Option<OauthGgUser>, Box<dyn error::Error>> {
         use crate::diesel_cfg::schema::oath_users::dsl::*;
@@ -518,6 +517,7 @@ impl OauthGgUser {
             provider_verified.eq(usr_data.verified_email),
             locale.eq(usr_data.locale),
             acc_id.eq(usr_data.id),
+            provider.eq("google"),
         );
         let user = diesel::insert_into(oath_users)
             .values(&new_data)

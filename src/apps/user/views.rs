@@ -3,8 +3,8 @@
 //!
 
 use super::models::{
-    GoogleUser, NewUser, OClient, OauthInfo, PassResetData, ResetPassData, SignInUser, User,
-    UserEmail,
+    GoogleUser, NewUser, OClient, OauthGgUser, OauthInfo, PassResetData, ResetPassData, SignInUser,
+    User, UserEmail,
 };
 
 use super::utils::{err_response, get_context, get_reset_context, get_url, TEMPLATE};
@@ -459,7 +459,30 @@ pub fn register_g_oauth(req: HttpRequest) -> HttpResponse {
     let res = resp.json::<GoogleUser>().unwrap();
     // let j_res: Value = serde_json::from_str(&res).unwrap();
 
-    println!("{:#?}\n\n", res);
+    match OauthGgUser::register_as_third_party(res) {
+        Ok(data) => {
+            if let Some(_) = &data {
+                // New oauth account
+                respond(
+                    hashmap!["status" => "201",
+            "message" => "Success. Account created"],
+                    data,
+                    None,
+                )
+                .unwrap()
+            } else {
+                // Existing
+                respond(
+                    hashmap!["status" => "200",
+            "message" => "Success. Account updated"],
+                    Some("".to_owned()),
+                    None,
+                )
+                .unwrap()
+            }
+        }
 
-    HttpResponse::build(http::StatusCode::OK).json(res)
+        // Registered regular account
+        Err(e) => err("409", e.to_string()),
+    }
 }

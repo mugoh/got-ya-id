@@ -113,7 +113,7 @@ where
     T: Serialize,
 {
     //
-    let status = StatusCode::from_u16(data["status"].parse::<u16>().unwrap()).unwrap();
+    let status = StatusCode::from_u16(data["status"].parse::<u16>()?)?;
     if err.is_some() {
         Ok(HttpResponse::build(status)
             .json(json!({"status": &status.to_string(), "error": err.unwrap()})))
