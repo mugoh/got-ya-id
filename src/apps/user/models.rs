@@ -41,6 +41,7 @@ pub struct User {
     pub is_active: bool,
     pub is_verified: bool,
     pub social_id: Option<String>,
+    pub social_account_verified: bool,
 }
 
 /// Temporary holds new User data
@@ -120,6 +121,7 @@ pub struct OauthInfo {
 pub struct OClient {
     pub client: oauth2::basic::BasicClient,
 }
+
 impl<'a> NewUser<'a> {
     /// Saves a new user record to the db
     ///
@@ -362,15 +364,6 @@ impl User {
             .load::<Avatar>(&connect_to_db())?
             .pop())
     }
-
-    /// Registers a user account using Oauth
-    /// from a third party account
-    ///
-    /// # Arguments
-    ///  `token`: Oauth authentication token
-    pub fn register_as_third_party<'b>(&self, _usr_data: GoogleUser) {
-        std::todo!()
-    }
 }
 
 impl<'a> SignInUser<'a> {
@@ -440,4 +433,55 @@ pub struct GoogleUser {
     /// avatar
     picture: String,
     locale: String,
+}
+
+/// Service Oauth User Object
+/// Holds user social-authenticated user data
+#[derive(Queryable, Serialize, AsChangeset, Deserialize, Identifiable)]
+#[table_name = "oauth_users"]
+pub struct OauthGgUser {
+    pub id: i32,
+    pub email: String,
+    pub name: String,
+    pub first_name: Option<String>,
+    pub family_name: Option<String>,
+    pub is_verified: bool,
+
+    picture: Option<String>,
+    locale: Option<String>,
+    acc_id: String,
+    pub is_active: bool,
+
+    #[serde(deserialize_with = "from_timestamp")]
+    pub created_at: NaiveDateTime,
+    #[serde(deserialize_with = "from_timestamp")]
+    updated_at: NaiveDateTime,
+}
+
+impl OauthGgUser {
+    /// Registers a user account using Oauth
+    /// from a third party account
+    ///
+    /// # Arguments
+    ///  `usr_data`: GoogleUser data holding the user account profile info
+    pub fn register_as_third_party(
+        &self,
+        usr_data: GoogleUser,
+    ) -> Result<(), Box<dyn error::Error>> {
+        use crate::diesel_cfg::schema::users::dsl::*;
+
+        let present_user_email = users
+            .filter(email.eq(usr_data.email))
+            .select(email)
+            .get_results::<String>(&connect_to_db())?;
+
+        if !present_user_email.is_empty() {
+            Err("You seem to have an account with this email. Try signing in".to_owned())?
+        }
+        let user = diesel::insert_into(users::table)
+            .values(usr_data)
+            .get_result::<User>(&connect_to_db())?;
+
+        Ok(())
+    }
 }
