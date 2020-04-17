@@ -11,7 +11,11 @@ CREATE TABLE oath_users (
     acc_id VARCHAR NOT NULL UNIQUE,
     is_active BOOLEAN NOT NULL DEFAULT TRUE,
     provider VARCHAR(15) NOT NULL,
+    provider_verified BOOLEAN NOT NULL DEFAULT FALSE,
 
     created_at timestamp without time zone not null default (now() at time zone 'utc'), 
     updated_at timestamp without time zone not null default (now() at time zone 'utc')
 );
+
+
+CREATE UNIQUE INDEX user_cred on oath_users (acc_id);
