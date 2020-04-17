@@ -455,6 +455,9 @@ pub struct OauthGgUser {
     /// Oauth Account provider
     provider: String,
 
+    /// Verified Oauth account used
+    provider_verified: bool,
+
     #[serde(deserialize_with = "from_timestamp")]
     pub created_at: NaiveDateTime,
     #[serde(deserialize_with = "from_timestamp")]
@@ -467,26 +470,45 @@ impl OauthGgUser {
     ///
     /// # Arguments
     ///  `usr_data`: GoogleUser data holding the user account profile info
+    ///
+    ///  # Retuns
+    ///  - `None` if account id exists
+    ///  - `OauthGgUser`: Newly registered account data
     pub fn register_as_third_party(
         &self,
         usr_data: GoogleUser,
-    ) -> Result<(), Box<dyn error::Error>> {
+    ) -> Result<Option<OauthGgUser>, Box<dyn error::Error>> {
         use crate::diesel_cfg::schema::oath_users::dsl::*;
         use crate::diesel_cfg::schema::users::dsl::{email as uemail, users};
-
         let present_user_email = users
-            .filter(uemail.eq(usr_data.email))
+            .filter(uemail.eq(&usr_data.email))
             .select(uemail)
             .get_results::<String>(&connect_to_db())?;
 
         if !present_user_email.is_empty() {
             Err("You seem to have an account with this email. Try signing in".to_owned())?
+        } else if !oath_users
+            .filter(acc_id.eq(&usr_data.id))
+            .select(acc_id)
+            .get_result::<String>(&connect_to_db())?
+            .is_empty()
+        {
+            return Ok(None);
         }
-        let new_data = (email.eq(usr_data.email),);
-        let user = diesel::insert_into(oath_users::table)
-            .values(usr_data)
-            .get_result::<User>(&connect_to_db())?;
 
-        Ok(())
+        let new_data = (
+            email.eq(&usr_data.email),
+            name.eq(usr_data.name),
+            first_name.eq(usr_data.given_name),
+            family_name.eq(usr_data.family_name),
+            provider_verified.eq(usr_data.verified_email),
+            locale.eq(usr_data.locale),
+            acc_id.eq(usr_data.id),
+        );
+        let user = diesel::insert_into(oath_users)
+            .values(&new_data)
+            .get_result::<OauthGgUser>(&connect_to_db())?;
+
+        Ok(Some(user))
     }
 }
