@@ -1,7 +1,7 @@
 
 CREATE TABLE oath_users (
     id SERIAL PRIMARY KEY,
-    email VARCHAR(40) NOT NULL UNIQUE,
+    email VARCHAR(40) NOT NULL,
     name VARCHAR NOT NULL,
     first_name VARCHAR(50),
     family_name VARCHAR(50),
