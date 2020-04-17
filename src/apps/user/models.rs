@@ -26,7 +26,7 @@ use jwt::{encode, Header};
 
 /// User Object
 /// Holds user data
-#[derive(Queryable, Serialize, AsChangeset, Deserialize, Identifiable, Debug, Clone, Validate)]
+#[derive(Queryable, Serialize, AsChangeset, Deserialize, Identifiable, Clone, Validate)]
 #[table_name = "users"]
 pub struct User {
     pub id: i32,
@@ -45,7 +45,7 @@ pub struct User {
 
 /// Temporary holds new User data
 /// User Record for new User entries
-#[derive(Debug, Clone, Validate, Serialize, Deserialize, Insertable)]
+#[derive(Clone, Validate, Serialize, Deserialize, Insertable)]
 #[table_name = "users"]
 #[serde(deny_unknown_fields)]
 pub struct NewUser<'b> {
@@ -74,7 +74,7 @@ pub struct SignInUser<'a> {
 }
 
 /// Holds data passed on Password-reset request
-#[derive(Debug, Serialize, Deserialize, Validate)]
+#[derive(Serialize, Deserialize, Validate)]
 #[serde(deny_unknown_fields)]
 pub struct PassResetData<'a> {
     #[validate(email(message = "Email format not invented yet"))]
@@ -82,7 +82,7 @@ pub struct PassResetData<'a> {
 }
 
 /// Holds Account Password reset data
-#[derive(Debug, Serialize, Deserialize, Validate)]
+#[derive(Serialize, Deserialize, Validate)]
 #[serde(deny_unknown_fields)]
 pub struct ResetPassData {
     #[validate(length(min = 5, message = "Give your password at least 5 characters"))]
@@ -92,7 +92,7 @@ pub struct ResetPassData {
 }
 
 /// Holds JWT Authorization Claims
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Serialize, Deserialize)]
 struct Claims {
     pub company: String,
     pub exp: usize,
@@ -368,7 +368,7 @@ impl User {
     ///
     /// # Arguments
     ///  `token`: Oauth authentication token
-    pub fn register_as_third_party(&self, _usr_data: &str) {
+    pub fn register_as_third_party<'b>(&self, _usr_data: GoogleUser) {
         std::todo!()
     }
 }
@@ -417,4 +417,27 @@ impl<'a> SignInUser<'a> {
     pub fn get_password(&self) -> &str {
         self.password.as_ref()
     }
+}
+
+/// User Profile data from google Oauth
+#[derive(Debug, Deserialize, Serialize)]
+pub struct GoogleUser {
+    /// Full name
+    name: String,
+
+    /// First name
+    given_name: String,
+
+    family_name: String,
+    email: String,
+
+    /// Verified_social_email
+    verified_email: bool,
+
+    /// Social ID
+    id: String,
+
+    /// avatar
+    picture: String,
+    locale: String,
 }

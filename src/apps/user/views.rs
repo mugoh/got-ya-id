@@ -3,7 +3,8 @@
 //!
 
 use super::models::{
-    NewUser, OClient, OauthInfo, PassResetData, ResetPassData, SignInUser, User, UserEmail,
+    GoogleUser, NewUser, OClient, OauthInfo, PassResetData, ResetPassData, SignInUser, User,
+    UserEmail,
 };
 
 use super::utils::{err_response, get_context, get_reset_context, get_url, TEMPLATE};
@@ -428,7 +429,6 @@ pub fn google_auth_callback(
 /// `Authorization: Bearer`
 pub fn register_g_oauth(req: HttpRequest) -> HttpResponse {
     use serde_json::Value;
-    use std::collections::HashMap;
 
     let token_hdr = match Authorization::<Bearer>::parse(&req) {
         Ok(auth_header) => auth_header.into_scheme().to_owned().to_string(),
@@ -451,12 +451,15 @@ pub fn register_g_oauth(req: HttpRequest) -> HttpResponse {
         .get(&profile_url)
         .headers(headr)
         //   .bearer_auth(format!("Bearer {}", token))
-        .send();
-    println!("res: {:?}", resp);
-    let res = resp.unwrap().json::<HashMap<String, Value>>().unwrap();
+        .send()
+        .unwrap();
+    if !resp.status().is_success() {
+        return err(resp.status().as_str(), resp.json::<Value>().unwrap());
+    }
+    let res = resp.json::<GoogleUser>().unwrap();
     // let j_res: Value = serde_json::from_str(&res).unwrap();
 
-    let j_res = res;
-    println!("{:#?}", j_res);
-    HttpResponse::build(http::StatusCode::OK).json(j_res)
+    println!("{:#?}\n\n", res);
+
+    HttpResponse::build(http::StatusCode::OK).json(res)
 }
