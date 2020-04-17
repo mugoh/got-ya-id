@@ -1,1 +1,2 @@
-ALTER TABLE users ADD COLUMN social_account_verified BOOLEAN;
+ALTER TABLE users
+ADD COLUMN social_account_verified BOOLEAN NOT NULL DEFAULT FALSE;
