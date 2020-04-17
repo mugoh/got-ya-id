@@ -487,14 +487,28 @@ impl OauthGgUser {
 
         if !present_user_email.is_empty() {
             Err("You seem to have an account with this email. Try signing in".to_owned())?
-        } else if !oath_users
-            .filter(acc_id.eq(&usr_data.id))
-            .select(acc_id)
-            .get_result::<String>(&connect_to_db())?
-            .is_empty()
-        {
-            return Ok(None);
         }
+
+        match oath_users
+            .filter(acc_id.eq(&usr_data.id))
+            .load::<OauthGgUser>(&connect_to_db())?
+            .pop()
+        {
+            // Update modifiable fields
+            // Possibly consider if a single insert/update is more viable
+            Some(thing) => {
+                diesel::update(&thing)
+                    .set((
+                        picture.eq(&usr_data.picture),
+                        name.eq(&usr_data.name),
+                        first_name.eq(&usr_data.given_name),
+                        family_name.eq(&usr_data.family_name),
+                    ))
+                    .execute(&connect_to_db())?;
+                return Ok(None);
+            }
+            None => {}
+        };
 
         let new_data = (
             email.eq(&usr_data.email),
