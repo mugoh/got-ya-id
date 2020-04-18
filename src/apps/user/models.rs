@@ -472,27 +472,56 @@ impl OauthGgUser {
     ///  - `OauthGgUser`: Newly registered account data
     pub fn register_as_third_party(
         usr_data: GoogleUser,
-    ) -> Result<Option<OauthGgUser>, Box<dyn error::Error>> {
-        use crate::diesel_cfg::schema::oath_users::dsl::*;
-        use crate::diesel_cfg::schema::users::dsl::{email as uemail, users};
-        let present_user_email = users
-            .filter(uemail.eq(&usr_data.email))
-            .select(uemail)
-            .get_results::<String>(&connect_to_db())?;
+    ) -> Result<Option<(OauthGgUser, User)>, Box<dyn error::Error>> {
+        use rand::{thread_rng, Alphanumeric};
 
-        if !present_user_email.is_empty() {
-            Err("You seem to have an account with this email. Try signing in".to_owned())?
+        use crate::diesel_cfg::schema::oath_users::dsl::*;
+        use crate::diesel_cfg::schema::users::dsl::{
+            email as uemail, social_id as usocial_id, users,
+        };
+
+        let present_user = users
+            .filter(uemail.eq(&usr_data.email))
+            .select((uemail, usocial_id))
+            .get_results::<(String, Option<String>)>(&connect_to_db())?;
+
+        if present_user.is_empty() {
+            // New User
+
+            let acc_provider = "google";
+            let new_data = (
+                email.eq(&usr_data.email),
+                name.eq(usr_data.name),
+                first_name.eq(usr_data.given_name),
+                family_name.eq(usr_data.family_name),
+                provider_verified.eq(usr_data.verified_email),
+                locale.eq(usr_data.locale),
+                acc_id.eq(usr_data.id),
+                provider.eq(acc_provider),
+            );
+            let user = diesel::insert_into(oath_users)
+                .values(&new_data)
+                .get_result::<OauthGgUser>(&connect_to_db())?;
+
+            // Insert to Users
+
+            let _rnd_ext = thread_rng()
+                .sample_iter(&Alphanumeric)
+                .take(10)
+                .collect::<String>();
+            let user_name = format!("{}-{}-{}", usr_data.name, _rnd_ext, acc_provider);
+            let ord_user = diesel::insert_into(users)
+                .values(&(uemail.eq(usr_data.email), usocial_id.eq(usr_data.id)))
+                .get_result::<User>(&connect_to_db())?;
+
+            return Ok(Some((user, ord_user)));
         }
 
-        match oath_users
-            .filter(acc_id.eq(&usr_data.id))
-            .load::<OauthGgUser>(&connect_to_db())?
-            .pop()
-        {
-            // Update modifiable fields
-            // Possibly consider if a single insert/update is more viable
-            Some(thing) => {
-                diesel::update(&thing)
+        let (_, s_id) = &present_user[0];
+        match s_id {
+            // Previously used Oauth account
+            Some(s) => {
+                diesel::update(oath_users.filter(acc_id.eq(s)))
                     .set((
                         picture.eq(&usr_data.picture),
                         name.eq(&usr_data.name),
@@ -500,25 +529,11 @@ impl OauthGgUser {
                         family_name.eq(&usr_data.family_name),
                     ))
                     .execute(&connect_to_db())?;
+
                 return Ok(None);
             }
-            None => {}
-        };
-
-        let new_data = (
-            email.eq(&usr_data.email),
-            name.eq(usr_data.name),
-            first_name.eq(usr_data.given_name),
-            family_name.eq(usr_data.family_name),
-            provider_verified.eq(usr_data.verified_email),
-            locale.eq(usr_data.locale),
-            acc_id.eq(usr_data.id),
-            provider.eq("google"),
-        );
-        let user = diesel::insert_into(oath_users)
-            .values(&new_data)
-            .get_result::<OauthGgUser>(&connect_to_db())?;
-
-        Ok(Some(user))
+            // Existing user email
+            None => Err("You seem to have an account with this email. Try signing in".to_owned())?,
+        }
     }
 }
