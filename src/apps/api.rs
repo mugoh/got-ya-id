@@ -28,7 +28,7 @@ pub fn api(cfg: &mut web::ServiceConfig) {
                     )
                     .service(
                         web::resource("/password/reset/{token}")
-                            .route(web::patch().to_async(user::views::reset_password)),
+                            .route(web::get().to(user::views::reset_password)),
                     )
                     .service(
                         web::resource("/password/request")

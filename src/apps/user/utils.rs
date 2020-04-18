@@ -15,8 +15,7 @@ lazy_static! {
 
     /// Lazily Compiled Templates
     pub static ref TEMPLATE: Tera = {
-        let mut tera = tera::compile_templates!("src/templates/**/*");
-        tera.autoescape_on(vec![".sql"]);
+        let tera = Tera::new("src/templates/**/*").unwrap();
         tera
     };
 }
@@ -84,8 +83,8 @@ pub fn validate_pass(pass: &str) -> Result<(), ValidationError> {
 pub fn get_context<'a>(data: &NewUser, path: &'a str) -> Context {
     let mut context = Context::new();
 
-    context.add("username", &data.username);
-    context.add("link", &path);
+    context.insert("username", &data.username);
+    context.insert("link", &path);
     context
 }
 
@@ -94,8 +93,8 @@ pub fn get_context<'a>(data: &NewUser, path: &'a str) -> Context {
 pub fn get_reset_context<'a>(data: &User, path: &'a str) -> Context {
     let mut context = Context::new();
 
-    context.add("username", &data.username);
-    context.add("link", &path);
+    context.insert("username", &data.username);
+    context.insert("link", &path);
     context
 }
 
@@ -158,7 +157,7 @@ pub fn err_response<T>(status: String, msg: T) -> response::JsonErrResponse<T> {
 pub fn get_url<'a>(host: &'a str, path: &'a str, id: &'a str) -> String {
     //
     format!(
-        r#"https://{host}/{path}/{id}"#,
+        r#"http://{host}/{path}/{id}"#,
         host = host,
         path = path,
         id = id

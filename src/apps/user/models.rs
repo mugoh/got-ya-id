@@ -33,7 +33,7 @@ pub struct User {
     pub username: String,
     pub email: String,
     #[serde(skip_deserializing)]
-    password: String,
+    password: Option<String>,
     #[serde(deserialize_with = "from_timestamp")]
     pub created_at: NaiveDateTime,
     #[serde(deserialize_with = "from_timestamp")]
@@ -89,7 +89,7 @@ pub struct ResetPassData {
     #[validate(length(min = 5, message = "Give your password at least 5 characters"))]
     pub password: String,
     #[validate(must_match = "password")] // Can't give error message given on failed match
-    password_conf: String,
+    pub password_conf: String,
 }
 
 /// Holds JWT Authorization Claims
@@ -187,7 +187,7 @@ impl User {
     ///
     /// bool: True -> Verified, False -> Fail
     pub fn verify_pass<'a>(&self, pass: &'a str) -> Result<bool, ()> {
-        verify(pass, &self.password).map_err(|e| debug!("{:?}", e))
+        verify(pass, &self.password.as_ref().unwrap()).map_err(|e| debug!("{:?}", e))
     }
 
     /// Creates an authorization token encoded with the
@@ -240,20 +240,16 @@ impl User {
 
         let user = match validate::decode_auth_token(token) {
             Ok(usr) => usr.company,
-            Err(e) => return Err(e.into()),
+            Err(e) => Err(e)?,
         };
         let pass_hash = match hash(new_password, DEFAULT_COST) {
             Ok(h) => h,
-            Err(e) => {
-                error!("{}", &format!("{:?}", e));
-                return Err(e.into());
-            }
+            Err(e) => Err(e)?,
         };
 
         diesel::update(users.filter(email.eq(&user)))
             .set(password.eq(pass_hash))
-            .get_result::<User>(&connect_to_db())
-            .unwrap();
+            .get_result::<User>(&connect_to_db())?;
         Ok(())
     }
 

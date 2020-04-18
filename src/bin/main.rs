@@ -6,6 +6,8 @@ use std::{
     sync::{Arc, Mutex},
 };
 
+use tera::Tera;
+
 use got_ya_id::apps::api;
 use got_ya_id::apps::user::{models::OClient, utils::create_oauth_client};
 
@@ -14,7 +16,7 @@ fn main() -> io::Result<()> {
 
     // env::set_var("RUST_LOG", "debug");
     env_logger::init();
-
+    let tera = Tera::new("src/templates/**/*").unwrap();
     let data = OClient {
         client: create_oauth_client(),
     };
@@ -27,6 +29,7 @@ fn main() -> io::Result<()> {
             .wrap(middleware::Logger::default())
             .data(web::JsonConfig::default().limit(8192))
             .data(data.clone())
+            .data(tera.clone())
     });
 
     app = if let Some(listener) = listen_fd.take_tcp_listener(0).unwrap() {

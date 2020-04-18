@@ -14,7 +14,7 @@ use crate::core::mail;
 use crate::core::response::{self, err, respond};
 use crate::hashmap;
 
-use log::{debug, error};
+use log::debug;
 use tera::{self, Context};
 
 use actix_web::{http, web, HttpRequest, HttpResponse};
@@ -71,18 +71,14 @@ pub fn register_user(mut data: web::Json<NewUser>, req: HttpRequest) -> HttpResp
 
     // Mail
     let context: Context = get_context(&data.0, &path);
-    match TEMPLATE.render("email_activation.html", context) {
+    match TEMPLATE.render("email_activation.html", &context) {
         Ok(s) => {
             let mut mail =
                 mail::Mail::new(&data.0.email, &data.0.username, "Email activation", &s).unwrap();
             mail.send().unwrap();
         }
 
-        Err(e) => {
-            for er in e.iter() {
-                error!("Reason: {}", er);
-            }
-        }
+        Err(e) => return err("500", e.to_string()),
     };
 
     let res: response::JsonResponse<_> = response::JsonResponse::new(
@@ -221,6 +217,7 @@ pub fn send_reset_email(mut data: web::Json<PassResetData>, req: HttpRequest) ->
         let res = response::JsonErrResponse::new("400".to_string(), err);
         return HttpResponse::build(http::StatusCode::BAD_REQUEST).json(&res);
     };
+
     let user = match User::find_by_email(&data.email.to_mut()) {
         Ok(usr) => usr,
         Err(e) => {
@@ -234,7 +231,7 @@ pub fn send_reset_email(mut data: web::Json<PassResetData>, req: HttpRequest) ->
     let host = format!("{:?}", req.headers().get("host").unwrap());
     let path = get_url(&host, "api/auth", &token);
     let context: Context = get_reset_context(&user, &path);
-    match TEMPLATE.render("password_reset.html", context) {
+    match TEMPLATE.render("password_reset.html", &context) {
         Ok(s) => {
             let mut mail = mail::Mail::new(
                 &user.email,
@@ -247,11 +244,7 @@ pub fn send_reset_email(mut data: web::Json<PassResetData>, req: HttpRequest) ->
             mail.send().unwrap();
         }
 
-        Err(e) => {
-            for er in e.iter().skip(1) {
-                error!("Reason: {}", er);
-            }
-        }
+        Err(e) => return err("500", e.to_string()),
     };
     let res = response::JsonResponse::new(
         http::StatusCode::OK.to_string(),
@@ -271,29 +264,56 @@ pub fn send_reset_email(mut data: web::Json<PassResetData>, req: HttpRequest) ->
 /// ## `auth/password/reset/{token}`
 ///
 /// # Method
-/// ## PATCH
+/// ## GET
 ///
-pub fn reset_password(data: web::Json<ResetPassData>, path: web::Path<String>) -> HttpResponse {
-    if let Err(err) = data.validate() {
-        let res = response::JsonErrResponse::new("400".to_string(), err);
-        return HttpResponse::build(http::StatusCode::BAD_REQUEST).json(&res);
-    };
+pub fn reset_password(
+    tmpl: web::Data<tera::Tera>,
+    query: web::Query<std::collections::HashMap<String, String>>,
+    path: web::Path<String>,
+    req: HttpRequest,
+) -> HttpResponse {
+    let data: ResetPassData;
+    let host = format!("{:?}", req.headers().get("host").unwrap());
 
+    let host = format!(
+        r#"http://{host}/{path}/{id}"#,
+        host = host,
+        path = "api/auth/password/reset",
+        id = path
+    )
+    .replace("\"", "");
+
+    // submitted form
+    let mut ctx = tera::Context::new();
+    ctx.insert("link", &host.as_str());
+
+    if let Some(name) = query.get("new password") {
+        ctx.insert("name", &name.to_owned());
+        data = ResetPassData {
+            password: query.get("new password").unwrap().to_owned(),
+            password_conf: query.get("confirm password").unwrap().to_owned(),
+        };
+        if let Err(err) = data.validate() {
+            let res = response::JsonErrResponse::new("400".to_string(), err);
+            return HttpResponse::build(http::StatusCode::BAD_REQUEST).json(&res);
+        };
+    } else {
+        let s = tmpl.render("password_reset_form.html", &ctx).unwrap();
+        return HttpResponse::build(http::StatusCode::OK)
+            .content_type("text/html")
+            .body(s);
+    }
+
+    let s = tmpl.render("password_reset_form.html", &ctx).unwrap();
     match User::reset_pass(&path, &data.password) {
-        Ok(_) => {
-            let res = response::JsonResponse::new(
-                http::StatusCode::OK.to_string(),
-                "Success. Account password changed".to_string(),
-                "",
-            );
-
-            HttpResponse::build(http::StatusCode::OK).json(&res)
-        }
+        Ok(_) => HttpResponse::build(http::StatusCode::OK)
+            .content_type("text/html")
+            .body(s),
         Err(e) => {
             let status = http::StatusCode::UNAUTHORIZED;
-            HttpResponse::build(status).json(err_response(
-                status.to_string(),
-                format!("Failed to reset password: {:?}", e),
+            HttpResponse::build(status).body(format!(
+                "There was a problem resetting your password: {:?}.\n Request a resend of a new password reset link",
+                e
             ))
         }
     }
