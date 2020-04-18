@@ -348,7 +348,7 @@ impl User {
 
         let avatar = Avatar::belonging_to(self)
             .load::<Avatar>(&connect_to_db())
-            .expect("Error retreiving avatar");
+            .expect("Error retrieving avatar");
         Ok(diesel::update(&avatar[0])
             .set(url.eq(avatar_url))
             .get_result::<Avatar>(&connect_to_db())?)
@@ -475,6 +475,7 @@ impl OauthGgUser {
     ) -> Result<Option<(OauthGgUser, User)>, Box<dyn error::Error>> {
         use rand::{thread_rng, Alphanumeric};
 
+        use crate::diesel_cfg::schema::avatars::dsl::url as av_url;
         use crate::diesel_cfg::schema::oath_users::dsl::*;
         use crate::diesel_cfg::schema::users::dsl::{
             email as uemail, social_id as usocial_id, users,
@@ -510,9 +511,17 @@ impl OauthGgUser {
                 .take(10)
                 .collect::<String>();
             let user_name = format!("{}-{}-{}", usr_data.name, _rnd_ext, acc_provider);
+
             let ord_user = diesel::insert_into(users)
                 .values(&(uemail.eq(usr_data.email), usocial_id.eq(usr_data.id)))
                 .get_result::<User>(&connect_to_db())?;
+
+            let avatar = Avatar::belonging_to(&ord_user)
+                .load::<Avatar>(&connect_to_db())
+                .expect("Error retrieving avatar");
+            diesel::update(&avatar[0])
+                .set(av_url.eq(user.picture))
+                .get_result::<Avatar>(&connect_to_db())?;
 
             return Ok(Some((user, ord_user)));
         }
