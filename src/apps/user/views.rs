@@ -135,7 +135,7 @@ pub fn login(user: web::Json<SignInUser>) -> HttpResponse {
                     "Could not find details that match you. Just try again.",
                 ));
             }
-            match usr.create_token(&usr.email) {
+            match User::create_token(&usr.email) {
                 Ok(s) => response::JsonResponse::new(
                     http::StatusCode::OK.to_string(),
                     "Login Success".to_string(),
@@ -227,7 +227,7 @@ pub fn send_reset_email(mut data: web::Json<PassResetData>, req: HttpRequest) ->
         }
     };
     let user = &user[0];
-    let token = user.create_token(&user.email).unwrap();
+    let token = User::create_token(&user.email).unwrap();
     let host = format!("{:?}", req.headers().get("host").unwrap());
     let path = get_url(&host, "api/auth", &token);
     let context: Context = get_reset_context(&user, &path);
@@ -481,12 +481,19 @@ pub fn register_g_oauth(req: HttpRequest) -> HttpResponse {
 
     match OauthGgUser::register_as_third_party(res) {
         Ok(data) => {
-            if let Some(_) = &data {
+            let token = User::create_token(&res.email).unwrap();
+
+            if let Some(dt) = &data {
                 // New oauth account
+
                 respond(
                     hashmap!["status" => "201",
             "message" => "Success. Account created"],
-                    data,
+                    Some(json!({
+                        "email": & dt.0.email,
+                        "token": &token,
+                        "user": &data,
+                    })),
                     None,
                 )
                 .unwrap()
@@ -495,7 +502,10 @@ pub fn register_g_oauth(req: HttpRequest) -> HttpResponse {
                 respond(
                     hashmap!["status" => "200",
             "message" => "Success. Account updated"],
-                    Some("".to_owned()),
+                    Some(json!({
+                        "email": & res.email,
+                        "token": &token,
+                    })),
                     None,
                 )
                 .unwrap()

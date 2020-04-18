@@ -192,7 +192,7 @@ impl User {
 
     /// Creates an authorization token encoded with the
     /// given user detail
-    pub fn create_token(&self, user_cred: &String) -> Result<String, Box<dyn error::Error>> {
+    pub fn create_token(user_cred: &String) -> Result<String, Box<dyn error::Error>> {
         let payload = Claims {
             company: user_cred.to_owned(),
             exp: (Utc::now() + Duration::hours(720)).timestamp() as usize,
@@ -418,7 +418,7 @@ pub struct GoogleUser {
     given_name: String,
 
     family_name: String,
-    email: String,
+    pub email: String,
 
     /// Verified_social_email
     verified_email: bool,
