@@ -6,6 +6,9 @@ use dotenv::dotenv;
 use std::collections::HashMap;
 use std::env;
 
+lazy_static! {
+//
+}
 pub fn connect_to_db() -> PgConnection {
     dotenv().ok();
     let keys = vec!["db_username", "db_pass", "db_host", "db_port", "db_name"];

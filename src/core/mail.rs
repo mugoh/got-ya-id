@@ -75,9 +75,9 @@ impl Mail {
 }
 
 /// Retrieves ENV Variable given the Keys
-pub fn get_env_var<'a>(keys: Vec<&'a str>, values: &mut Vec<String>) -> () {
+pub fn get_env_var<'a>(keys: Vec<&'a str>, values: &mut Vec<String>) {
     for key in keys.iter() {
-        let val = env::var(key.to_string().to_lowercase()).unwrap_or_else(|_er| {
+        let val = env::var((*key).to_lowercase()).unwrap_or_else(|_er| {
             error!("Error configuring mail");
             error!("Missing ENV variable -> {}", key);
             process::exit(0);

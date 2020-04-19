@@ -217,16 +217,16 @@ pub fn verify(path: web::Path<String>) -> HttpResponse {
                     "is_verified": &user.is_verified
                 }),
             );
-            return HttpResponse::build(http::StatusCode::OK).json(&res);
+            HttpResponse::build(http::StatusCode::OK).json(&res)
         }
         Err(e) => {
             let res = response::JsonErrResponse::new(
                 http::StatusCode::FORBIDDEN.to_string(),
                 format!("Account verification failed: {}", e),
             );
-            return HttpResponse::build(http::StatusCode::FORBIDDEN).json(&res);
+            HttpResponse::build(http::StatusCode::FORBIDDEN).json(&res)
         }
-    };
+    }
 }
 
 /// Sends a Password Reset Email
@@ -246,8 +246,7 @@ pub fn send_reset_email(mut data: web::Json<UserEmail>, req: HttpRequest) -> Htt
         Ok(usr) => usr,
         Err(e) => {
             let status = http::StatusCode::NOT_FOUND;
-            return HttpResponse::build(status)
-                .json(err_response(status.to_string(), format!("{}", e)));
+            return HttpResponse::build(status).json(err_response(status.to_string(), e));
         }
     };
     let user = &user[0];
@@ -390,7 +389,7 @@ pub fn change_activation_status(mut data: web::Json<UserEmail>) -> HttpResponse 
                 Err(e) => err("500", e.to_string()),
             }
         }
-        Err(e) => err("404", e.to_string()),
+        Err(e) => err("404", e),
     }
 }
 
@@ -418,7 +417,6 @@ pub fn google_auth(_req: HttpRequest, data: web::Data<Arc<Mutex<OClient>>>) -> H
 
     let data = hashmap!["status" => "200", "message" => "Authentication success. Browse to the authentication url given"];
     let body = json!({ "auth_url": auth_url.to_string() });
-    std::mem::drop(client);
 
     respond(data, Some(body), None).unwrap()
 }
@@ -447,7 +445,7 @@ pub fn google_auth_callback(
     let client = &data.get_ref().lock().unwrap().client;
     let code = AuthorizationCode::new(info.code.to_string());
 
-    let token_data = match client.exchange_code(code) {
+    match client.exchange_code(code) {
         Ok(token) => {
             let data = hashmap!["status" => "200",
             "message" => "Success. Authorization token received"];
@@ -455,10 +453,7 @@ pub fn google_auth_callback(
             respond(data, Some(token), None).unwrap()
         }
         Err(er) => err("403", er.to_string()),
-    };
-
-    std::mem::drop(client);
-    token_data
+    }
 }
 
 /// Registers users authenticated with google Oauth
@@ -475,7 +470,7 @@ pub fn register_g_oauth(req: HttpRequest) -> HttpResponse {
     use serde_json::Value;
 
     let token_hdr = match Authorization::<Bearer>::parse(&req) {
-        Ok(auth_header) => auth_header.into_scheme().to_owned().to_string(),
+        Ok(auth_header) => auth_header.into_scheme().to_string(),
         Err(e) => return err("400", e.to_string()),
     };
 
@@ -553,8 +548,8 @@ fn send_activation_link(
     let mut username = "";
 
     let s = TEMPLATE.render(template, &context)?;
-    if user_name.is_some() {
-        username = user_name.unwrap();
+    if let Some(name) = user_name {
+        username = name;
     }
 
     let mut mail = mail::Mail::new(user_email, username, "Email activation", &s)?;

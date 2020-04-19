@@ -15,9 +15,7 @@ use crate::core::py_interface::create_py_mod;
 // use crate::core::py_interface::create_py_mod;
 
 /// Extracts the Multipart Field from the multipart object
-pub fn extract_multipart_field<'a>(
-    field: Field,
-) -> impl Future<Item = (i64, String), Error = Error> {
+pub fn extract_multipart_field(field: Field) -> impl Future<Item = (i64, String), Error = Error> {
     //
     // dotenv().ok();
 
@@ -37,7 +35,7 @@ pub fn extract_multipart_field<'a>(
                     //   env::var("UPLOAD_URL").expect("ENV Err: Missing static image upload URL");
 
                     file.write_all(bytes.as_ref()).map_err(|e| {
-                        println!("File.write failed: {:?}", e);
+                        debug!("File.write failed: {:?}", e);
                         MultipartError::Payload(act_err::PayloadError::Io(e))
                     })?;
                     acc += bytes.len() as i64;
@@ -90,7 +88,7 @@ pub fn extract_multipart_field<'a>(
 }
 
 /// Creates a temprory file to be used in executing the multipart write
-fn make_temp_file<'a>() -> Result<(File, String), Box<dyn error::Error>> {
+fn make_temp_file() -> Result<(File, String), Box<dyn error::Error>> {
     let rand_str = "temp_upload_file";
     let mut dir = std::env::temp_dir();
     dir.push(rand_str);
@@ -108,7 +106,6 @@ struct UploadData {
 }
 
 mod base_64 {
-    use base64;
     use serde::{de, Deserialize, Deserializer, Serializer};
 
     pub fn serialize<S>(bytes: &[u8], serializer: S) -> Result<S::Ok, S::Error>

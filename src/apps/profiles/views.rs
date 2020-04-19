@@ -22,15 +22,14 @@ use log::error as log_error;
 ///   GET
 ///
 pub fn get_profile(id: web::Path<i32>) -> HttpResponse {
-    let res = match Profile::find_by_key(*id) {
+    match Profile::find_by_key(*id) {
         Ok(mut prof_vec) => {
             let data = hashmap!["status" => "200",
             "message" => "Success. Profile retreived"];
             respond(data, Some(prof_vec.0.pop()), None).unwrap()
         }
         Err(e) => err("404", e.to_string()),
-    };
-    res
+    }
 }
 
 /// Retrieves all existing user profiles
@@ -70,7 +69,7 @@ pub fn update_profile(data: web::Json<UpdtProfile>, id: web::Path<i32>) -> HttpR
                 Err(e) => err("500", e.to_string()),
             }
         }
-        Err(e) => return err("404", e.to_string()),
+        Err(e) => err("404", e.to_string()),
     }
 }
 

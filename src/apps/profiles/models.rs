@@ -96,6 +96,7 @@ impl<'a> NewProfile<'a> {
     /// - profile: Option<u32>
     ///     If Some returns the created user Profile object.
     ///     None(default): Nothing is returned
+    #[allow(clippy::new_ret_no_self)]
     pub fn new<'b>(
         user_id: i32,
         profile: Option<u32>,
@@ -110,7 +111,7 @@ impl<'a> NewProfile<'a> {
             .expect("Error creating user profile");
         let res_av = match NewAvatar::new(user_id) {
             Ok(av) => av,
-            Err(e) => Err(e.to_string())?,
+            Err(e) => return Err(e.to_string()),
         };
 
         if profile.is_some() {
@@ -153,6 +154,7 @@ pub struct NewAvatar<'a> {
 
 impl<'a> NewAvatar<'a> {
     /// Creates a new user profile avatar
+    #[allow(clippy::new_ret_no_self)]
     pub fn new<'b>(user_id: i32) -> Result<Avatar<'b>, diesel::result::Error> {
         //
         //TODO Set Default avatar url

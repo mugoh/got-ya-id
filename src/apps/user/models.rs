@@ -207,13 +207,13 @@ impl User {
 
     /// Decodes the auth token representing a user
     /// to return an user object with a verified account
-    pub fn verify_user(user_key: &String) -> Result<User, Box<dyn stdError>> {
+    pub fn verify_user(user_key: &str) -> Result<User, Box<dyn stdError>> {
         use crate::diesel_cfg::schema::users::dsl::*;
         let user = match validate::decode_auth_token(user_key) {
             Ok(user_detail) => user_detail.company,
             Err(e) => {
                 // return (status code, e)
-                return Err(e.into());
+                return Err(e);
             }
         };
         let user = diesel::update(users.filter(email.eq(&user)))
@@ -226,16 +226,16 @@ impl User {
 
     /// Alters the existing account password to match
     /// the string passed as a new password.
-    pub fn reset_pass(token: &String, new_password: &String) -> Result<(), Box<dyn stdError>> {
+    pub fn reset_pass(token: &str, new_password: &str) -> Result<(), Box<dyn stdError>> {
         use crate::diesel_cfg::schema::users::dsl::*;
 
         let user = match validate::decode_auth_token(token) {
             Ok(usr) => usr.company,
-            Err(e) => Err(e)?,
+            Err(e) => return Err(e),
         };
         let pass_hash = match hash(new_password, DEFAULT_COST) {
             Ok(h) => h,
-            Err(e) => Err(e)?,
+            Err(e) => return Err(e.into()),
         };
 
         diesel::update(users.filter(email.eq(&user)))
@@ -251,16 +251,17 @@ impl User {
     /// ## Result
     /// OK -> User object that matches the given email
     /// ERR -> String
-    pub fn find_by_email<'a>(given_email: &'a str) -> Result<Vec<User>, String> {
+    pub fn find_by_email(given_email: &str) -> Result<Vec<User>, String> {
         use crate::diesel_cfg::schema::users::dsl::{email, users};
 
         let user = users
             .filter(email.eq(given_email))
             .load::<User>(&connect_to_db())
             .unwrap();
-        match user.is_empty() {
-            false => Ok(user),
-            _ => Err(format!("User of email {} non-existent", given_email).into()),
+        if user.is_empty() {
+            Err(format!("User of email {} non-existent", given_email))
+        } else {
+            Ok(user)
         }
     }
 
@@ -281,12 +282,14 @@ impl User {
         //
         use crate::diesel_cfg::schema::users::dsl::*;
         let user = users.find(pk).get_result::<User>(&connect_to_db())?;
-        if !include_profile.is_some() {
+
+        if include_profile.is_none() {
             return Ok((user, None));
         }
+
         let mut usr_profile = Profile::belonging_to(&user).load::<Profile>(&connect_to_db())?;
         if usr_profile.is_empty() {
-            Err(format!("User of ID {id} non existent", id = pk))?
+            return Err(format!("User of ID {id} non existent", id = pk).into());
         }
         Ok((user, usr_profile.pop()))
     }
@@ -301,23 +304,22 @@ impl User {
     ///  Return each User Object with its corresponding Profile
     ///     WARNING ->
     /// If Some(u8), a second query will be done for ALL user profiles
-    pub fn retrieve_all<'a>(with_profile: Option<u8>) -> Result<Vec<User>, Box<dyn stdError>> {
+    pub fn retrieve_all(with_profile: Option<u8>) -> Result<Vec<User>, Box<dyn stdError>> {
         use crate::diesel_cfg::schema::users::dsl::*;
         let user_vec = users.load::<User>(&connect_to_db()).unwrap();
 
-        match with_profile {
-            Some(_) => {
-                Err("Unimplemented")?;
-                let mut res: std::collections::HashMap<usize, (&User, Profile)> =
-                    std::collections::HashMap::new();
-                for (i, usr) in user_vec.iter().enumerate() {
-                    let profile = Profile::belonging_to(usr)
-                        .first::<Profile<'a>>(&connect_to_db())
-                        .unwrap();
-                    res.insert(i, (usr, profile));
-                }
+        if with_profile.is_some() {
+            return Err("Unimplemented".into());
+            /*
+            let mut res: std::collections::HashMap<usize, (&User, Profile)> =
+                std::collections::HashMap::new();
+            for (i, usr) in user_vec.iter().enumerate() {
+                let profile = Profile::belonging_to(usr)
+                    .first::<Profile>(&connect_to_db())
+                    .unwrap();
+                res.insert(i, (usr, profile));
             }
-            _ => (),
+            */
         }
         Ok(user_vec)
     }
@@ -346,7 +348,7 @@ impl User {
     }
 
     /// Retrieves the Avatar belonging to the user instance
-    pub fn get_avatar<'b>(&self) -> Result<Option<Avatar>, diesel::result::Error> {
+    pub fn get_avatar(&self) -> Result<Option<Avatar>, diesel::result::Error> {
         Ok(Avatar::belonging_to(self)
             .load::<Avatar>(&connect_to_db())?
             .pop())
@@ -366,8 +368,8 @@ impl<'a> SignInUser<'a> {
             ("username", &self.username)
         };
 
-        let query = match &key {
-            &"email" => users
+        match key {
+            "email" => users
                 .filter(email.eq(identity.clone().unwrap()))
                 // .select(email)
                 .load::<User>(&connect_to_db()),
@@ -375,8 +377,7 @@ impl<'a> SignInUser<'a> {
                 .filter(username.eq(identity.clone().unwrap()))
                 // .select(username)
                 .load::<User>(&connect_to_db()),
-        };
-        query
+        }
     }
 
     /// Verifies the given Sign In detail contains
@@ -534,10 +535,10 @@ impl OauthGgUser {
                     ))
                     .execute(&connect_to_db())?;
 
-                return Ok(None);
+                Ok(None)
             }
             // Existing user email
-            None => Err("You seem to have an account with this email. Try signing in".to_owned())?,
+            None => Err("You seem to have an account with this email. Try signing in".into()),
         }
     }
 }

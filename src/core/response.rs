@@ -6,7 +6,7 @@ use serde::{Deserialize, Serialize};
 use actix_web::{http::StatusCode, HttpResponse};
 use serde_json::json;
 
-use std::{collections::HashMap, error};
+use std::{collections::HashMap, error::Error as stdError};
 /// Response to User on Success
 /// Deserialized to JSON
 #[derive(Deserialize, Serialize, Debug)]
@@ -102,11 +102,11 @@ where
 ///  #- Ok: HttpResponse
 ///  #- Err: dyn std::error::Error
 ///  ```
-pub fn respond<'a, T>(
-    data: HashMap<&'static str, &'static str>,
+pub fn respond<'a, 'c, T>(
+    data: HashMap<&'c str, &'c str>,
     body: Option<T>,
     err: Option<&'a str>,
-) -> Result<HttpResponse, Box<dyn error::Error>>
+) -> Result<HttpResponse, Box<dyn stdError>>
 //
 where
     T: serde::de::DeserializeOwned,

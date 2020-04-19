@@ -16,7 +16,7 @@ use std::{borrow::Cow, collections::HashMap};
 /// # Arguments
 /// file: &str
 ///     - The url path of the file to upload
-pub fn create_py_mod<'a>(file_path: String) -> Result<String, ()> {
+pub fn create_py_mod(file_path: String) -> Result<String, ()> {
     // use pyo3::prelude::*;
 
     let py = Python::acquire_gil();
@@ -47,11 +47,11 @@ fn upload_static<'a>(py: Python, file_: &'a str) -> PyResult<String> {
         .to_string();
 
     let res = res.replace("{", "").replace("'", "\"").replace("}", "");
-    let res = res.split(",").collect::<Vec<&str>>();
+    let res = res.split(',').collect::<Vec<&str>>();
     let mut res_map = std::collections::HashMap::new();
 
     for item in &res {
-        let key_value = item.splitn(2, ":").collect::<Vec<&str>>();
+        let key_value = item.splitn(2, ':').collect::<Vec<&str>>();
         res_map.insert(
             key_value[0]
                 .trim_matches(|x: char| x.is_whitespace())

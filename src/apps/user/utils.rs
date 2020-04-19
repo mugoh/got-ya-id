@@ -1,4 +1,3 @@
-use lazy_static;
 use regex::Regex;
 use tera::{self, Context, Tera};
 use validator::ValidationError;
@@ -15,8 +14,8 @@ lazy_static! {
 
     /// Lazily Compiled Templates
     pub static ref TEMPLATE: Tera = {
-        let tera = Tera::new("src/templates/**/*").unwrap();
-        tera
+    Tera::new("src/templates/**/*").unwrap()
+
     };
 }
 /// Validates name
@@ -89,8 +88,8 @@ pub fn validate_pass(pass: &str) -> Result<(), ValidationError> {
 pub fn get_context(username: Option<&str>, path: &str) -> Context {
     let mut context = Context::new();
 
-    if username.is_some() {
-        context.insert("username", username.unwrap());
+    if let Some(name) = username {
+        context.insert("username", name);
     }
 
     context.insert("link", path);
@@ -112,7 +111,7 @@ pub mod naive_date_format {
     use chrono::NaiveDateTime;
     use serde::{self, Deserialize, Deserializer, Serializer};
 
-    const FORMAT: &'static str = "%Y-%m-%dT%H:%M:%S.%f %:z";
+    const FORMAT: &str = "%Y-%m-%dT%H:%M:%S.%f %:z";
 
     // The signature of a serialize_with function must follow the pattern:
     //
@@ -201,7 +200,7 @@ pub fn create_oauth_client() -> oauth2::basic::BasicClient {
             .expect("Invalid token endpoint URL"),
     );
 
-    let client = BasicClient::new(
+    BasicClient::new(
         google_client_id,
         Some(google_client_secret),
         auth_url,
@@ -217,9 +216,7 @@ pub fn create_oauth_client() -> oauth2::basic::BasicClient {
         // host.join("api/auth/callback")
         //     .expect("Invalid redirect Url"),
         Url::parse("http://127.0.0.1:8888/api/auth/callback").expect("Invalid RedirectUrl"),
-    ));
-
-    client
+    ))
 }
 
 struct NaiveDateTimeVisitor;
