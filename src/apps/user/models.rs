@@ -488,6 +488,7 @@ impl OauthGgUser {
                 first_name.eq(&usr_data.given_name),
                 family_name.eq(&usr_data.family_name),
                 provider_verified.eq(&usr_data.verified_email),
+                picture.eq(&usr_data.picture),
                 locale.eq(&usr_data.locale),
                 acc_id.eq(&usr_data.id),
                 provider.eq(acc_provider),
@@ -511,11 +512,10 @@ impl OauthGgUser {
                     usocial_id.eq(&usr_data.id),
                 ))
                 .get_result::<User>(&connect_to_db())?;
+            NewProfile::new(ord_user.id, None)?;
 
-            let avatar = Avatar::belonging_to(&ord_user)
-                .load::<Avatar>(&connect_to_db())
-                .expect("Error retrieving avatar");
-            diesel::update(&avatar[0])
+            let avatar = Avatar::belonging_to(&ord_user).get_result::<Avatar>(&connect_to_db())?;
+            diesel::update(&avatar)
                 .set(av_url.eq(&user.picture))
                 .get_result::<Avatar>(&connect_to_db())?;
 

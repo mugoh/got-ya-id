@@ -101,6 +101,9 @@ pub fn register_user(mut data: web::Json<NewUser>, req: HttpRequest) -> HttpResp
 /// `POST`
 pub fn send_account_activation_link(email: web::Json<UserEmail>, req: HttpRequest) -> HttpResponse {
     //
+    if let Err(e) = email.0.validate() {
+        return HttpResponse::build(StatusCode::BAD_REQUEST).json(e);
+    }
     if let Err(e) = User::find_by_email(&email.email) {
         return HttpResponse::build(http::StatusCode::NOT_FOUND).json(e);
     }
@@ -207,25 +210,9 @@ pub fn login(user: web::Json<SignInUser>) -> HttpResponse {
 ///
 pub fn verify(path: web::Path<String>) -> HttpResponse {
     match User::verify_user(&path) {
-        Ok(user) => {
-            let res = response::JsonResponse::new(
-                http::StatusCode::OK.to_string(),
-                format!("Success. Account of user {} verified", user.email),
-                json!({
-                    "username": &user.username,
-                    "email": &user.email,
-                    "is_verified": &user.is_verified
-                }),
-            );
-            HttpResponse::build(http::StatusCode::OK).json(&res)
-        }
-        Err(e) => {
-            let res = response::JsonErrResponse::new(
-                http::StatusCode::FORBIDDEN.to_string(),
-                format!("Account verification failed: {}", e),
-            );
-            HttpResponse::build(http::StatusCode::FORBIDDEN).json(&res)
-        }
+        Ok(_) => HttpResponse::build(http::StatusCode::OK).body("Your account is now verified"),
+        Err(_) => HttpResponse::build(http::StatusCode::FORBIDDEN)
+            .json("Oopsy! That didn't work. Just request a resend of the account activation link"),
     }
 }
 
@@ -457,7 +444,9 @@ pub fn google_auth_callback(
 }
 
 /// Registers users authenticated with google Oauth
-///
+/// This endpoint should be manulllay called with
+/// the Oauth token received from the callback url (`/auth/callback`)
+/// in the Authorization header
 /// # url
 /// `auth/register/social`
 ///
