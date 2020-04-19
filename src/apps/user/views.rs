@@ -3,8 +3,8 @@
 //!
 
 use super::models::{
-    GoogleUser, NewUser, OClient, OauthGgUser, OauthInfo, PassResetData, ResetPassData, SignInUser,
-    User, UserEmail,
+    GoogleUser, NewUser, OClient, OauthGgUser, OauthInfo, ResetPassData, SignInUser, User,
+    UserEmail,
 };
 
 use super::utils::{err_response, get_context, get_reset_context, get_url, TEMPLATE};
@@ -23,6 +23,7 @@ use validator::Validate;
 
 use std::{
     env,
+    error::Error as stdError,
     sync::{Arc, Mutex},
 };
 
@@ -45,7 +46,7 @@ use actix_web_httpauth::headers::authorization::Bearer;
 /// - On ERROR: JSONErrResponse
 ///
 pub fn register_user(mut data: web::Json<NewUser>, req: HttpRequest) -> HttpResponse {
-    let user_ = data.0.clone();
+    let user_ = &data.0;
     let token = validate::encode_jwt_token(user_).unwrap();
     let _claims = validate::decode_auth_token(&token);
 
@@ -70,27 +71,50 @@ pub fn register_user(mut data: web::Json<NewUser>, req: HttpRequest) -> HttpResp
     };
 
     // Mail
-    let context: Context = get_context(&data.0, &path);
-    match TEMPLATE.render("email_activation.html", &context) {
-        Ok(s) => {
-            let mut mail =
-                mail::Mail::new(&data.0.email, &data.0.username, "Email activation", &s).unwrap();
-            mail.send().unwrap();
-        }
-
-        Err(e) => return err("500", e.to_string()),
-    };
-
+    if let Err(e) = send_activation_link(
+        &data.email,
+        Some(&data.username),
+        &path,
+        "email_activation.html",
+    ) {
+        return err("500", e.to_string());
+    }
     let res: response::JsonResponse<_> = response::JsonResponse::new(
         http::StatusCode::CREATED.to_string(),
-        format!(
-            "Success. An activation link sent to {}",
-            &data.0.email.clone()
-        ),
+        format!("Success. An activation link sent to {}", &data.0.email),
         json!({"email": &data.0.email, "username": &data.0.username, "token": &token}),
     );
 
     HttpResponse::build(http::StatusCode::CREATED).json(&res)
+}
+
+/// Sends an activation link to a user email
+///
+/// This endpoint should specifically be useful in re-sending
+/// of account activation links to users
+///
+/// # url
+/// `/auth/activation/send`
+///
+/// # method
+///
+/// `POST`
+pub fn send_account_activation_link(email: web::Json<UserEmail>, req: HttpRequest) -> HttpResponse {
+    //
+    if let Err(e) = User::find_by_email(&email.email) {
+        return HttpResponse::build(http::StatusCode::NOT_FOUND).json(e);
+    }
+
+    let token = User::create_token(&email.email).unwrap();
+    let host = format!("{:?}", req.headers().get("host").unwrap());
+    let path = get_url(&host, "api/auth/verify", &token);
+
+    if let Err(e) = send_activation_link(&email.email, None, &path, "email_activation.html") {
+        return err("500", e.to_string());
+    }
+
+    let data = hashmap!["status" => "200", "message" => "Success. Activation link sent"];
+    respond(data, Some("".to_string()), None).unwrap()
 }
 
 /// Logs in registered user
@@ -212,7 +236,7 @@ pub fn verify(path: web::Path<String>) -> HttpResponse {
 ///
 /// # Method
 /// ## POST
-pub fn send_reset_email(mut data: web::Json<PassResetData>, req: HttpRequest) -> HttpResponse {
+pub fn send_reset_email(mut data: web::Json<UserEmail>, req: HttpRequest) -> HttpResponse {
     if let Err(err) = data.validate() {
         let res = response::JsonErrResponse::new("400".to_string(), err);
         return HttpResponse::build(http::StatusCode::BAD_REQUEST).json(&res);
@@ -476,7 +500,7 @@ pub fn register_g_oauth(req: HttpRequest) -> HttpResponse {
     if !resp.status().is_success() {
         return err(resp.status().as_str(), resp.json::<Value>().unwrap());
     }
-    let res = resp.json::<GoogleUser>().unwrap();
+    let res = &resp.json::<GoogleUser>().unwrap();
     // let j_res: Value = serde_json::from_str(&res).unwrap();
 
     match OauthGgUser::register_as_third_party(res) {
@@ -515,4 +539,25 @@ pub fn register_g_oauth(req: HttpRequest) -> HttpResponse {
         // Registered regular account
         Err(e) => err("409", e.to_string()),
     }
+}
+
+/// Sends an account activation link to a user email
+fn send_activation_link(
+    user_email: &str,
+    user_name: Option<&str>,
+    reset_link: &str,
+    template: &str,
+) -> Result<(), Box<dyn stdError>> {
+    //
+    let context = get_context(user_name, reset_link);
+    let mut username = "";
+
+    let s = TEMPLATE.render(template, &context)?;
+    if user_name.is_some() {
+        username = user_name.unwrap();
+    }
+
+    let mut mail = mail::Mail::new(user_email, username, "Email activation", &s)?;
+    mail.send()?;
+    Ok(())
 }

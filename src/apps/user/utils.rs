@@ -3,7 +3,7 @@ use regex::Regex;
 use tera::{self, Context, Tera};
 use validator::ValidationError;
 
-use super::models::{NewUser, User};
+use super::models::User;
 
 use crate::apps::core::response;
 
@@ -78,13 +78,22 @@ pub fn validate_pass(pass: &str) -> Result<(), ValidationError> {
 
 /// Returns the context holding the template variables
 ///
+/// This is the email activation context
+///
+/// # Arguments
+/// `username`: Greeting name
+/// `path`: The activation link
+///
 /// # Returns
 /// - tera::Context
-pub fn get_context<'a>(data: &NewUser, path: &'a str) -> Context {
+pub fn get_context(username: Option<&str>, path: &str) -> Context {
     let mut context = Context::new();
 
-    context.insert("username", &data.username);
-    context.insert("link", &path);
+    if username.is_some() {
+        context.insert("username", username.unwrap());
+    }
+
+    context.insert("link", path);
     context
 }
 
