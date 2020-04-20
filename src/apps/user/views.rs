@@ -102,7 +102,7 @@ pub fn register_user(mut data: web::Json<NewUser>, req: HttpRequest) -> HttpResp
 pub fn send_account_activation_link(email: web::Json<UserEmail>, req: HttpRequest) -> HttpResponse {
     //
     if let Err(e) = email.0.validate() {
-        return HttpResponse::build(StatusCode::BAD_REQUEST).json(e);
+        return HttpResponse::build(http::StatusCode::BAD_REQUEST).json(e);
     }
     if let Err(e) = User::find_by_email(&email.email) {
         return HttpResponse::build(http::StatusCode::NOT_FOUND).json(e);
