@@ -1,22 +1,35 @@
 use actix_web::{middleware, web, App, HttpServer};
-use env_logger;
+//use env_logger;
 use listenfd::ListenFd;
-use std::{env, io};
+use std::{
+    io,
+    sync::{Arc, Mutex},
+};
+
+use tera::Tera;
 
 use got_ya_id::apps::api;
+use got_ya_id::apps::user::{models::OClient, utils::create_oauth_client};
 
 fn main() -> io::Result<()> {
     let mut listen_fd = ListenFd::from_env();
 
-    env::set_var("RUST_LOG", "actix_todo=debug, actix-web=info");
+    // env::set_var("RUST_LOG", "debug");
     env_logger::init();
+    let tera = Tera::new("src/templates/**/*").unwrap();
+    let data = OClient {
+        client: create_oauth_client(),
+    };
+    let data = Arc::new(Mutex::new(data));
 
-    let mut app = HttpServer::new(|| {
+    let mut app = HttpServer::new(move || {
         App::new()
             .configure(api::api)
             .wrap(middleware::NormalizePath)
             .wrap(middleware::Logger::default())
             .data(web::JsonConfig::default().limit(8192))
+            .data(data.clone())
+            .data(tera.clone())
     });
 
     app = if let Some(listener) = listen_fd.take_tcp_listener(0).unwrap() {

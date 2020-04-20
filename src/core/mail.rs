@@ -5,8 +5,6 @@ use lettre::smtp::authentication::Credentials;
 use lettre::{smtp, SmtpClient, SmtpTransport, Transport};
 use std::{env, process};
 
-use log::debug;
-
 /// Enables sending of email
 ///
 /// # Fields
@@ -77,11 +75,12 @@ impl Mail {
 }
 
 /// Retrieves ENV Variable given the Keys
-pub fn get_env_var<'a>(keys: Vec<&'a str>, values: &mut Vec<String>) -> () {
+pub fn get_env_var<'a>(keys: Vec<&'a str>, values: &mut Vec<String>) {
     for key in keys.iter() {
-        let val = env::var(key.to_string().to_lowercase()).unwrap_or_else(|er| {
-            debug!("Error configuring mail -> {:#?}", er);
-            process::exit(1);
+        let val = env::var((*key).to_lowercase()).unwrap_or_else(|_er| {
+            error!("Error configuring mail");
+            error!("Missing ENV variable -> {}", key);
+            process::exit(0);
         });
         values.push(val);
     }

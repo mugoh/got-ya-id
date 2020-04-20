@@ -1,0 +1,7 @@
+
+{% macro input(label="", class="",label_class="", type="text", required="required", name="name", value="") %}
+<label class="{{label_class}}">
+        {{ label }}
+    </label>
+        <input type="{{type}}", required="{{required}}", name="{{name}}", value="{{value}}" class="{{class}}"/>
+{% endmacro input %}

@@ -22,15 +22,14 @@ use log::error as log_error;
 ///   GET
 ///
 pub fn get_profile(id: web::Path<i32>) -> HttpResponse {
-    let res = match Profile::find_by_key(*id) {
+    match Profile::find_by_key(*id) {
         Ok(mut prof_vec) => {
             let data = hashmap!["status" => "200",
             "message" => "Success. Profile retreived"];
             respond(data, Some(prof_vec.0.pop()), None).unwrap()
         }
         Err(e) => err("404", e.to_string()),
-    };
-    res
+    }
 }
 
 /// Retrieves all existing user profiles
@@ -70,7 +69,7 @@ pub fn update_profile(data: web::Json<UpdtProfile>, id: web::Path<i32>) -> HttpR
                 Err(e) => err("500", e.to_string()),
             }
         }
-        Err(e) => return err("404", e.to_string()),
+        Err(e) => err("404", e.to_string()),
     }
 }
 
@@ -94,7 +93,7 @@ pub fn upload_avatar(
     id: web::Path<i32>,
     multipart: Multipart,
 ) -> impl Future<Item = HttpResponse, Error = Error> {
-    futures::future::result(User::find_by_pk(*id))
+    futures::future::result(User::find_by_pk(*id, Some(1)))
         .map(|user_data| user_data.0)
         .map_err(error::ErrorNotFound)
         .and_then(|some_user| {
@@ -115,4 +114,28 @@ pub fn upload_avatar(
                     e
                 })
         })
+}
+
+/// Retrieves an avatar url of a user profile
+///
+/// # url
+/// ## `/user/{user_id}/profile/avatar`
+///
+/// # method
+/// GET
+pub fn retrieve_profile_avatar(id: web::Path<i32>) -> HttpResponse {
+    let user = match User::find_by_pk(*id, None) {
+        Ok(usr) => usr.0,
+        Err(e) => return err("404", e.to_string()),
+    };
+
+    match user.get_avatar() {
+        Ok(avatar) => respond(
+            hashmap!["status" => "200", "message" => "Success. Avatar retrieved"],
+            avatar,
+            None,
+        )
+        .unwrap(),
+        Err(e) => err("500", e.to_string()),
+    }
 }

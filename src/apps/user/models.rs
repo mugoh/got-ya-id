@@ -1,16 +1,16 @@
 //! This module holds items related to data manipulation
 //! for the User Object
 
-use super::utils::{naive_date_format, validate_email, validate_name};
+use super::utils::{from_timestamp, validate_email, validate_name};
 
 use std::borrow::Cow;
 
 use crate::apps::auth::validate;
 use crate::apps::profiles::models::{Avatar, NewProfile, Profile};
 use crate::config::config;
-use crate::diesel_cfg::{config::connect_to_db, schema::users};
+use crate::diesel_cfg::{config::connect_to_db, schema::oath_users, schema::users};
 
-use std::error;
+use std::error::Error as stdError;
 
 use serde::{Deserialize, Serialize};
 use validator::Validate;
@@ -26,25 +26,27 @@ use jwt::{encode, Header};
 
 /// User Object
 /// Holds user data
-#[derive(Queryable, Serialize, AsChangeset, Deserialize, Identifiable, Debug, Clone, Validate)]
+#[derive(Queryable, Serialize, AsChangeset, Deserialize, Identifiable, Validate)]
 #[table_name = "users"]
 pub struct User {
     pub id: i32,
     pub username: String,
     pub email: String,
     #[serde(skip_deserializing)]
-    password: String,
-    #[serde(with = "naive_date_format")]
+    password: Option<String>,
+    #[serde(deserialize_with = "from_timestamp")]
     pub created_at: NaiveDateTime,
-    #[serde(with = "naive_date_format")]
+    #[serde(deserialize_with = "from_timestamp")]
     updated_at: NaiveDateTime,
     pub is_active: bool,
     pub is_verified: bool,
+    pub social_id: Option<String>,
+    pub social_account_verified: bool,
 }
 
 /// Temporary holds new User data
 /// User Record for new User entries
-#[derive(Debug, Clone, Validate, Serialize, Deserialize, Insertable)]
+#[derive(Clone, Validate, Serialize, Deserialize, Insertable)]
 #[table_name = "users"]
 #[serde(deny_unknown_fields)]
 pub struct NewUser<'b> {
@@ -59,22 +61,57 @@ pub struct NewUser<'b> {
     pub email: Cow<'b, str>,
 }
 
-/// Holds data passed on Password-reset request
-#[derive(Debug, Serialize, Deserialize, Validate)]
+/// Holds Sign-In user details
+#[derive(Deserialize, Serialize, Validate)]
+pub struct SignInUser<'a> {
+    // #[validate(email(message = "Oops! Email format not invented yet"))]
+
+    // Email validation Panicks with :: ->
+    /* the trait bound `std::borrow::Cow<'_, str>: std::convert::From<&std::borrow::Cow<'_, str>>` is not satisfied */
+    #[validate(custom = "validate_email")]
+    email: Option<Cow<'a, str>>,
+    username: Option<Cow<'a, str>>,
+    password: Cow<'a, str>,
+}
+
+/// Holds user email passed in email-only JSON requests
+#[derive(Deserialize, Validate)]
 #[serde(deny_unknown_fields)]
-pub struct PassResetData<'a> {
+pub struct UserEmail<'a> {
     #[validate(email(message = "Email format not invented yet"))]
     pub email: Cow<'a, str>,
 }
 
 /// Holds Account Password reset data
-#[derive(Debug, Serialize, Deserialize, Validate)]
+#[derive(Serialize, Deserialize, Validate)]
 #[serde(deny_unknown_fields)]
 pub struct ResetPassData {
     #[validate(length(min = 5, message = "Give your password at least 5 characters"))]
     pub password: String,
     #[validate(must_match = "password")] // Can't give error message given on failed match
-    password_conf: String,
+    pub password_conf: String,
+}
+
+/// Holds JWT Authorization Claims
+#[derive(Serialize, Deserialize)]
+struct Claims {
+    pub company: String,
+    pub exp: usize,
+    sub: String,
+}
+
+/// Oauth Query Params Struct extractor
+#[derive(Deserialize)]
+pub struct OauthInfo {
+    pub code: String,
+    pub state: String,
+}
+
+/// App Data extractor
+///
+/// Holds the Oauth Client
+pub struct OClient {
+    pub client: oauth2::basic::BasicClient,
 }
 
 impl<'a> NewUser<'a> {
@@ -142,12 +179,14 @@ impl User {
     ///
     /// bool: True -> Verified, False -> Fail
     pub fn verify_pass<'a>(&self, pass: &'a str) -> Result<bool, ()> {
-        verify(pass, &self.password).map_err(|e| debug!("{:?}", e))
+        verify(pass, &self.password.as_ref().unwrap()).map_err(|e| debug!("{:?}", e))
     }
 
     /// Creates an authorization token encoded with the
     /// given user detail
-    pub fn create_token(&self, user_cred: &String) -> Result<String, Box<dyn error::Error>> {
+    ///
+    /// The cred used is the user email
+    pub fn create_token(user_cred: &str) -> Result<String, Box<dyn stdError>> {
         let payload = Claims {
             company: user_cred.to_owned(),
             exp: (Utc::now() + Duration::hours(720)).timestamp() as usize,
@@ -163,21 +202,18 @@ impl User {
 
         let header = Header::default();
 
-        match encode(&header, &payload, key.as_ref()) {
-            Ok(t) => Ok(t),
-            Err(e) => Result::Err(Box::new(e)),
-        }
+        Ok(encode(&header, &payload, key.as_ref())?)
     }
 
     /// Decodes the auth token representing a user
     /// to return an user object with a verified account
-    pub fn verify_user(user_key: &String) -> Result<User, Box<dyn error::Error>> {
+    pub fn verify_user(user_key: &str) -> Result<User, Box<dyn stdError>> {
         use crate::diesel_cfg::schema::users::dsl::*;
         let user = match validate::decode_auth_token(user_key) {
             Ok(user_detail) => user_detail.company,
             Err(e) => {
                 // return (status code, e)
-                return Err(e.into());
+                return Err(e);
             }
         };
         let user = diesel::update(users.filter(email.eq(&user)))
@@ -190,25 +226,21 @@ impl User {
 
     /// Alters the existing account password to match
     /// the string passed as a new password.
-    pub fn reset_pass(token: &String, new_password: &String) -> Result<(), Box<dyn error::Error>> {
+    pub fn reset_pass(token: &str, new_password: &str) -> Result<(), Box<dyn stdError>> {
         use crate::diesel_cfg::schema::users::dsl::*;
 
         let user = match validate::decode_auth_token(token) {
             Ok(usr) => usr.company,
-            Err(e) => return Err(e.into()),
+            Err(e) => return Err(e),
         };
         let pass_hash = match hash(new_password, DEFAULT_COST) {
             Ok(h) => h,
-            Err(e) => {
-                error!("{}", &format!("{:?}", e));
-                return Err(e.into());
-            }
+            Err(e) => return Err(e.into()),
         };
 
         diesel::update(users.filter(email.eq(&user)))
             .set(password.eq(pass_hash))
-            .get_result::<User>(&connect_to_db())
-            .unwrap();
+            .get_result::<User>(&connect_to_db())?;
         Ok(())
     }
 
@@ -219,16 +251,17 @@ impl User {
     /// ## Result
     /// OK -> User object that matches the given email
     /// ERR -> String
-    pub fn find_by_email<'a>(given_email: &'a str) -> Result<Vec<User>, String> {
+    pub fn find_by_email(given_email: &str) -> Result<Vec<User>, String> {
         use crate::diesel_cfg::schema::users::dsl::{email, users};
 
         let user = users
             .filter(email.eq(given_email))
             .load::<User>(&connect_to_db())
             .unwrap();
-        match user.is_empty() {
-            false => Ok(user),
-            _ => Err(format!("User of email {} non-existent", given_email).into()),
+        if user.is_empty() {
+            Err(format!("User of email {} non-existent", given_email))
+        } else {
+            Ok(user)
         }
     }
 
@@ -237,13 +270,26 @@ impl User {
     /// # Returns
     /// The user object and corresponding Profile
     ///
-    pub fn find_by_pk<'a>(pk: i32) -> Result<(User, Option<Profile<'a>>), Box<dyn error::Error>> {
+    /// # Arguments
+    ///
+    /// * `pk`  - User primary key
+    /// * `include_profile` - If supplied, return a tuple of the user and the user profile. Returns the user instance only if None
+    ///
+    pub fn find_by_pk<'a>(
+        pk: i32,
+        include_profile: Option<i32>,
+    ) -> Result<(User, Option<Profile<'a>>), Box<dyn stdError>> {
         //
         use crate::diesel_cfg::schema::users::dsl::*;
         let user = users.find(pk).get_result::<User>(&connect_to_db())?;
+
+        if include_profile.is_none() {
+            return Ok((user, None));
+        }
+
         let mut usr_profile = Profile::belonging_to(&user).load::<Profile>(&connect_to_db())?;
         if usr_profile.is_empty() {
-            Err(format!("User of ID {id} non existent", id = pk))?
+            return Err(format!("User of ID {id} non existent", id = pk).into());
         }
         Ok((user, usr_profile.pop()))
     }
@@ -258,30 +304,29 @@ impl User {
     ///  Return each User Object with its corresponding Profile
     ///     WARNING ->
     /// If Some(u8), a second query will be done for ALL user profiles
-    pub fn retrieve_all<'a>(with_profile: Option<u8>) -> Result<Vec<User>, Box<dyn error::Error>> {
+    pub fn retrieve_all(with_profile: Option<u8>) -> Result<Vec<User>, Box<dyn stdError>> {
         use crate::diesel_cfg::schema::users::dsl::*;
         let user_vec = users.load::<User>(&connect_to_db()).unwrap();
 
-        match with_profile {
-            Some(_) => {
-                Err("Unimplemented")?;
-                let mut res: std::collections::HashMap<usize, (&User, Profile)> =
-                    std::collections::HashMap::new();
-                for (i, usr) in user_vec.iter().enumerate() {
-                    let profile = Profile::belonging_to(usr)
-                        .first::<Profile<'a>>(&connect_to_db())
-                        .unwrap();
-                    res.insert(i, (usr, profile));
-                }
+        if with_profile.is_some() {
+            return Err("Unimplemented".into());
+            /*
+            let mut res: std::collections::HashMap<usize, (&User, Profile)> =
+                std::collections::HashMap::new();
+            for (i, usr) in user_vec.iter().enumerate() {
+                let profile = Profile::belonging_to(usr)
+                    .first::<Profile>(&connect_to_db())
+                    .unwrap();
+                res.insert(i, (usr, profile));
             }
-            _ => (),
+            */
         }
         Ok(user_vec)
     }
 
     /// Alters an account activation status
     /// Activates or Deactivates a User account
-    pub fn alter_activation_status(&self) -> Result<User, Box<dyn error::Error>> {
+    pub fn alter_activation_status(&self) -> Result<User, Box<dyn stdError>> {
         //
         use crate::diesel_cfg::schema::users::dsl::*;
         Ok(diesel::update(&*self)
@@ -296,24 +341,18 @@ impl User {
 
         let avatar = Avatar::belonging_to(self)
             .load::<Avatar>(&connect_to_db())
-            .expect("Error retreiving avatar");
+            .expect("Error retrieving avatar");
         Ok(diesel::update(&avatar[0])
             .set(url.eq(avatar_url))
             .get_result::<Avatar>(&connect_to_db())?)
     }
-}
 
-/// Holds Sign-In user details
-#[derive(Deserialize, Serialize, Validate)]
-pub struct SignInUser<'a> {
-    // #[validate(email(message = "Oops! Email format not invented yet"))]
-
-    // Email validation Panicks with :: ->
-    /* the trait bound `std::borrow::Cow<'_, str>: std::convert::From<&std::borrow::Cow<'_, str>>` is not satisfied */
-    #[validate(custom = "validate_email")]
-    email: Option<Cow<'a, str>>,
-    username: Option<Cow<'a, str>>,
-    password: Cow<'a, str>,
+    /// Retrieves the Avatar belonging to the user instance
+    pub fn get_avatar(&self) -> Result<Option<Avatar>, diesel::result::Error> {
+        Ok(Avatar::belonging_to(self)
+            .load::<Avatar>(&connect_to_db())?
+            .pop())
+    }
 }
 
 impl<'a> SignInUser<'a> {
@@ -329,8 +368,8 @@ impl<'a> SignInUser<'a> {
             ("username", &self.username)
         };
 
-        let query = match &key {
-            &"email" => users
+        match key {
+            "email" => users
                 .filter(email.eq(identity.clone().unwrap()))
                 // .select(email)
                 .load::<User>(&connect_to_db()),
@@ -338,8 +377,7 @@ impl<'a> SignInUser<'a> {
                 .filter(username.eq(identity.clone().unwrap()))
                 // .select(username)
                 .load::<User>(&connect_to_db()),
-        };
-        query
+        }
     }
 
     /// Verifies the given Sign In detail contains
@@ -362,18 +400,145 @@ impl<'a> SignInUser<'a> {
     }
 }
 
-/// Holds JWT Authorization Claims
-#[derive(Debug, Serialize, Deserialize)]
-struct Claims {
-    pub company: String,
-    pub exp: usize,
-    sub: String,
+/// User Profile data from google Oauth
+#[derive(Debug, Deserialize, Serialize)]
+pub struct GoogleUser {
+    /// Full name
+    name: String,
+
+    /// First name
+    given_name: String,
+
+    family_name: String,
+    pub email: String,
+
+    /// Verified_social_email
+    verified_email: bool,
+
+    /// Social ID
+    id: String,
+
+    /// avatar
+    picture: String,
+    locale: String,
 }
 
-/// Json Request data with Email field only
-#[derive(Deserialize, Validate)]
-#[serde(deny_unknown_fields)]
-pub struct UserEmail<'a> {
-    #[validate(email(message = "Email format not invented yet"))]
-    pub email: Cow<'a, str>,
+/// Service Oauth User Object
+/// Holds user social-authenticated user data
+#[derive(Queryable, Serialize, AsChangeset, Deserialize, Identifiable)]
+#[table_name = "oath_users"]
+pub struct OauthGgUser {
+    pub id: i32,
+    pub email: String,
+    pub name: String,
+    pub first_name: Option<String>,
+    pub family_name: Option<String>,
+    pub is_verified: bool,
+
+    picture: Option<String>,
+    locale: Option<String>,
+    acc_id: String,
+    pub is_active: bool,
+
+    /// Oauth Account provider
+    provider: String,
+
+    /// Verified Oauth account used
+    provider_verified: bool,
+
+    #[serde(deserialize_with = "from_timestamp")]
+    pub created_at: NaiveDateTime,
+    #[serde(deserialize_with = "from_timestamp")]
+    updated_at: NaiveDateTime,
+}
+
+impl OauthGgUser {
+    /// Registers a user account using Oauth
+    /// from a third party account
+    ///
+    /// # Arguments
+    ///  `usr_data`: GoogleUser data holding the user account profile info
+    ///
+    ///  # Retuns
+    ///  - `None` if account id exists
+    ///  - `OauthGgUser`: Newly registered account data
+    pub fn register_as_third_party(
+        usr_data: &GoogleUser,
+    ) -> Result<Option<(OauthGgUser, User)>, Box<dyn stdError>> {
+        use rand::{distributions::Alphanumeric, thread_rng, Rng};
+
+        use crate::diesel_cfg::schema::avatars::dsl::url as av_url;
+        use crate::diesel_cfg::schema::oath_users::dsl::*;
+        use crate::diesel_cfg::schema::users::dsl::{
+            email as uemail, social_id as usocial_id, username as u_username, users,
+        };
+
+        let present_user = users
+            .filter(uemail.eq(&usr_data.email))
+            .select((uemail, usocial_id))
+            .get_results::<(String, Option<String>)>(&connect_to_db())?;
+
+        if present_user.is_empty() {
+            // New User
+
+            let acc_provider = "google";
+            let new_data = (
+                email.eq(&usr_data.email),
+                name.eq(&usr_data.name),
+                first_name.eq(&usr_data.given_name),
+                family_name.eq(&usr_data.family_name),
+                provider_verified.eq(&usr_data.verified_email),
+                picture.eq(&usr_data.picture),
+                locale.eq(&usr_data.locale),
+                acc_id.eq(&usr_data.id),
+                provider.eq(acc_provider),
+            );
+            let user = diesel::insert_into(oath_users)
+                .values(&new_data)
+                .get_result::<OauthGgUser>(&connect_to_db())?;
+
+            // Insert to Users
+
+            let _rnd_ext = thread_rng()
+                .sample_iter(Alphanumeric)
+                .take(10)
+                .collect::<String>();
+            let user_name = format!("{}-{}-{}", &usr_data.name, _rnd_ext, acc_provider);
+
+            let ord_user = diesel::insert_into(users)
+                .values(&(
+                    uemail.eq(&usr_data.email),
+                    u_username.eq(user_name),
+                    usocial_id.eq(&usr_data.id),
+                ))
+                .get_result::<User>(&connect_to_db())?;
+            NewProfile::new(ord_user.id, None)?;
+
+            let avatar = Avatar::belonging_to(&ord_user).get_result::<Avatar>(&connect_to_db())?;
+            diesel::update(&avatar)
+                .set(av_url.eq(&user.picture))
+                .get_result::<Avatar>(&connect_to_db())?;
+
+            return Ok(Some((user, ord_user)));
+        }
+
+        let (_, s_id) = &present_user[0];
+        match s_id {
+            // Previously used Oauth account
+            Some(s) => {
+                diesel::update(oath_users.filter(acc_id.eq(s)))
+                    .set((
+                        picture.eq(&usr_data.picture),
+                        name.eq(&usr_data.name),
+                        first_name.eq(&usr_data.given_name),
+                        family_name.eq(&usr_data.family_name),
+                    ))
+                    .execute(&connect_to_db())?;
+
+                Ok(None)
+            }
+            // Existing user email
+            None => Err("You seem to have an account with this email. Try signing in".into()),
+        }
+    }
 }

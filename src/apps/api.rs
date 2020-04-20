@@ -16,16 +16,31 @@ pub fn api(cfg: &mut web::ServiceConfig) {
                         web::resource("/login").route(web::post().to_async(user::views::login)),
                     )
                     .service(
+                        web::resource("/google").route(web::get().to(user::views::google_auth)),
+                    )
+                    .service(
+                        web::resource("/callback")
+                            .route(web::get().to(user::views::google_auth_callback)),
+                    )
+                    .service(
                         web::resource("/verify/{token}")
                             .route(web::get().to_async(user::views::verify)),
                     )
                     .service(
                         web::resource("/password/reset/{token}")
-                            .route(web::patch().to_async(user::views::reset_password)),
+                            .route(web::get().to(user::views::reset_password)),
                     )
                     .service(
                         web::resource("/password/request")
                             .route(web::post().to_async(user::views::send_reset_email)),
+                    )
+                    .service(
+                        web::resource("/register/social")
+                            .route(web::get().to(user::views::register_g_oauth)),
+                    )
+                    .service(
+                        web::resource("/activation/send")
+                            .route(web::post().to(user::views::send_account_activation_link)),
                     )
                     .service(
                         web::resource("/activate")
@@ -42,7 +57,8 @@ pub fn api(cfg: &mut web::ServiceConfig) {
                     .service(web::resource("/{id}").route(web::get().to(user::views::get_user)))
                     .service(
                         web::resource("/{id}/profile/avatar")
-                            .route(web::put().to_async(profiles::views::upload_avatar)),
+                            .route(web::put().to_async(profiles::views::upload_avatar))
+                            .route(web::get().to(profiles::views::retrieve_profile_avatar)),
                     ),
             )
             .service(web::scope("/users").service(

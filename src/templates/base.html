@@ -2,13 +2,165 @@
 <html lang="en">
 <head>
     {% block head %}
-        <link rel="stylesheet" href="styles.css"/>
-        <title>{% block title %}Got-ya-Id{% endblock title %}</title>
+        <link rel="stylesheet" href="/static/styles.css" type="text/css">
+<style>
+
+body {
+      margin: 0;
+      padding: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Roboto", "Segoe UI", "Oxygen",
+      "Ubuntu", "Cantarell", "Fira Sans", "Droid Sans", "Helvetica Neue", sans-serif;
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+      width: 100%;
+      height: 100%;
+                          
+}
+html, body {
+    height: 100%;
+}
+#greeting {
+    font-size: 15px;
+    font-weight: 400;
+
+}
+#username {
+    font-weight: bolder;
+}
+
+
+.header-title{
+    color:  #170c65;
+    padding: .5em 1.5em ;
+}
+.container {
+    padding: 10px;
+    margin: 0 10px;
+    width: 90%;
+    margin-left: auto;
+    margin-right: auto;
+    padding-bottom: 50px;
+    min-height: 100%;
+}
+
+#act {
+    width: 100%;
+    text-align: center;
+}
+
+/*==========
+Pass reset form
+
+*/
+
+.reset-label {
+     padding: 10px 3px;
+    display: block;
+                
+}
+
+.reset-input {
+  width: 22%;
+  padding: 12px;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  resize: vertical;
+}
+
+  @media screen and (max-width: 600px) {
+  .reset-input, .reset-label, .submit-reset {
+    width: 100%;
+    margin-top: 0;
+  }
+}
+
+.submit-reset {  
+background-color:  #4b34ff;
+  color: white;
+  padding: 12px 20px;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.submit-reset:hover {
+ background-color :   #311fc2;
+}
+
+/*=================*/
+
+#activate-link {
+    text-decoration: None;
+}
+
+#act-button {
+    text-decoration: None;
+    font-size: 1em;
+    text-align: center;
+    width: 90%;
+    margin-left: auto;
+    margin-right: auto;
+    color: #fff;
+    padding: .45em;
+    margin-top: .2em;
+    margin-bottom: .5em;
+    border-radius: 7px;
+    background-color:  #1302AE;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.10), 0 1px 2px rgba(0,0,0,0.20);
+    transition: all 0.9s cubic-bezier(.25,.8,.25,1);
+}
+
+#act-button:hover {
+    background-color: #090B7F;
+    cursor: pointer;
+}
+
+.footer {
+      border: 1px solid  #0041a1 ;
+      width: 100%;
+      border-radius: 3px;
+      height: auto;
+      padding: 0 4px;
+      background-image: radial-gradient( circle farthest-corner at 24.1% 68.8%,  rgba(50,50,50,.9) 30%, rgba(0,0,0,1) 99.4% );
+                  
+}
+
+.footer-text {
+    color: #fff;
+   padding-top: .3em ;
+}
+
+.footer {
+ position: relative;
+    left: 0;
+    bottom: 0;
+    width: 100%;
+    overflow: hidden;
+    margin-top: 50px;
+    }
+</style>
+        <title>{% block title %}{% endblock title %} - Got-ya-Id </title>
     {% endblock head %}
 </head>
 <body>
+    {% block header_title %}
+
+    <div class="header-title">
+        <h2 class="atr">
+            Got ya Id
+        </h2>
+    </div>
+
+    {% endblock header_title %}
+
     <div class="container">
-        <div id="greeting"><p id="hello"> Hello <span id="username">{{username}},</span></p></div>
+        <div id="greeting"><p id="hello"> Hello <span id="username">
+                {% if username %}
+                    {{username}},
+                {% else %}
+                    fellow person,
+                {% endif %}
+                </span></p></div>
         <div class="content">
             {% block content %}
             
@@ -26,4 +178,7 @@
             </p>
         </div>
 </body>
+<footer>
+
+</footer
 </html>

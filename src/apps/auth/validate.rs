@@ -19,9 +19,9 @@ pub struct Claims {
 }
 
 /// Encodes a JWT token with user details {email, username}
-pub fn encode_jwt_token(user: NewUser) -> Result<String, Box<dyn error::Error>> {
+pub fn encode_jwt_token(user: &NewUser) -> Result<String, Box<dyn error::Error>> {
     let payload = Claims {
-        company: user.email.into_owned(),
+        company: user.email.to_string(),
         sub: "REG".to_owned(),
         exp: (Utc::now() + Duration::hours(36)).timestamp() as usize,
     };
@@ -57,13 +57,13 @@ pub fn encode_jwt_token(user: NewUser) -> Result<String, Box<dyn error::Error>> 
 /// # Panics
 /// - If the token decoding fails
 ///
-pub fn decode_auth_token(token: &String) -> Result<Claims, Box<dyn error::Error>> {
-    let key = env::var("secret_key").unwrap_or_else(|er| {
-        eprintln!("Error: Missing required ENV Variable\n{:#?}", er);
-        process::exit(78);
+pub fn decode_auth_token(token: &str) -> Result<Claims, Box<dyn error::Error>> {
+    let key = env::var("secret_key").unwrap_or_else(|_er| {
+        eprintln!("Error: Missing required ENV Variable `secret_key`\n");
+        process::exit(0);
     });
 
-    let decoded_token = match decode::<Claims>(&token, key.as_ref(), &Validation::default()) {
+    let decoded_token = match decode::<Claims>(token, key.as_ref(), &Validation::default()) {
         Ok(c) => c,
         Err(e) => return Result::Err(Box::new(e)),
     };
