@@ -1,5 +1,4 @@
 //! Contains the Database setup and configuration
-//!
 
 use diesel::{pg::PgConnection, prelude::*};
 use dotenv::dotenv;
@@ -29,6 +28,7 @@ lazy_static! {
         )
     };
 }
+
 pub fn connect_to_db() -> PgConnection {
     PgConnection::establish(&DB_URL).expect("Error Initializing the database connection")
 }

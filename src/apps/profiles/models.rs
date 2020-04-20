@@ -44,11 +44,10 @@ impl<'a> Profile<'a> {
             return Err(format!("User of ID {} non-existent", pk).into());
         }
         let av = json!({"avatar": avatars
-            .find(pk)
-            .first::<Avatar>(&connect_to_db())?
-            .url
-            .unwrap()
-            .into_owned()});
+        .find(pk)
+        .first::<Avatar>(&connect_to_db())?
+        .url
+        });
         Ok((profile, av))
     }
 
