@@ -29,7 +29,7 @@ pub fn create_py_mod<'a>(file_path: String, dir_path: &'a str) -> Result<String,
 
 ///  Deletes a static cloudinary file matiching
 ///  the given public ID
-pub fn remove_py_mod<'a>(file_path: &'a str) -> Result<String, ()> {
+pub fn remove_py_mod(file_path: &str) -> Result<String, ()> {
     let py = Python::acquire_gil();
     let py = py.python();
 
