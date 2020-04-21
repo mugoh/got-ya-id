@@ -66,7 +66,7 @@ fn upload_static<'a>(py: Python, file_: &'a str) -> PyResult<String> {
 }
 
 /// Holds the key, value response from the sent upload request
-#[derive(Serialize, Debug, Deserialize)]
+#[derive(Serialize, Deserialize)]
 // Deserialize PyDict into struct
 pub struct UploadResponse<'a> {
     public_id: Cow<'a, str>,

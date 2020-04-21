@@ -11,7 +11,8 @@ use tera::Tera;
 use got_ya_id::apps::api;
 use got_ya_id::apps::user::{models::OClient, utils::create_oauth_client};
 
-fn main() -> io::Result<()> {
+#[actix_rt::main]
+async fn main() -> io::Result<()> {
     let mut listen_fd = ListenFd::from_env();
 
     // env::set_var("RUST_LOG", "debug");
@@ -38,5 +39,5 @@ fn main() -> io::Result<()> {
         app.bind("127.0.0.1:8888")?
     };
 
-    app.run()
+    app.run().await
 }
