@@ -8,7 +8,7 @@ use crate::core::{response::{err, respond}, py_interface::create_py_mod};
 use crate::hashmap;
 
 use actix_multipart::Multipart;
-use actix_web::{ web, Error, HttpResponse};
+use actix_web::{http::StatusCode, web, Error, HttpResponse};
 
 use futures::{StreamExt, TryStreamExt};
 use std::io::Write;
@@ -94,7 +94,7 @@ pub async fn upload_avatar(
     id: web::Path<i32>,
     mut multipart: Multipart,
 ) -> Result<HttpResponse, Error> {
-    let mut path = "empty".into();
+    let mut path = "".into();
 
     let user = match User::find_by_pk(*id, None){
         Ok(usr) => usr.0,
@@ -105,6 +105,7 @@ pub async fn upload_avatar(
     while let Ok(Some(mut field)) = multipart.try_next().await {
         let content_type = field.content_disposition().unwrap();
         let filename = content_type.get_filename().unwrap().to_string();
+
 
         // let filepath = format!("./tmp/");
         // File::create is blocking operation, use threadpool
@@ -120,9 +121,16 @@ pub async fn upload_avatar(
             f = web::block(move || f.write_all(&data).map(|_| f)).await?;
         }
 
-        path = create_py_mod(filepath).expect("Initiating file send failed");
+        path = create_py_mod(filepath, "got_ya_id/avatars/")?;
+
     }
-   Ok(HttpResponse::Ok().body(path))
+
+    if !path.is_empty() {
+        match user.save_avatar(&path) {
+            Ok(_) => Ok(HttpResponse::Ok().json(path)),
+            Err(e) => Ok(HttpResponse::build(StatusCode::INTERNAL_SERVER_ERROR).json(e.to_string())),
+        }
+        } else {Ok(HttpResponse::build(StatusCode::BAD_REQUEST).json("File upload failed, big man. File upload failed"))}
 
 }
 

@@ -8,6 +8,7 @@ use std::borrow::Cow;
 use crate::apps::auth::validate;
 use crate::apps::profiles::models::{Avatar, NewProfile, Profile};
 use crate::config::config;
+use crate::core::py_interface::remove_py_mod;
 use crate::diesel_cfg::{config::connect_to_db, schema::oath_users, schema::users};
 
 use std::error::Error as stdError;
@@ -23,6 +24,8 @@ use log::{debug, error};
 
 use jsonwebtoken as jwt;
 use jwt::{encode, Header};
+
+use url::Url;
 
 /// User Object
 /// Holds user data
@@ -336,12 +339,29 @@ impl User {
 
     /// Alters the avatar table associated with the user profile
     /// to match the given url field
-    pub fn save_avatar<'b>(&self, avatar_url: &'b str) -> Result<Avatar, diesel::result::Error> {
+    pub fn save_avatar<'b>(&self, avatar_url: &'b str) -> Result<Avatar, Box<dyn stdError>> {
         use crate::diesel_cfg::schema::avatars::dsl::*;
 
-        let avatar = Avatar::belonging_to(self)
-            .load::<Avatar>(&connect_to_db())
-            .expect("Error retrieving avatar");
+        let avatar = Avatar::belonging_to(self).load::<Avatar>(&connect_to_db())?;
+
+        // Delete old avatar.
+        // Avatars in the got_ya_id storage have a got_ya_id substring.
+        // This should differentiate them from oauth2 profile avatars
+        let old_url = &avatar[0].url;
+
+        if old_url.is_some() && old_url.clone().unwrap().contains("got_ya_id") {
+            let compl = Url::parse(&old_url.clone().unwrap())?;
+            let s: Vec<&str> = compl
+                .path_segments()
+                .unwrap()
+                .filter(|a| a.contains('.'))
+                .collect();
+            let ss = s[0].split('.').collect::<Vec<&str>>()[0];
+
+            let delete_res = remove_old_url(ss).expect("Delete failed");
+            info!("File deleted : {}", delete_res);
+        }
+
         Ok(diesel::update(&avatar[0])
             .set(url.eq(avatar_url))
             .get_result::<Avatar>(&connect_to_db())?)
@@ -541,4 +561,9 @@ impl OauthGgUser {
             None => Err("You seem to have an account with this email. Try signing in".into()),
         }
     }
+}
+
+/// Deletes the avatar file matching the given ID
+fn remove_old_url(pub_id: &str) -> Result<String, ()> {
+    remove_py_mod(pub_id)
 }
