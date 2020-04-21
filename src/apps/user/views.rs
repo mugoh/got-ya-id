@@ -455,7 +455,7 @@ pub fn google_auth_callback(
 ///
 /// # Arguments
 /// `Authorization: Bearer`
-pub fn register_g_oauth(req: HttpRequest) -> HttpResponse {
+pub async fn register_g_oauth(req: HttpRequest) ->HttpResponse {
     use serde_json::Value;
 
     let token_hdr = match Authorization::<Bearer>::parse(&req) {
@@ -469,7 +469,7 @@ pub fn register_g_oauth(req: HttpRequest) -> HttpResponse {
     let profile_url =
         env::var("GOOGLE_PROFILE_URL").expect("Missing the GOOGLE_PROFILE_URL env variable");
 
-    let client = reqwest::blocking::Client::default();
+    let client = reqwest::Client::default();
     let mut headr = reqwest::header::HeaderMap::default();
     headr.append(
         reqwest::header::AUTHORIZATION,
@@ -478,13 +478,13 @@ pub fn register_g_oauth(req: HttpRequest) -> HttpResponse {
     let resp = client
         .get(&profile_url)
         .headers(headr)
-        //   .bearer_auth(format!("Bearer {}", token))
         .send()
+        .await
         .unwrap();
     if !resp.status().is_success() {
-        return err(resp.status().as_str(), resp.json::<Value>().unwrap());
+        return err(resp.status().as_str(), resp.json::<Value>().await.unwrap());
     }
-    let res = &resp.json::<GoogleUser>().unwrap();
+    let res = &resp.json::<GoogleUser>().await.unwrap();
     // let j_res: Value = serde_json::from_str(&res).unwrap();
 
     match OauthGgUser::register_as_third_party(res) {

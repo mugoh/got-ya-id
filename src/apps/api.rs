@@ -12,9 +12,7 @@ pub fn api(cfg: &mut web::ServiceConfig) {
                     .service(
                         web::resource("").route(web::post().to(user::views::register_user)), // .route(web::get().to(|| "")),
                     )
-                    .service(
-                        web::resource("/login").route(web::post().to_async(user::views::login)),
-                    )
+                    .service(web::resource("/login").route(web::post().to(user::views::login)))
                     .service(
                         web::resource("/google").route(web::get().to(user::views::google_auth)),
                     )
@@ -23,8 +21,7 @@ pub fn api(cfg: &mut web::ServiceConfig) {
                             .route(web::get().to(user::views::google_auth_callback)),
                     )
                     .service(
-                        web::resource("/verify/{token}")
-                            .route(web::get().to_async(user::views::verify)),
+                        web::resource("/verify/{token}").route(web::get().to(user::views::verify)),
                     )
                     .service(
                         web::resource("/password/reset/{token}")
@@ -32,7 +29,7 @@ pub fn api(cfg: &mut web::ServiceConfig) {
                     )
                     .service(
                         web::resource("/password/request")
-                            .route(web::post().to_async(user::views::send_reset_email)),
+                            .route(web::post().to(user::views::send_reset_email)),
                     )
                     .service(
                         web::resource("/register/social")
@@ -44,7 +41,7 @@ pub fn api(cfg: &mut web::ServiceConfig) {
                     )
                     .service(
                         web::resource("/activate")
-                            .route(web::patch().to_async(user::views::change_activation_status)),
+                            .route(web::patch().to(user::views::change_activation_status)),
                     ),
             )
             .service(
@@ -57,18 +54,20 @@ pub fn api(cfg: &mut web::ServiceConfig) {
                     .service(web::resource("/{id}").route(web::get().to(user::views::get_user)))
                     .service(
                         web::resource("/{id}/profile/avatar")
-                            .route(web::put().to_async(profiles::views::upload_avatar))
+                            .route(web::put().to(profiles::views::upload_avatar))
                             .route(web::get().to(profiles::views::retrieve_profile_avatar)),
                     ),
             )
             .service(web::scope("/users").service(
                 web::resource("/profiles").route(web::get().to(profiles::views::get_all_profiles)),
             ))
-            .service(web::resource("/").route(web::get().to(|| "Aha")))
+            .service(web::resource("/").route(web::get().to(|| HttpResponse::Ok().body("Aha"))))
             .default_service(
                 // 404 GET
                 web::resource("")
-                    .route(web::get().to(|| "Oopsy! Coudn't find what you were looking for"))
+                    .route(web::get().to(|| {
+                        HttpResponse::Ok().body("Oopsy! Coudn't find what you were looking for")
+                    }))
                     // None GET
                     .route(
                         web::route()
