@@ -16,15 +16,42 @@ use std::{borrow::Cow, collections::HashMap};
 /// # Arguments
 /// file: &str
 ///     - The url path of the file to upload
-pub fn create_py_mod(file_path: String) -> Result<String, ()> {
+pub fn create_py_mod<'a>(file_path: String, dir_path: &'a str) -> Result<String, ()> {
     // use pyo3::prelude::*;
 
     let py = Python::acquire_gil();
     let py = py.python();
 
-    upload_static(py, &file_path).map_err(|e| {
+    upload_static(py, &file_path, dir_path).map_err(|e| {
         e.print_and_set_sys_last_vars(py);
     })
+}
+
+///  Deletes a static cloudinary file matiching
+///  the given public ID
+pub fn remove_py_mod<'a>(file_path: &'a str) -> Result<String, ()> {
+    let py = Python::acquire_gil();
+    let py = py.python();
+
+    delete_static(py, &file_path).map_err(|e| {
+        e.print_and_set_sys_last_vars(py);
+    })
+}
+
+/// Makes a call to the script executing the delete
+fn delete_static<'a>(py: Python, file_id: &'a str) -> PyResult<String> {
+    //
+    use pyo3::prelude::PyModule;
+    use std::fs;
+
+    let script = fs::read_to_string("src/core/upload")?;
+
+    let loaded_mod = PyModule::from_code(py, &script, "upload", "upload")?;
+
+    Ok(loaded_mod
+        .call("destroy", (file_id,), None)?
+        .as_ref()
+        .to_string())
 }
 
 /// Perfoms the foreign call to the script that should
@@ -34,7 +61,7 @@ pub fn create_py_mod(file_path: String) -> Result<String, ()> {
 /// file: &str
 ///     - The url path of the file to upload
 ///
-fn upload_static<'a>(py: Python, file_: &'a str) -> PyResult<String> {
+fn upload_static<'a>(py: Python, file_: &'a str, dir_: &'a str) -> PyResult<String> {
     use pyo3::prelude::PyModule;
     use std::fs;
 
@@ -42,7 +69,7 @@ fn upload_static<'a>(py: Python, file_: &'a str) -> PyResult<String> {
 
     let loaded_mod = PyModule::from_code(py, &script, "upload", "upload")?;
     let res = loaded_mod
-        .call("upload", (file_,), None)?
+        .call("upload", (file_, dir_), None)?
         .as_ref()
         .to_string();
 
