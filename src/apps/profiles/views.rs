@@ -1,17 +1,18 @@
 //! Holds View-related functions for the Profile Module
 
 use super::models::{Profile, UpdtProfile};
-use super::utils::extract_multipart_field;
+use super::utils::make_temp_file;
 
 use crate::apps::user::models::User;
-use crate::core::response::{err, respond};
+use crate::core::{response::{err, respond}, py_interface::create_py_mod};
 use crate::hashmap;
 
 use actix_multipart::Multipart;
-use actix_web::{error, web, Error, HttpResponse};
+use actix_web::{http::StatusCode, web, Error, HttpResponse};
 
-use futures::{Future, Stream};
-use log::error as log_error;
+use futures::{StreamExt, TryStreamExt};
+use std::io::Write;
+
 
 /// Retrieves the profile matching the given user ID
 ///
@@ -89,31 +90,48 @@ pub fn update_profile(data: web::Json<UpdtProfile>, id: web::Path<i32>) -> HttpR
 ///
 /// # Method
 ///    PUT
-pub fn upload_avatar(
+pub async fn upload_avatar(
     id: web::Path<i32>,
-    multipart: Multipart,
-) -> impl Future<Item = HttpResponse, Error = Error> {
-    futures::future::result(User::find_by_pk(*id, Some(1)))
-        .map(|user_data| user_data.0)
-        .map_err(error::ErrorNotFound)
-        .and_then(|some_user| {
-            multipart
-                .map_err(error::ErrorInternalServerError)
-                .map(|field| extract_multipart_field(field).into_stream())
-                .flatten()
-                .collect()
-                .map(move |upload_response| {
-                    let file_url = &upload_response[0].1;
-                    match some_user.save_avatar(file_url) {
-                        Ok(res) => HttpResponse::Ok().json(res),
-                        Err(e) => err("500", e.to_string()),
-                    }
-                })
-                .map_err(|e| {
-                    log_error!("File upload failed: {:?}", e);
-                    e
-                })
-        })
+    mut multipart: Multipart,
+) -> Result<HttpResponse, Error> {
+    let mut path = "".into();
+
+    let user = match User::find_by_pk(*id, None){
+        Ok(usr) => usr.0,
+    Err(e) =>return  Ok(err("400", e.to_string()))
+    };
+
+    // iterate over multipart stream
+    while let Ok(Some(mut field)) = multipart.try_next().await {
+        let content_type = field.content_disposition().unwrap();
+        let filename = content_type.get_filename().unwrap().to_string();
+
+
+        // let filepath = format!("./tmp/");
+        // File::create is blocking operation, use threadpool
+        
+        // let  f = web::block(|| std::fs::File::create(filepath))
+        //    .await
+        //    .unwrap();
+        let  ( mut f, filepath) = web::block(|| make_temp_file(Some(filename))).await?;
+        // Field in turn is stream of *Bytes* object
+        while let Some(chunk) = field.next().await {
+            let data = chunk.unwrap();
+            // filesystem operations are blocking, we have to use threadpool
+            f = web::block(move || f.write_all(&data).map(|_| f)).await?;
+        }
+
+        path = create_py_mod(filepath, "got_ya_id/avatars/")?;
+
+    }
+
+    if !path.is_empty() {
+        match user.save_avatar(&path) {
+            Ok(_) => Ok(HttpResponse::Ok().json(path)),
+            Err(e) => Ok(HttpResponse::build(StatusCode::INTERNAL_SERVER_ERROR).json(e.to_string())),
+        }
+        } else {Ok(HttpResponse::build(StatusCode::BAD_REQUEST).json("File upload failed, big man. File upload failed"))}
+
 }
 
 /// Retrieves an avatar url of a user profile

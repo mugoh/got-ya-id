@@ -139,7 +139,7 @@ pub struct UpdtProfile<'a> {
 pub struct Avatar<'a> {
     id: i32,
     user_id: i32,
-    url: Option<Cow<'a, str>>,
+    pub url: Option<Cow<'a, str>>,
     //file_object: Option<UploadResponse>,
 }
 
