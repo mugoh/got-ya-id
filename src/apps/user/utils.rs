@@ -245,3 +245,30 @@ where
 {
     d.deserialize_str(NaiveDateTimeVisitor)
 }
+
+struct NaiveYear;
+
+impl<'de> de::Visitor<'de> for NaiveYear {
+    type Value = NaiveDateTime;
+
+    fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+        write!(formatter, "a string represents chrono::NaiveDateTime")
+    }
+
+    fn visit_str<E>(self, s: &str) -> Result<Self::Value, E>
+    where
+        E: de::Error,
+    {
+        match NaiveDateTime::parse_from_str(s, "%Y") {
+            Ok(t) => Ok(t),
+            Err(_) => Err(de::Error::invalid_value(de::Unexpected::Str(s), &self)),
+        }
+    }
+}
+
+pub fn to_year<'de, D>(d: D) -> Result<NaiveDateTime, D::Error>
+where
+    D: de::Deserializer<'de>,
+{
+    d.deserialize_str(NaiveDateTimeVisitor)
+}
