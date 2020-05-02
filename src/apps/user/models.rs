@@ -45,6 +45,7 @@ pub struct User {
     pub is_verified: bool,
     pub social_id: Option<String>,
     pub social_account_verified: bool,
+    pub access_level: i32,
 }
 
 /// Temporary holds new User data
