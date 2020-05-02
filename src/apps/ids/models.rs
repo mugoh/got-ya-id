@@ -22,7 +22,7 @@ pub struct Identification {
     pub institution: String,
     pub campus: Option<String>,
     pub location_name: String,
-    pub location_point: Option<(i32, i32)>,
+    pub location_point: Option<(f64, f64)>,
     pub picture: Option<String>,
     posted_by: Option<i32>,
     is_found: bool,
