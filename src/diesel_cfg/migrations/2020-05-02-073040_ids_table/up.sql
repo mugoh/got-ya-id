@@ -5,7 +5,7 @@ CREATE TABLE identifications (
     valid_from DATE,
     valid_till DATE,
     institution VARCHAR NOT NULL,
-    campus VARCHAR, /*institution location*/
+    campus VARCHAR NOT NULL, /*institution location*/
     location_name VARCHAR NOT NULL,
     location_point POINT, /*lat/longitude -> Use this with map api*/
     picture VARCHAR,

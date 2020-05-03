@@ -10,22 +10,30 @@ pub mod serde_pg_point {
         lon: f64,
     }
 
-    pub fn serialize<S>(point: &PgPoint, serializer: S) -> Result<S::Ok, S::Error>
+    pub fn serialize<S>(point: &Option<PgPoint>, serializer: S) -> Result<S::Ok, S::Error>
     where
         S: Serializer,
     {
-        PgPointStruct {
-            lat: point.0,
-            lon: point.1,
+        if let Some(pt) = point {
+            PgPointStruct {
+                lat: pt.0,
+                lon: pt.1,
+            }
+            .serialize(serializer)
+        } else {
+            serializer.serialize_none()
         }
-        .serialize(serializer)
     }
 
-    pub fn deserialize<'de, D>(deserializer: D) -> Result<PgPoint, D::Error>
+    pub fn deserialize<'de, D>(deserializer: D) -> Result<Option<PgPoint>, D::Error>
     where
         D: Deserializer<'de>,
     {
-        let point = PgPointStruct::deserialize(deserializer)?;
-        Ok(PgPoint(point.lat, point.lon))
+        let point: Option<PgPointStruct> = Option::deserialize(deserializer)?;
+        if let Some(p) = point {
+            Ok(Some(PgPoint(p.lat, p.lon)))
+        } else {
+            Ok(None)
+        }
     }
 }
