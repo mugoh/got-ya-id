@@ -5,6 +5,7 @@ use serde::{Deserialize, Serialize};
 
 use actix_web::{http::StatusCode, HttpResponse};
 use serde_json::json;
+use serde_json::Value;
 
 use std::{collections::HashMap, error::Error as stdError};
 /// Response to User on Success
@@ -105,23 +106,22 @@ where
 pub fn respond<'a, 'c, T>(
     data: HashMap<&'c str, &'c str>,
     body: Option<T>,
-    err: Option<&'a str>,
+    err: Option<&'c str>,
 ) -> Result<HttpResponse, Box<dyn stdError>>
 //
 where
     T: serde::de::DeserializeOwned,
     T: Serialize,
 {
-    //
     let status = StatusCode::from_u16(data["status"].parse::<u16>()?)?;
-    if err.is_some() {
-        Ok(HttpResponse::build(status)
-            .json(json!({"status": &status.to_string(), "error": err.unwrap()})))
-    // let res = Response::err(&status.to_string(), err.unwrap());
-    // HttpResponse::build(status)json(res)
+    if let Some(error_msg) = err {
+        //   Ok(HttpResponse::build(status)
+        //       .json(json!({"status": &status.to_string(), "error": err.unwrap()})))
+        let res: Response<'c, Value> = Response::err(data["status"], error_msg);
+        Ok(HttpResponse::build(status).json(res))
     } else {
         Ok(HttpResponse::build(status).json(Response::success(
-            status.as_str(),
+            data["status"],
             &data.get("message").unwrap(),
             body.unwrap(),
         )))
@@ -137,6 +137,6 @@ pub fn err<'a, T: serde::de::DeserializeOwned + Serialize>(
 {
     let status = StatusCode::from_u16(status.parse::<u16>().unwrap()).unwrap();
 
-    let res = json!({"status": &status.to_string(), "error": err});
+    let res = json!({"status": &status.to_string(), "errors": err});
     HttpResponse::build(status).json(res)
 }
