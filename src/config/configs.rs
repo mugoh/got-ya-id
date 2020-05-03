@@ -1,7 +1,5 @@
 //! Environment Variables Config
-//!
 
-use envy;
 use serde::Deserialize;
 use std::error;
 

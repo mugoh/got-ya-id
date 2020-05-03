@@ -7,7 +7,7 @@ use std::borrow::Cow;
 
 use crate::apps::auth::validate;
 use crate::apps::profiles::models::{Avatar, NewProfile, Profile};
-use crate::config::config;
+use crate::config::configs as config;
 use crate::core::py_interface::remove_py_mod;
 use crate::diesel_cfg::{config::connect_to_db, schema::oath_users, schema::users};
 

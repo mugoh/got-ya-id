@@ -3,7 +3,7 @@
 use std::{env, error, process};
 
 use crate::apps::user::models::NewUser;
-use crate::config::config;
+use crate::config::configs as config;
 
 use chrono::{prelude::*, Duration};
 use jsonwebtoken as jwt;
