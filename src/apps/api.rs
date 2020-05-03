@@ -2,7 +2,7 @@
 //!
 use actix_web::{guard, web, HttpResponse};
 
-use crate::apps::{profiles, user};
+use crate::apps::{ids, profiles, user};
 /// Configures the app service
 pub fn api(cfg: &mut web::ServiceConfig) {
     cfg.service(
@@ -60,6 +60,9 @@ pub fn api(cfg: &mut web::ServiceConfig) {
             )
             .service(web::scope("/users").service(
                 web::resource("/profiles").route(web::get().to(profiles::views::get_all_profiles)),
+            ))
+            .service(web::scope("/ids").service(
+                web::resource("/new").route(web::post().to(ids::views::create_new_identification)),
             ))
             .service(web::resource("/").route(web::get().to(|| HttpResponse::Ok().body("Aha"))))
             .default_service(

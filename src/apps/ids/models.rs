@@ -56,7 +56,7 @@ pub struct Identification {
 }
 
 /// The Insertable new Identification record
-#[derive(Insertable, Serialize, Deserialize, Validate)]
+#[derive(Insertable, Debug, Serialize, Deserialize, Validate)]
 #[table_name = "identifications"]
 #[serde(deny_unknown_fields)]
 pub struct NewIdentification<'a> {
@@ -72,7 +72,7 @@ pub struct NewIdentification<'a> {
     #[validate(custom = "validate_alpha_regex")]
     institution: Cow<'a, str>,
 
-    #[validate(custom = "validate_alpha_regex")]
+    #[validate(custom = "validate_location_name")]
     campus: Cow<'a, str>,
 
     #[validate(custom = "validate_location_name")]
@@ -84,11 +84,12 @@ pub struct NewIdentification<'a> {
 
 impl<'a> NewIdentification<'a> {
     /// Saves a new ID record to the Identifications table
-    pub fn save(&mut self) -> Result<Identification, Box<dyn stdErr>> {
+    pub fn save(&self) -> Result<Identification, diesel::result::Error> {
         //
-        let ID = diesel::insert_into(identifications::table)
+        let idt = diesel::insert_into(identifications::table)
             .values(&*self)
             .get_result::<Identification>(&connect_to_db())?;
-        Ok(ID)
+
+        Ok(idt)
     }
 }

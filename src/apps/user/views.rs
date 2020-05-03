@@ -30,7 +30,6 @@ use std::{
 use actix_web::http::header::Header;
 use actix_web_httpauth::headers::authorization::Authorization;
 use actix_web_httpauth::headers::authorization::Bearer;
-// use actix_web_httpauth::headers::www_authenticate::bearer::Bearer;
 
 /// Registers a new user
 ///
