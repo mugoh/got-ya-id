@@ -1,6 +1,9 @@
 //! Identification card models
 
-use super::utils::serde_pg_point;
+use super::{
+    utils::serde_pg_point,
+    validators::{validate_alpha_regex, validate_location_name},
+};
 use crate::diesel_cfg::{config::connect_to_db, schema::identifications};
 
 use chrono::NaiveDate;
@@ -11,6 +14,7 @@ use validator_derive::Validate;
 
 use diesel_geometry::data_types::PgPoint;
 use std::{borrow::Cow, error::Error as stdErr};
+
 /// Represents the Queryable IDentification data model
 /// matching the database `identification` schema
 #[derive(Queryable, Serialize, Deserialize, Identifiable)]
@@ -42,7 +46,7 @@ pub struct Identification {
     /// Location from which the ID should be picked
     pub location_name: String,
 
-    #[serde(flatten, with = "serde_pg_point")]
+    #[serde(flatten, default, with = "serde_pg_point")]
     /// Lat, Longitude representation of the ID location point
     pub location_point: Option<PgPoint>,
 
@@ -56,13 +60,24 @@ pub struct Identification {
 #[table_name = "identifications"]
 #[serde(deny_unknown_fields)]
 pub struct NewIdentification<'a> {
+    #[validate(custom = "validate_alpha_regex")]
     pub name: Cow<'a, str>,
+
+    #[validate(custom = "validate_alpha_regex")]
     pub course: Cow<'a, str>,
+
     pub valid_from: Option<NaiveDate>,
     pub valid_till: Option<NaiveDate>,
+
+    #[validate(custom = "validate_alpha_regex")]
     institution: Cow<'a, str>,
+
+    #[validate(custom = "validate_alpha_regex")]
     campus: Cow<'a, str>,
+
+    #[validate(custom = "validate_location_name")]
     location_name: Cow<'a, str>,
+
     #[serde(flatten, with = "serde_pg_point")]
     location_point: Option<PgPoint>,
 }
