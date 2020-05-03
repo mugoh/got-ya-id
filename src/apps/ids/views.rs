@@ -19,7 +19,7 @@ pub async fn create_new_identification(new_idt: web::Json<NewIdentification<'_>>
    }
    new_idt
        .save()
-       .map_err(|e| ErrorInternalServerError(e))
+       .map_err(ErrorInternalServerError)
        .map( move|idt| {
             let res = hashmap!["status" => "201",
             "message" => "Success. Indentification created"];

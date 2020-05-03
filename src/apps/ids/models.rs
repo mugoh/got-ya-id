@@ -13,7 +13,7 @@ use validator::Validate;
 use validator_derive::Validate;
 
 use diesel_geometry::data_types::PgPoint;
-use std::{borrow::Cow, error::Error as stdErr};
+use std::borrow::Cow;
 
 /// Represents the Queryable IDentification data model
 /// matching the database `identification` schema

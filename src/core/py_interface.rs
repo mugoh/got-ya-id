@@ -16,7 +16,7 @@ use std::{borrow::Cow, collections::HashMap};
 /// # Arguments
 /// file: &str
 ///     - The url path of the file to upload
-pub fn create_py_mod<'a>(file_path: String, dir_path: &'a str) -> Result<String, ()> {
+pub fn create_py_mod(file_path: String, dir_path: &'_ str) -> Result<String, ()> {
     // use pyo3::prelude::*;
 
     let py = Python::acquire_gil();

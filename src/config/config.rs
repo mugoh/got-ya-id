@@ -1,5 +1,7 @@
 //! Environment Variables Config
+//!
 
+use envy;
 use serde::Deserialize;
 use std::error;
 
@@ -13,7 +15,7 @@ pub struct Config {
 
 /// Default ENV value for log
 fn default_log() -> String {
-    String::from("actix-web=debug")
+    String::from("actix-web=info")
 }
 
 /// Returns a Serialized ENV variable Configuration

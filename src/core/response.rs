@@ -103,7 +103,7 @@ where
 ///  #- Ok: HttpResponse
 ///  #- Err: dyn std::error::Error
 ///  ```
-pub fn respond<'a, 'c, T>(
+pub fn respond<'c, T>(
     data: HashMap<&'c str, &'c str>,
     body: Option<T>,
     err: Option<&'c str>,
@@ -130,10 +130,7 @@ where
 
 /// Gives a HttpResponse holding an error status
 /// and the cause of request error
-pub fn err<'a, T: serde::de::DeserializeOwned + Serialize>(
-    status: &'a str,
-    err: T,
-) -> HttpResponse //serde_json::value::Value
+pub fn err<T: serde::de::DeserializeOwned + Serialize>(status: &'_ str, err: T) -> HttpResponse //serde_json::value::Value
 {
     let status = StatusCode::from_u16(status.parse::<u16>().unwrap()).unwrap();
 
