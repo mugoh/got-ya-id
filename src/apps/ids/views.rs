@@ -1,5 +1,5 @@
 use actix_web::{Error, HttpResponse, Result, web, http::StatusCode};
-use actix_web::error::ErrorInternalServerError;
+use actix_web::error::ErrorConflict;
 
 use super::models::{ NewIdentification};
 use crate::{hashmap, core::response::{ respond}};
@@ -20,7 +20,7 @@ pub async fn create_new_identification(new_idt: web::Json<NewIdentification<'_>>
    }
    new_idt
        .save()
-       .map_err(ErrorInternalServerError)
+       .map_err(ErrorConflict)
        .map( move|idt| {
             let res = hashmap!["status" => "201",
             "message" => "Success. Indentification created"];

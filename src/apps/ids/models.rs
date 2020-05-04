@@ -10,7 +10,7 @@ use validator::Validate;
 use validator_derive::Validate;
 
 use diesel_geometry::data_types::PgPoint;
-use std::borrow::Cow;
+use std::{borrow::Cow, error::Error as stdErr};
 
 /// Represents the Queryable IDentification data model
 /// matching the database `identification` schema
@@ -88,8 +88,26 @@ pub struct NewIdentification<'a> {
 
 impl<'a> NewIdentification<'a> {
     /// Saves a new ID record to the Identifications table
-    pub fn save(&self) -> Result<Identification, diesel::result::Error> {
+    pub fn save(&self) -> Result<Identification, Box<dyn stdErr>> {
         //
+        use crate::diesel_cfg::schema::identifications::dsl::{
+            campus, course, identifications as _identifications, institution, name,
+        };
+        let presents = _identifications
+            .filter(
+                name.eq(&self.name)
+                    .and(course.eq(&self.course))
+                    .and(institution.eq(&self.institution))
+                    .and(campus.eq(&self.campus)),
+            )
+            .load::<Identification>(&connect_to_db())?;
+        for ident in &presents {
+            if ident == self {
+                return Err(
+                    "You seem to have saved an Identification matching these details".into(),
+                );
+            }
+        }
 
         let idt = diesel::insert_into(identifications::table)
             .values(&*self)
