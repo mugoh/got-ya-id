@@ -10,7 +10,7 @@ pub fn validate_location_name(name: &str) -> Result<(), ValidationError> {
     }
     if !NAME_PATTERN.is_match(name) {
         return Err(ValidationError::new(
-            "Invalid characters in name. Name should contain Alphanumerics or the characters: -_",
+            "should just have letters, digits or -_",
         ));
     }
     Ok(())
@@ -22,6 +22,9 @@ pub mod regexes {
     lazy_static! {
         pub static ref ALPHA_REGEX: Regex = Regex::new(r"^[a-zA-Z]+$").unwrap();
     }
+    lazy_static! {
+        pub static ref LOCATION_REGEX: Regex = Regex::new(r"^[a-zA-Z0-9 -`_]+$").unwrap();
+    }
 }
 
 /// Validates alphabetic regex
@@ -31,9 +34,7 @@ pub fn validate_alpha_regex(name: &str) -> Result<(), ValidationError> {
         static ref PATTERN: Regex = Regex::new(r"^[a-zA-Z]+$").unwrap();
     }
     if !PATTERN.is_match(name) {
-        return Err(ValidationError::new(
-            "Invalid characters in name. Name should only contain letters",
-        ));
+        return Err(ValidationError::new("should just have letters"));
     }
     Ok(())
 }

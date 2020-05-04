@@ -1,9 +1,6 @@
 //! Identification card models
 
-use super::{
-    utils::serde_pg_point,
-    validators::{validate_alpha_regex, validate_location_name},
-};
+use super::{utils::serde_pg_point, validators::regexes};
 use crate::diesel_cfg::{config::connect_to_db, schema::identifications};
 
 use chrono::NaiveDate;
@@ -60,22 +57,28 @@ pub struct Identification {
 #[table_name = "identifications"]
 #[serde(deny_unknown_fields)]
 pub struct NewIdentification<'a> {
-    #[validate(custom = "validate_alpha_regex")]
+    #[validate(regex(path = "regexes::ALPHA_REGEX", message = "  should just have letters"))]
     pub name: Cow<'a, str>,
 
-    #[validate(custom = "validate_alpha_regex")]
+    #[validate(regex(path = "regexes::ALPHA_REGEX", message = "  should just have letters"))]
     pub course: Cow<'a, str>,
 
     pub valid_from: Option<NaiveDate>,
     pub valid_till: Option<NaiveDate>,
 
-    #[validate(custom = "validate_alpha_regex")]
+    #[validate(regex(path = "regexes::ALPHA_REGEX", message = "  should just have letters"))]
     institution: Cow<'a, str>,
 
-    #[validate(custom = "validate_location_name")]
+    #[validate(regex(
+        path = "regexes::LOCATION_REGEX",
+        message = "  should have letters, digits or -_`"
+    ))]
     campus: Cow<'a, str>,
 
-    #[validate(custom = "validate_location_name")]
+    #[validate(regex(
+        path = "regexes::LOCATION_REGEX",
+        message = "  should have letters, digits or -_`"
+    ))]
     location_name: Cow<'a, str>,
 
     #[serde(flatten, with = "serde_pg_point")]
