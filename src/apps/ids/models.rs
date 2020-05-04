@@ -14,7 +14,7 @@ use std::borrow::Cow;
 
 /// Represents the Queryable IDentification data model
 /// matching the database `identification` schema
-#[derive(Queryable, Serialize, Deserialize, Identifiable)]
+#[derive(Queryable, Default, Serialize, Deserialize, Identifiable)]
 #[table_name = "identifications"]
 pub struct Identification {
     pub id: i32,
@@ -57,42 +57,84 @@ pub struct Identification {
 #[table_name = "identifications"]
 #[serde(deny_unknown_fields)]
 pub struct NewIdentification<'a> {
-    #[validate(regex(path = "regexes::ALPHA_REGEX", message = "  should just have letters"))]
+    #[validate(regex(path = "regexes::ALPHA_REGEX", message = "should just have letters"))]
     pub name: Cow<'a, str>,
 
-    #[validate(regex(path = "regexes::ALPHA_REGEX", message = "  should just have letters"))]
+    #[validate(regex(path = "regexes::ALPHA_REGEX", message = "should just have letters"))]
     pub course: Cow<'a, str>,
 
     pub valid_from: Option<NaiveDate>,
     pub valid_till: Option<NaiveDate>,
 
-    #[validate(regex(path = "regexes::ALPHA_REGEX", message = "  should just have letters"))]
+    #[validate(regex(path = "regexes::ALPHA_REGEX", message = "should just have letters"))]
     institution: Cow<'a, str>,
 
     #[validate(regex(
         path = "regexes::LOCATION_REGEX",
-        message = "  should have letters, digits or -_`"
+        message = "should have letters, digits or -_`"
     ))]
     campus: Cow<'a, str>,
 
     #[validate(regex(
         path = "regexes::LOCATION_REGEX",
-        message = "  should have letters, digits or -_`"
+        message = "should have letters, digits or -_`"
     ))]
     location_name: Cow<'a, str>,
 
     #[serde(flatten, with = "serde_pg_point")]
     location_point: Option<PgPoint>,
+    posted_by: Option<i32>,
 }
 
 impl<'a> NewIdentification<'a> {
     /// Saves a new ID record to the Identifications table
     pub fn save(&self) -> Result<Identification, diesel::result::Error> {
         //
+
         let idt = diesel::insert_into(identifications::table)
             .values(&*self)
             .get_result::<Identification>(&connect_to_db())?;
 
         Ok(idt)
+    }
+}
+
+impl PartialEq<Identification> for NewIdentification<'_> {
+    fn eq(&self, idt: &Identification) -> bool {
+        let comp_vec = vec![
+            self.name.eq(&idt.name),
+            self.course.eq(&idt.course),
+            self.valid_from.eq(&idt.valid_from),
+            self.valid_till.eq(&idt.valid_till),
+            self.institution.eq(&idt.institution),
+            self.campus.eq(&idt.campus),
+            self.location_name.eq(&idt.location_name),
+            self.location_point.eq(&idt.location_point),
+            self.posted_by.eq(&idt.posted_by),
+        ];
+
+        let is_equal = comp_vec.into_iter().all(|v| v == true);
+
+        // Idts matching in the above details should have been found(logic being an Idt can be
+        // relost)
+        is_equal & !idt.is_found
+    }
+}
+impl PartialEq<NewIdentification<'_>> for Identification {
+    fn eq(&self, idt: &NewIdentification) -> bool {
+        let comp_vec = vec![
+            self.name.eq(&idt.name),
+            self.course.eq(&idt.course),
+            self.valid_from.eq(&idt.valid_from),
+            self.valid_till.eq(&idt.valid_till),
+            self.institution.eq(&idt.institution),
+            self.campus.eq(&idt.campus),
+            self.location_name.eq(&idt.location_name),
+            self.location_point.eq(&idt.location_point),
+            self.posted_by.eq(&idt.posted_by),
+        ];
+
+        let is_equal = comp_vec.into_iter().all(|v| v == true);
+        is_equal & !self.is_found
     }
 }
