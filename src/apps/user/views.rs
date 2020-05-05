@@ -47,7 +47,6 @@ use actix_web_httpauth::headers::authorization::Bearer;
 pub fn register_user(mut data: web::Json<NewUser>, req: HttpRequest) -> HttpResponse {
     let user_ = &data.0;
     let token = validate::encode_jwt_token(user_).unwrap();
-    let _claims = validate::decode_auth_token(&token);
 
     // -> Extract host info from req Headers
     let host = format!("{:?}", req.headers().get("host").unwrap());

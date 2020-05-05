@@ -5,24 +5,24 @@ use std::{env, error, process};
 use crate::apps::user::models::NewUser;
 use crate::config::configs as config;
 
-use chrono::{prelude::*, Duration};
+use chrono::{Duration, Utc};
 use jsonwebtoken as jwt;
 use jwt::{decode, encode, Header, Validation};
 use serde_derive::{Deserialize, Serialize};
 
-/// JWT Auth Identity
-#[derive(Debug, Serialize, Deserialize)]
+/// JWT Auth Identity Claims
+#[derive(Serialize, Deserialize)]
 pub struct Claims {
     pub sub: String,
-    pub company: String,
     pub exp: usize,
+    pub iat: usize,
 }
 
 /// Encodes a JWT token with user details {email, username}
 pub fn encode_jwt_token(user: &NewUser) -> Result<String, Box<dyn error::Error>> {
     let payload = Claims {
-        company: user.email.to_string(),
-        sub: "REG".to_owned(),
+        sub: user.email.to_string(),
+        iat: (Utc::now()).timestamp() as usize,
         exp: (Utc::now() + Duration::hours(36)).timestamp() as usize,
     };
 
@@ -33,8 +33,7 @@ pub fn encode_jwt_token(user: &NewUser) -> Result<String, Box<dyn error::Error>>
     });
     let key = &conf.secret_key;
 
-    let mut header = Header::default();
-    header.kid = Some("secretssec".to_owned());
+    let header = Header::default();
 
     match encode(&header, &payload, key.as_ref()) {
         Ok(t) => Ok(t),

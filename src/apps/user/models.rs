@@ -5,7 +5,7 @@ use super::utils::{from_timestamp, validate_email, validate_name};
 
 use std::borrow::Cow;
 
-use crate::apps::auth::validate;
+use crate::apps::auth::validate::{self, Claims};
 use crate::apps::profiles::models::{Avatar, NewProfile, Profile};
 use crate::config::configs as config;
 use crate::core::py_interface::remove_py_mod;
@@ -96,14 +96,6 @@ pub struct ResetPassData {
     pub password_conf: String,
 }
 
-/// Holds JWT Authorization Claims
-#[derive(Serialize, Deserialize)]
-struct Claims {
-    pub company: String,
-    pub exp: usize,
-    sub: String,
-}
-
 /// Oauth Query Params Struct extractor
 #[derive(Deserialize)]
 pub struct OauthInfo {
@@ -192,9 +184,9 @@ impl User {
     /// The cred used is the user email
     pub fn create_token(user_cred: &str) -> Result<String, Box<dyn stdError>> {
         let payload = Claims {
-            company: user_cred.to_owned(),
+            sub: user_cred.to_owned(),
+            iat: (Utc::now()).timestamp() as usize,
             exp: (Utc::now() + Duration::hours(720)).timestamp() as usize,
-            sub: "login".to_string(),
         };
 
         // ENV Configuration
@@ -214,7 +206,7 @@ impl User {
     pub fn verify_user(user_key: &str) -> Result<User, Box<dyn stdError>> {
         use crate::diesel_cfg::schema::users::dsl::*;
         let user = match validate::decode_auth_token(user_key) {
-            Ok(user_detail) => user_detail.company,
+            Ok(user_detail) => user_detail.sub,
             Err(e) => {
                 // return (status code, e)
                 return Err(e);
@@ -234,7 +226,7 @@ impl User {
         use crate::diesel_cfg::schema::users::dsl::*;
 
         let user = match validate::decode_auth_token(token) {
-            Ok(usr) => usr.company,
+            Ok(usr) => usr.sub,
             Err(e) => return Err(e),
         };
         let pass_hash = match hash(new_password, DEFAULT_COST) {

@@ -20,7 +20,7 @@ pub fn validate_location_name(name: &str) -> Result<(), ValidationError> {
 pub mod regexes {
     use super::Regex;
     lazy_static! {
-        pub static ref ALPHA_REGEX: Regex = Regex::new(r"^[a-zA-Z]+$").unwrap();
+        pub static ref ALPHA_REGEX: Regex = Regex::new(r"^[a-zA-Z ]+$").unwrap();
     }
     lazy_static! {
         pub static ref LOCATION_REGEX: Regex = Regex::new(r"^[a-zA-Z0-9 -`_]+$").unwrap();
