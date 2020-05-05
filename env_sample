@@ -20,6 +20,10 @@ export MAIL_ADDR=
 export MAIL_USERNAME=
 export MAIL_PASS=
 
+# In minutes
+export REFRESH_TOKEN_DURATION=$(30*24*60)
+export AUTH_TOKEN_DURATION=120
+
 # export RUST_LOG=debug
 # export actix_web=debug
 # export actix_todo=debug

@@ -182,11 +182,19 @@ impl User {
     /// given user detail
     ///
     /// The cred used is the user email
-    pub fn create_token(user_cred: &str) -> Result<String, Box<dyn stdError>> {
+    pub fn create_token(
+        user_cred: &str,
+        duration_min: Option<i64>,
+    ) -> Result<String, Box<dyn stdError>> {
+        let dur = if let Some(time) = duration_min {
+            time
+        } else {
+            24 * 60 // Use env variable
+        };
         let payload = Claims {
             sub: user_cred.to_owned(),
             iat: (Utc::now()).timestamp() as usize,
-            exp: (Utc::now() + Duration::hours(720)).timestamp() as usize,
+            exp: (Utc::now() + Duration::minutes(dur)).timestamp() as usize,
         };
 
         // ENV Configuration
@@ -384,11 +392,9 @@ impl<'a> SignInUser<'a> {
         match key {
             "email" => users
                 .filter(email.eq(identity.clone().unwrap()))
-                // .select(email)
                 .load::<User>(&connect_to_db()),
             _ => users
                 .filter(username.eq(identity.clone().unwrap()))
-                // .select(username)
                 .load::<User>(&connect_to_db()),
         }
     }

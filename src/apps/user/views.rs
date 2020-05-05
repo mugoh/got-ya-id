@@ -85,7 +85,7 @@ pub fn register_user(mut data: web::Json<NewUser>, req: HttpRequest) -> HttpResp
     HttpResponse::build(http::StatusCode::CREATED).json(&res)
 }
 
-/// Sends an activation link to a user email
+/// Sends an account activation link to a user email
 ///
 /// This endpoint should specifically be useful in re-sending
 /// of account activation links to users. (Logic assumes, in cases
@@ -98,7 +98,6 @@ pub fn register_user(mut data: web::Json<NewUser>, req: HttpRequest) -> HttpResp
 ///
 /// `POST`
 pub fn send_account_activation_link(email: web::Json<UserEmail>, req: HttpRequest) -> HttpResponse {
-    //
     if let Err(e) = email.0.validate() {
         return HttpResponse::build(http::StatusCode::BAD_REQUEST).json(e);
     }
@@ -106,7 +105,7 @@ pub fn send_account_activation_link(email: web::Json<UserEmail>, req: HttpReques
         return HttpResponse::build(http::StatusCode::NOT_FOUND).json(e);
     }
 
-    let token = User::create_token(&email.email, None).unwrap();
+    let token = User::create_token(&email.email, Some(24 * 60)).unwrap();
     let host = format!("{:?}", req.headers().get("host").unwrap());
     let path = get_url(&host, "api/auth/verify", &token);
 
@@ -172,7 +171,7 @@ pub fn login(user: web::Json<SignInUser>) -> HttpResponse {
                     "Could not find details that match you. Just try again.",
                 ));
             }
-            match User::create_token(&usr.email) {
+            match User::create_token(&usr.email, None) {
                 Ok(s) => response::JsonResponse::new(
                     http::StatusCode::OK.to_string(),
                     format!("{}Login success", reactication_msg),
@@ -247,7 +246,7 @@ pub fn send_reset_email(mut data: web::Json<UserEmail>, req: HttpRequest) -> Htt
         }
     };
     let user = &user[0];
-    let token = User::create_token(&user.email).unwrap();
+    let token = User::create_token(&user.email, Some(59)).unwrap();
     let host = format!("{:?}", req.headers().get("host").unwrap());
     let path = get_url(&host, "api/auth", &token);
     let context: Context = get_reset_context(&user, &path);
@@ -454,7 +453,7 @@ pub fn google_auth_callback(
 }
 
 /// Registers users authenticated with google Oauth
-/// This endpoint should be manulllay called with
+/// This endpoint should be manually called with
 /// the Oauth token received from the callback url (`/auth/callback`)
 /// in the Authorization header
 /// # url
@@ -499,7 +498,7 @@ pub async fn register_g_oauth(req: HttpRequest) ->HttpResponse {
 
     match OauthGgUser::register_as_third_party(res) {
         Ok(data) => {
-            let token = User::create_token(&res.email).unwrap();
+            let token = User::create_token(&res.email, None).unwrap();
 
             if let Some(dt) = &data {
                 // New oauth account
