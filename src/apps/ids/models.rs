@@ -1,9 +1,10 @@
 //! Identification card models
 
 use super::{utils::serde_pg_point, validators::regexes};
+use crate::apps::user::utils::from_timestamp;
 use crate::diesel_cfg::{config::connect_to_db, schema::identifications};
 
-use chrono::NaiveDate;
+use chrono::{NaiveDate, NaiveDateTime};
 use diesel::{self, prelude::*};
 use serde::{Deserialize, Serialize};
 use validator::Validate;
@@ -14,7 +15,7 @@ use std::{borrow::Cow, error::Error as stdErr};
 
 /// Represents the Queryable IDentification data model
 /// matching the database `identification` schema
-#[derive(Queryable, Default, Serialize, Deserialize, Identifiable)]
+#[derive(Queryable, Serialize, Deserialize, Identifiable)]
 #[table_name = "identifications"]
 pub struct Identification {
     pub id: i32,
@@ -50,6 +51,11 @@ pub struct Identification {
     pub picture: Option<String>,
     posted_by: Option<i32>,
     is_found: bool,
+
+    #[serde(deserialize_with = "from_timestamp")]
+    created_at: NaiveDateTime,
+    #[serde(deserialize_with = "from_timestamp")]
+    updated_at: NaiveDateTime,
 }
 
 /// The Insertable new Identification record
