@@ -174,18 +174,8 @@ pub async fn login(user: web::Json<SignInUser<'_>>) ->Result<HttpResponse, Error
                     "Could not find details that match you. Just try again.",
                 )).await?);
             }
+            let (auth_token, refresh_tkn) = generate_tokens(usr).await?;
 
-            let auth_tk_duration =  env::var("AUTH_TOKEN_DURATION").unwrap_or_else(|e| {
-                debug!("{}", e); "120".into()
-            }).parse::<i64>().map_err(|e| atxErrs::ErrorInternalServerError(e.to_string()))?;
-            let auth_token = User::create_token(&usr.email, Some(auth_tk_duration)).map_err(|e| atxErrs::ErrorInternalServerError(e.to_string()))?;
-
-            let rf_duration =  env::var("REFRESH_TOKEN_DURATION").unwrap_or_else(|e| {
-                debug!("{}", e); "42600".into()
-            })
-            .parse::<i64>().map_err(|e| atxErrs::ErrorInternalServerError(e.to_string()))?;
-
-            let refresh_tkn = User::create_token(&usr.email, Some(rf_duration)).map_err(|e| atxErrs::ErrorInternalServerError(e.to_string()))?;
             response::JsonResponse::new(
                     http::StatusCode::OK.to_string(),
                     format!("{}Login success", reactication_msg),
@@ -231,6 +221,18 @@ pub fn verify(path: web::Path<String>) -> HttpResponse {
             .body("Oopsy! The link you used seems expired. Just request a resend of the account activation link"),
     }
 }
+
+/// Exchanges a refresh token for a new user authorization token
+///
+/// # url
+/// `auth/token/refresh`
+///
+/// # Method
+/// `GET`
+pub async fn refresh_access_token<'a>(_ref_tkn: web::Path<&'a str>) -> Result<HttpResponse, Error> {
+    //
+    Ok(HttpResponse::build(http::StatusCode::OK).body("OK"))
+    }
 
 /// Sends a Password Reset Email
 ///
@@ -561,3 +563,18 @@ fn send_activation_link(
     mail.send()?;
     Ok(())
 }
+
+async fn generate_tokens(usr: &User) -> Result<(String, String), Error> {
+            let auth_tk_duration =  env::var("AUTH_TOKEN_DURATION").unwrap_or_else(|e| {
+                debug!("{}", e); "120".into()
+            }).parse::<i64>().map_err(|e| atxErrs::ErrorInternalServerError(e.to_string()))?;
+            let auth_token = User::create_token(&usr.email, Some(auth_tk_duration)).map_err(|e| atxErrs::ErrorInternalServerError(e.to_string()))?;
+
+            let rf_duration =  env::var("REFRESH_TOKEN_DURATION").unwrap_or_else(|e| {
+                debug!("{}", e); "42600".into()
+            })
+            .parse::<i64>().map_err(|e| atxErrs::ErrorInternalServerError(e.to_string()))?;
+
+            let refresh_tkn = User::create_token(&usr.email, Some(rf_duration)).map_err(|e| atxErrs::ErrorInternalServerError(e.to_string()))?;
+            Ok((auth_token, refresh_tkn))
+    }
