@@ -1,17 +1,15 @@
 //! This module holds the API routes configuration
-//!
 use actix_web::{guard, web, HttpResponse};
 
 use crate::apps::{ids, profiles, user};
+
 /// Configures the app service
 pub fn api(cfg: &mut web::ServiceConfig) {
     cfg.service(
         web::scope("/api")
             .service(
                 web::scope("/auth")
-                    .service(
-                        web::resource("").route(web::post().to(user::views::register_user)), // .route(web::get().to(|| "")),
-                    )
+                    .service(web::resource("").route(web::post().to(user::views::register_user)))
                     .service(web::resource("/login").route(web::post().to(user::views::login)))
                     .service(
                         web::resource("/google").route(web::get().to(user::views::google_auth)),

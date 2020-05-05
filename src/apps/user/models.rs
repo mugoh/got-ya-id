@@ -20,7 +20,6 @@ use validator_derive::Validate;
 use bcrypt::{hash, verify, DEFAULT_COST};
 use chrono::{prelude::*, Duration, NaiveDateTime};
 use diesel::{self, prelude::*};
-use log::{debug, error};
 
 use jsonwebtoken as jwt;
 use jwt::{encode, Header};
@@ -115,7 +114,7 @@ impl<'a> NewUser<'a> {
     ///
     /// # Returns
     /// User
-    pub fn save(&mut self) -> Result<User, String> {
+    pub fn save(&mut self) -> Result<User, Box<dyn stdError>> {
         match self.is_unique() {
             Ok(_) => (),
             Err(e) => {
@@ -123,20 +122,20 @@ impl<'a> NewUser<'a> {
                     "{key} Oopsy! {field} already in use",
                     key = e.0,
                     field = e.1
-                ))
+                )
+                .into())
             }
         }
         match hash(&self.password, DEFAULT_COST) {
             Ok(h) => self.password = Cow::Owned(h),
             Err(e) => {
-                error!("{}", &format!("{:?}", e));
-                return Err("Failed to hash password".to_string());
+                debug!("{}", &format!("{:?}", e));
+                return Err(format!("Failed to hash password: {}", e).into());
             }
         };
         let usr = diesel::insert_into(users::table)
             .values(&*self) // diesel::Insertable unimplemented for &mut
-            .get_result::<User>(&connect_to_db())
-            .expect("Error saving user");
+            .get_result::<User>(&connect_to_db())?;
         NewProfile::new(usr.id, None)?;
         Ok(usr)
     }
@@ -189,7 +188,7 @@ impl User {
         let dur = if let Some(time) = duration_min {
             time
         } else {
-            24 * 60 // Use env variable
+            120 // Use env variable
         };
         let payload = Claims {
             sub: user_cred.to_owned(),

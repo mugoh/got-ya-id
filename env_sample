@@ -15,13 +15,13 @@ export secret_key='some_secrety_secrety'
 export GOOGLE_PROFILE_URL="https://www.googleapis.com/oauth2/v1/userinfo"
 
 # Email Client
-export SMTP_CLIENT=
-export MAIL_ADDR=
-export MAIL_USERNAME=
-export MAIL_PASS=
+export smtp_client=
+export mail_addr=
+export mail_username=
+export mail_pass=
 
 # In minutes
-export REFRESH_TOKEN_DURATION=$(30*24*60)
+export REFRESH_TOKEN_DURATION=43200
 export AUTH_TOKEN_DURATION=120
 
 # export RUST_LOG=debug

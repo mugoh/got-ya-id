@@ -3,7 +3,7 @@ use lettre_email::Email;
 
 use lettre::smtp::authentication::Credentials;
 use lettre::{smtp, SmtpClient, SmtpTransport, Transport};
-use std::{env, process};
+use std::{env, error::Error as stdError, process};
 
 /// Enables sending of email
 ///
@@ -26,7 +26,7 @@ impl Mail {
         to_name: &'a str,
         subject: &'a str,
         content: &'a str,
-    ) -> Result<Mail, &'static str> {
+    ) -> Result<Mail, Box<dyn stdError>> {
         // ENV
         //let SMTP_CLIENT;
         //let MAIL_USERNAME;
@@ -36,20 +36,12 @@ impl Mail {
             vec!["SMTP_CLIENT", "MAIL_ADDR", "MAIL_USERNAME", "MAIL_PASS"],
             &mut mail_vars,
         );
-        let email = match Email::builder()
+        let email = Email::builder()
             .to((to_addr, to_name))
             .from(mail_vars[1].as_str())
             .subject(subject)
             .html(content)
-            .build()
-        {
-            Ok(e) => e,
-
-            Err(er) => {
-                debug!("{:?}", er);
-                return Err("Unable to create email");
-            }
-        };
+            .build()?;
 
         let creds = Credentials::new(
             mail_vars.get(2).unwrap().into(),
@@ -57,8 +49,7 @@ impl Mail {
         );
         let mailer = SmtpClient::new_simple(
             mail_vars[0].as_ref(), //smtpclient//
-        )
-        .unwrap()
+        )?
         .credentials(creds)
         .transport();
 
@@ -67,10 +58,7 @@ impl Mail {
 
     /// Sends the email
     pub fn send(&mut self) -> Result<smtp::response::Response, smtp::error::Error> {
-        match self.mailer.send(self.email.clone().into()) {
-            Ok(s) => Ok(s),
-            Err(e) => Result::Err(e),
-        }
+        self.mailer.send(self.email.clone().into())
     }
 }
 

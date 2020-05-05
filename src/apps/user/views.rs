@@ -62,7 +62,7 @@ pub fn register_user(mut data: web::Json<NewUser>, req: HttpRequest) -> HttpResp
         Ok(saved_user) => saved_user,
         Err(e) => {
             let res: response::JsonErrResponse<_> =
-                response::JsonErrResponse::new("409".to_string(), e);
+                response::JsonErrResponse::new("409".to_string(), e.to_string());
             return HttpResponse::build(http::StatusCode::CONFLICT).json(&res);
         }
     };
@@ -177,6 +177,7 @@ pub fn login(user: web::Json<SignInUser>) -> HttpResponse {
                     format!("{}Login success", reactication_msg),
                     json!(
                         { "username": &usr.username,
+                          "email": &usr.email,
                           "token": &s
                         }
                     ),
