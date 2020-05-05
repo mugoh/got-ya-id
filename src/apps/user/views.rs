@@ -16,7 +16,7 @@ use crate::hashmap;
 
 use tera::{self, Context};
 
-use actix_web::{http, web, HttpRequest, HttpResponse};
+use actix_web::{http, web, HttpRequest, HttpResponse, Result, Error, error as atxErrs};
 use serde_json::json;
 use validator::Validate;
 
@@ -124,15 +124,15 @@ pub fn send_account_activation_link(email: web::Json<UserEmail>, req: HttpReques
 /// # url
 /// ## `auth/login`
 ///
-pub fn login(user: web::Json<SignInUser>) -> HttpResponse {
+pub async fn login(user: web::Json<SignInUser<'_>>) ->Result<HttpResponse, Error> {
     if let Err(err) = user.validate() {
         let res = response::JsonErrResponse::new("400".to_string(), err);
-        return HttpResponse::build(http::StatusCode::BAD_REQUEST).json(&res);
+        return Ok(HttpResponse::build(http::StatusCode::BAD_REQUEST).json(&res).await?);
     };
     if user.has_credentials() {
         let res =
             response::JsonErrResponse::new("400".to_string(), "Oh-uh, provide a username or email");
-        return HttpResponse::build(http::StatusCode::BAD_REQUEST).json(&res);
+        return Ok(HttpResponse::build(http::StatusCode::BAD_REQUEST).json(&res).await?);
     }
     
     let mut reactication_msg = "";
@@ -140,23 +140,26 @@ pub fn login(user: web::Json<SignInUser>) -> HttpResponse {
     let res = match user.sign_in() {
         Ok(usr_vec) => {
             if usr_vec.is_empty() {
-                return HttpResponse::build(http::StatusCode::UNAUTHORIZED).json(
+                let resp = HttpResponse::build(http::StatusCode::UNAUTHORIZED).json(
                     response::JsonErrResponse::new(
                         http::StatusCode::UNAUTHORIZED.to_string(),
                         "Could not find details that match you. Just try again.",
                     ),
                 );
+                return Ok(resp);
             }
             let usr = &usr_vec[0];
 
             if !usr.is_active {
                 if let Err(e) = usr.alter_activation_status(){
-                    debug!("{:?}",e);
-                    return HttpResponse::InternalServerError().json(
+                    debug!("{:?}", e);
+                    return Ok(HttpResponse::InternalServerError().json(
                         response::JsonErrResponse::new(
                             http::StatusCode::INTERNAL_SERVER_ERROR.to_string(),
-                            "Encountered a problem reacticating the account"));
-                } else {reactication_msg = "Account activated. ";}
+                            "Encountered a problem reacticating the account")).await?);
+                } else {
+                    reactication_msg = "Account activated. ";
+                }
                 /*
                 return HttpResponse::Forbidden().json(response::JsonErrResponse::new(
                     http::StatusCode::FORBIDDEN.to_string(),
@@ -164,37 +167,40 @@ pub fn login(user: web::Json<SignInUser>) -> HttpResponse {
                 ));
             */
             }
-            if !usr.verify_pass(user.get_password()).unwrap() {
+            if !usr.verify_pass(user.get_password())? {
                 let status = http::StatusCode::UNAUTHORIZED;
-                return HttpResponse::build(status).json(response::JsonErrResponse::new(
+                return Ok(HttpResponse::build(status).json(response::JsonErrResponse::new(
                     status.to_string(),
                     "Could not find details that match you. Just try again.",
-                ));
+                )).await?);
             }
-            match User::create_token(&usr.email, None) {
-                Ok(s) => response::JsonResponse::new(
+
+            let auth_tk_duration =  env::var("AUTH_TOKEN_DURATION").unwrap_or_else(|e| {
+                debug!("{}", e); "120".into()
+            }).parse::<i64>().map_err(|e| atxErrs::ErrorInternalServerError(e.to_string()))?;
+            let auth_token = User::create_token(&usr.email, Some(auth_tk_duration)).map_err(|e| atxErrs::ErrorInternalServerError(e.to_string()))?;
+
+            let rf_duration =  env::var("REFRESH_TOKEN_DURATION").unwrap_or_else(|e| {
+                debug!("{}", e); "42600".into()
+            })
+            .parse::<i64>().map_err(|e| atxErrs::ErrorInternalServerError(e.to_string()))?;
+
+            let refresh_tkn = User::create_token(&usr.email, Some(rf_duration)).map_err(|e| atxErrs::ErrorInternalServerError(e.to_string()))?;
+            response::JsonResponse::new(
                     http::StatusCode::OK.to_string(),
                     format!("{}Login success", reactication_msg),
                     json!(
                         { "username": &usr.username,
                           "email": &usr.email,
-                          "token": &s
+                          "auth_token": &auth_token,
+                          "refresh_token": &refresh_tkn,
                         }
                     ),
-                ),
-                Err(e) => {
-                    debug!("{:?}", e);
-                    let status = http::StatusCode::INTERNAL_SERVER_ERROR;
-                    let e = response::JsonErrResponse::new(
-                        status.to_string(),
-                        "Encountered a problem attempting to sign in. Try again later".to_string(),
-                    );
-                    return HttpResponse::build(status).json(e);
-                }
-            }
+                )
+
         }
         Err(e) => {
-            return HttpResponse::build(http::StatusCode::UNAUTHORIZED).json(
+            return Ok(HttpResponse::build(http::StatusCode::UNAUTHORIZED).json(
                 response::JsonErrResponse::new(
                     http::StatusCode::UNAUTHORIZED.to_string(),
                     format!(
@@ -202,11 +208,11 @@ pub fn login(user: web::Json<SignInUser>) -> HttpResponse {
                         e
                     ),
                 ),
-            );
+            ).await?);
         }
     };
 
-    HttpResponse::build(http::StatusCode::OK).json(res)
+    Ok(HttpResponse::build(http::StatusCode::OK).json(res).await?)
 }
 
 /// Verifies a user's account.

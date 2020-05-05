@@ -184,7 +184,7 @@ impl User {
     pub fn create_token(
         user_cred: &str,
         duration_min: Option<i64>,
-    ) -> Result<String, Box<dyn stdError>> {
+    ) -> Result<String, jsonwebtoken::errors::Error> {
         let dur = if let Some(time) = duration_min {
             time
         } else {
