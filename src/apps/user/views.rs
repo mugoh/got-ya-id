@@ -14,7 +14,6 @@ use crate::core::mail;
 use crate::core::response::{self, err, respond};
 use crate::hashmap;
 
-use log::debug;
 use tera::{self, Context};
 
 use actix_web::{http, web, HttpRequest, HttpResponse};
@@ -89,7 +88,8 @@ pub fn register_user(mut data: web::Json<NewUser>, req: HttpRequest) -> HttpResp
 /// Sends an activation link to a user email
 ///
 /// This endpoint should specifically be useful in re-sending
-/// of account activation links to users
+/// of account activation links to users. (Logic assumes, in cases
+/// where the initial link token expired before use)
 ///
 /// # url
 /// `/auth/activation/send`
@@ -106,7 +106,7 @@ pub fn send_account_activation_link(email: web::Json<UserEmail>, req: HttpReques
         return HttpResponse::build(http::StatusCode::NOT_FOUND).json(e);
     }
 
-    let token = User::create_token(&email.email).unwrap();
+    let token = User::create_token(&email.email, None).unwrap();
     let host = format!("{:?}", req.headers().get("host").unwrap());
     let path = get_url(&host, "api/auth/verify", &token);
 
@@ -135,6 +135,9 @@ pub fn login(user: web::Json<SignInUser>) -> HttpResponse {
             response::JsonErrResponse::new("400".to_string(), "Oh-uh, provide a username or email");
         return HttpResponse::build(http::StatusCode::BAD_REQUEST).json(&res);
     }
+    
+    let mut reactication_msg = "";
+
     let res = match user.sign_in() {
         Ok(usr_vec) => {
             if usr_vec.is_empty() {
@@ -148,10 +151,19 @@ pub fn login(user: web::Json<SignInUser>) -> HttpResponse {
             let usr = &usr_vec[0];
 
             if !usr.is_active {
+                if let Err(e) = usr.alter_activation_status(){
+                    debug!("{:?}",e);
+                    return HttpResponse::InternalServerError().json(
+                        response::JsonErrResponse::new(
+                            http::StatusCode::INTERNAL_SERVER_ERROR.to_string(),
+                            "Encountered a problem reacticating the account"));
+                } else {reactication_msg = "Account activated. ";}
+                /*
                 return HttpResponse::Forbidden().json(response::JsonErrResponse::new(
                     http::StatusCode::FORBIDDEN.to_string(),
                     &format!("Account associated with email {} is deactivated", usr.email),
                 ));
+            */
             }
             if !usr.verify_pass(user.get_password()).unwrap() {
                 let status = http::StatusCode::UNAUTHORIZED;
@@ -163,7 +175,7 @@ pub fn login(user: web::Json<SignInUser>) -> HttpResponse {
             match User::create_token(&usr.email) {
                 Ok(s) => response::JsonResponse::new(
                     http::StatusCode::OK.to_string(),
-                    "Login Success".to_string(),
+                    format!("{}Login success", reactication_msg),
                     json!(
                         { "username": &usr.username,
                           "token": &s
@@ -208,9 +220,9 @@ pub fn login(user: web::Json<SignInUser>) -> HttpResponse {
 ///
 pub fn verify(path: web::Path<String>) -> HttpResponse {
     match User::verify_user(&path) {
-        Ok(_) => HttpResponse::build(http::StatusCode::OK).body("Your account is now verified"),
+        Ok(_) => HttpResponse::build(http::StatusCode::OK).body("Yay! Your account is now verified"),
         Err(_) => HttpResponse::build(http::StatusCode::FORBIDDEN)
-            .json("Oopsy! That didn't work. Just request a resend of the account activation link"),
+            .body("Oopsy! The link you used seems expired. Just request a resend of the account activation link"),
     }
 }
 
