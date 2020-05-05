@@ -167,7 +167,7 @@ pub async fn login(user: web::Json<SignInUser<'_>>) ->Result<HttpResponse, Error
                 ));
             */
             }
-            if !usr.verify_pass(user.get_password())? {
+            if !usr.verify_pass(user.get_password()).await.map_err(|e| atxErrs::ErrorInternalServerError(e))? {
                 let status = http::StatusCode::UNAUTHORIZED;
                 return Ok(HttpResponse::build(status).json(response::JsonErrResponse::new(
                     status.to_string(),
