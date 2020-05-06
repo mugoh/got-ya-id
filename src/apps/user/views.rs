@@ -4,7 +4,7 @@
 
 use super::models::{
     GoogleUser, NewUser, OClient, OauthGgUser, OauthInfo, ResetPassData, SignInUser, User,
-    UserEmail, RefTokens
+    UserEmail, Reftoken
 };
 
 use super::utils::{err_response, get_context, get_reset_context, get_url, TEMPLATE};
@@ -220,18 +220,32 @@ pub fn verify(path: web::Path<String>) -> HttpResponse {
 /// Exchanges a refresh token for a new user authorization token
 ///
 /// # url
-/// `auth/token/refresh`
+/// `auth/refresh/{refresh}`
 ///
 /// # Method
 /// `GET`
-pub async fn refresh_access_token<'a>(ref_tkn: web::Path<&'a str>) -> Result<HttpResponse, Error> {
-   let tokens = RefTokens::exchange_token(ref_tkn.into_inner())?;
+pub async fn refresh_access_token(ref_tkn: web::Path<String>) -> Result<HttpResponse, Error> {
+   let tokens = Reftoken::exchange_token(&ref_tkn.into_inner())?;
  
     let msg = hashmap![
             "status" => "200",
             "message" => "success. tokens updated"];
    respond(msg, Some(tokens), None)?.await 
 }
+
+/// Logs out authenticated users
+/// The refresh token is invalidated
+///
+/// # url
+/// `auth/logout`
+///
+/// # method
+/// `GET`
+pub async fn logout(ref_tkn: web::Path<String>) -> Result< HttpResponse, Error> {
+    Reftoken::invalidate(&ref_tkn.into_inner())?;
+    Ok(HttpResponse::build(http::StatusCode::OK).body("io"))
+}
+
 
 /// Sends a Password Reset Email
 ///

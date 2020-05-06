@@ -20,6 +20,7 @@ use validator_derive::Validate;
 use actix_web::{Error, error::{ErrorInternalServerError, ErrorForbidden}};
 
 use bcrypt::{hash, verify, DEFAULT_COST};
+
 use chrono::{prelude::*, Duration, NaiveDateTime};
 use diesel::{self, prelude::*};
 
@@ -115,7 +116,7 @@ pub struct OClient {
 /// The Refresh tokens Queryable model
 #[derive(Queryable, Serialize, Deserialize, Identifiable)]
 #[table_name = "refresh_tokens"]
-pub struct RefTokens {
+pub struct Reftoken {
     id: i64,
     body: String,
     valid: bool
@@ -592,7 +593,7 @@ fn remove_old_url(pub_id: &str) -> Result<String, ()> {
     remove_py_mod(pub_id)
 }
 
-impl RefTokens {
+impl Reftoken {
     
     /// Verifies a given refresh token in exchange for
     /// new auth and refresh tokens for the user
@@ -602,25 +603,28 @@ impl RefTokens {
     pub fn exchange_token(given_tk: &str) -> Result<Tokens, Error> {
         use crate::diesel_cfg::schema::refresh_tokens::dsl::*;
         
-        let token = refresh_tokens.filter(body.eq(given_tk))
-            .load::<RefTokens>(&connect_to_db())
-            .unwrap();
+        let t_hash = hash(given_tk, DEFAULT_COST).map_err(ErrorInternalServerError)?;
+
+        let token = refresh_tokens.filter(body.eq(t_hash))
+            .load::<Reftoken>(&connect_to_db())
+            .map_err(ErrorInternalServerError)?;
         if token.is_empty() || !&token[0].valid {
             return Err(ErrorForbidden("Invalid Token".to_string()))
         };
 
-        let verified_tk = match validate::decode_auth_token(&token[0].body, Some("refresh".into())) {
+        let verified_tk = match validate::decode_auth_token(given_tk, Some("refresh".into())) {
             Ok(t) => t,
             Err(e) =>  return Err(ErrorForbidden(e.to_string()))
         };
 
-        let (new_autht, new_ref_t) = RefTokens::generate_tokens(&verified_tk.sub)?;
-        if let Err(e) = diesel::delete(&token[0]).execute(&connect_to_db()) {
+        let (new_autht, new_ref_t) = Reftoken::generate_tokens(&verified_tk.sub)?;
+        
+        diesel::delete(&token[0]).execute(&connect_to_db()).map_err(|e| {
             debug!("{}", e);
-            return Err(ErrorInternalServerError(e.to_string()))
-        }
+            ErrorInternalServerError::<String>(e.to_string())
+        })?;
 
-        let new_rf_stct = NewRfToken{body: Cow::Borrowed(&new_ref_t)};
+        let mut new_rf_stct = NewRfToken{body: Cow::Borrowed(&new_ref_t)};
         if let Err(e) = new_rf_stct.save() {
             return Err(ErrorInternalServerError(e))
         }
@@ -647,14 +651,39 @@ impl RefTokens {
             let refresh_tkn = User::create_token(sub, Some(rf_duration), "refresh".into()).map_err(|e| ErrorInternalServerError(e.to_string()))?;
             Ok((auth_token, refresh_tkn))
     }
+
+    /// __ Marks a refresh token as invalid__
+    /// Deletes the tokens from the associated table
+    pub fn invalidate(token: &str) -> Result<usize, Error> {
+        use crate::diesel_cfg::schema::refresh_tokens::dsl::*;
+
+        hash(token, DEFAULT_COST)
+            .map(|t_hash| t_hash)
+            .map_err(ErrorInternalServerError)
+            .and_then(|t_hash| {
+        
+        // diesel::update(refresh_tokens.filter(body.eq(token)))
+        //     .set(valid.eq(false))
+        //    .get_result::<Reftoken>(&connect_to_db())
+        diesel::delete(refresh_tokens.filter(body.eq(t_hash))).execute(&connect_to_db())
+            .map_err(ErrorInternalServerError)
+    })
+}
 }
 
 impl<'a> NewRfToken<'a> {
-    pub fn save(&self) -> Result<(), diesel::result::Error> {
+    
+    /// Saves a new refresh token to the refresh tokens table
+    pub fn save(&mut self) -> Result<(), String> {
+        match hash(self.body.to_mut(), DEFAULT_COST) {
+            Ok(t) => self.body = Cow::Owned(t),
+            Err(e) => return Err(e.to_string())
+        }
+
         if let Err(e) = diesel::insert_into(refresh_tokens::table)
             .values(&*self)
             .execute(&connect_to_db()) {
-                Err(e)
+                Err(e.to_string())
         } else {
             Ok(())
         }

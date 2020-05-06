@@ -15,6 +15,10 @@ pub fn api(cfg: &mut web::ServiceConfig) {
                         web::resource("/google").route(web::get().to(user::views::google_auth)),
                     )
                     .service(
+                        web::resource("/refresh/{refresh_token}")
+                            .route(web::get().to(user::views::refresh_access_token)),
+                    )
+                    .service(
                         web::resource("/callback")
                             .route(web::get().to(user::views::google_auth_callback)),
                     )
