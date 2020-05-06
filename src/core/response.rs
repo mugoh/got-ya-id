@@ -7,7 +7,7 @@ use actix_web::{http::StatusCode, HttpResponse};
 use serde_json::json;
 use serde_json::Value;
 
-use std::{collections::HashMap, error::Error as stdError};
+use std::collections::HashMap;
 /// Response to User on Success
 /// Deserialized to JSON
 #[derive(Deserialize, Serialize, Debug)]
@@ -107,13 +107,13 @@ pub fn respond<'c, T>(
     data: HashMap<&'c str, &'c str>,
     body: Option<T>,
     err: Option<&'c str>,
-) -> Result<HttpResponse, Box<dyn stdError>>
+) -> Result<HttpResponse, ()>
 //
 where
     T: serde::de::DeserializeOwned,
     T: Serialize,
 {
-    let status = StatusCode::from_u16(data["status"].parse::<u16>()?)?;
+    let status = StatusCode::from_u16(data["status"].parse::<u16>().unwrap()).unwrap();
     if let Some(error_msg) = err {
         //   Ok(HttpResponse::build(status)
         //       .json(json!({"status": &status.to_string(), "error": err.unwrap()})))

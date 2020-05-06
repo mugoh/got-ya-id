@@ -125,7 +125,7 @@ pub struct RefTokens {
 /// The Refresh Tokens Insertable model
 #[derive(Serialize, Deserialize, Insertable)]
 #[table_name = "refresh_tokens"]
-pub struct NewRfToken { body: String }
+pub struct NewRfToken<'a> { body: Cow<'a, str> }
 
 type Tokens = (String, String);
 
@@ -620,11 +620,10 @@ impl RefTokens {
             return Err(ErrorInternalServerError(e.to_string()))
         }
 
-        let new_rf_stct = NewRfToken{body: new_ref_t};
+        let new_rf_stct = NewRfToken{body: Cow::Borrowed(&new_ref_t)};
         if let Err(e) = new_rf_stct.save() {
             return Err(ErrorInternalServerError(e))
         }
-
 
         Ok((new_autht, new_ref_t))
     
@@ -650,7 +649,7 @@ impl RefTokens {
     }
 }
 
-impl NewRfToken {
+impl<'a> NewRfToken<'a> {
     pub fn save(&self) -> Result<(), diesel::result::Error> {
         if let Err(e) = diesel::insert_into(refresh_tokens::table)
             .values(&*self)
