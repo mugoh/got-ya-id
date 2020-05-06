@@ -9,7 +9,7 @@ use crate::apps::auth::validate::{self, Claims};
 use crate::apps::profiles::models::{Avatar, NewProfile, Profile};
 use crate::config::configs as config;
 use crate::core::py_interface::remove_py_mod;
-use crate::diesel_cfg::{config::connect_to_db, schema::oath_users, schema::users};
+use crate::diesel_cfg::{config::connect_to_db, schema::oath_users, schema::users, schema::refresh_tokens};
 
 use std::error::Error as stdError;
 
@@ -108,6 +108,22 @@ pub struct OauthInfo {
 pub struct OClient {
     pub client: oauth2::basic::BasicClient,
 }
+
+
+/// The Refresh tokens Queryable model
+#[derive(Queryable, Serialize, Deserialize, Identifiable)]
+#[table_name = "refresh_tokens"]
+pub struct RefTokens {
+    id: i64,
+    body: String,
+    valid: bool
+}
+
+
+/// The Refresh Tokens Insertable model
+#[derive(Serialize, Deserialize, Insertable)]
+#[table_name = "refresh_tokens"]
+pub struct NewRfToken { body: String }
 
 impl<'a> NewUser<'a> {
     /// Saves a new user record to the db
@@ -212,6 +228,16 @@ impl User {
 
         Ok(encode(&header, &payload, key.as_ref())?)
     }
+
+    /// Verifies a given refresh token in exchange for
+    /// new auth and refresh tokens for the user
+    pub fn verify_refresh_token( given_tk: &str) -> Result<(), String> {
+        use crate::diesel_cfg::schema::refresh_tokens::dsl::*;
+
+        // let rf_t = refresh_tokens.filter(token.eq(given_tk))
+            Ok(())
+                
+        }
 
     /// Decodes the auth token representing a user
     /// to return an user object with a verified account
@@ -569,4 +595,28 @@ impl OauthGgUser {
 /// Deletes the avatar file matching the given ID
 fn remove_old_url(pub_id: &str) -> Result<String, ()> {
     remove_py_mod(pub_id)
+}
+
+impl RefTokens {
+    
+    /// Verifies a given refresh token in exchange for
+    /// new auth and refresh tokens for the user
+    /// 
+    /// # Arguments
+    ///  given_tk: The refresh token to be verified
+    pub fn verify_token(given_tk: &str) -> Result<Self, String> {
+        use crate::diesel_cfg::schema::refresh_tokens::dsl::*;
+        
+        let token = refresh_tokens.filter(body.eq(given_tk))
+            .first::<RefTokens>(&connect_to_db())
+            .unwrap();
+        if !token.valid {
+            return Err("Invalid Token".into())
+        };
+
+        let verified_tk = validate::decode_auth_token(&token.body, Some("refresh".into())).map_err(|e| return e.to_string());
+    verified_tk.I();
+        Ok(token)
+    
+    }
 }
