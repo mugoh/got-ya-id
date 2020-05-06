@@ -187,6 +187,7 @@ impl User {
     pub fn create_token(
         user_cred: &str,
         duration_min: Option<i64>,
+        issuer: String
     ) -> Result<String, jsonwebtoken::errors::Error> {
         let dur = if let Some(time) = duration_min {
             time
@@ -197,6 +198,7 @@ impl User {
             sub: user_cred.to_owned(),
             iat: (Utc::now()).timestamp() as usize,
             exp: (Utc::now() + Duration::minutes(dur)).timestamp() as usize,
+            iss: issuer
         };
 
         // ENV Configuration
@@ -215,7 +217,7 @@ impl User {
     /// to return an user object with a verified account
     pub fn verify_user(user_key: &str) -> Result<User, Box<dyn stdError>> {
         use crate::diesel_cfg::schema::users::dsl::*;
-        let user = match validate::decode_auth_token(user_key) {
+        let user = match validate::decode_auth_token(user_key, Some("verification".to_owned())) {
             Ok(user_detail) => user_detail.sub,
             Err(e) => {
                 // return (status code, e)
@@ -235,7 +237,7 @@ impl User {
     pub fn reset_pass(token: &str, new_password: &str) -> Result<(), Box<dyn stdError>> {
         use crate::diesel_cfg::schema::users::dsl::*;
 
-        let user = match validate::decode_auth_token(token) {
+        let user = match validate::decode_auth_token(token, Some("password_reset".to_string())) {
             Ok(usr) => usr.sub,
             Err(e) => return Err(e),
         };

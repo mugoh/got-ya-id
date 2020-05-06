@@ -16,7 +16,7 @@ use crate::hashmap;
 
 use tera::{self, Context};
 
-use actix_web::{http, web, HttpRequest, HttpResponse, Result, Error, error as atxErrs};
+use actix_web::{http, web, HttpRequest, HttpResponse, Result, Error, error::ErrorInternalServerError};
 use serde_json::json;
 use validator::Validate;
 
@@ -45,7 +45,7 @@ use actix_web_httpauth::headers::authorization::Bearer;
 ///
 pub fn register_user(mut data: web::Json<NewUser>, req: HttpRequest) -> HttpResponse {
     let user_ = &data.0;
-    let token = validate::encode_jwt_token(user_).unwrap();
+    let token = validate::encode_jwt_token(user_, "verification".into()).unwrap();
 
     // -> Extract host info from req Headers
     let host = format!("{:?}", req.headers().get("host").unwrap());
@@ -105,7 +105,7 @@ pub fn send_account_activation_link(email: web::Json<UserEmail>, req: HttpReques
         return HttpResponse::build(http::StatusCode::NOT_FOUND).json(e);
     }
 
-    let token = User::create_token(&email.email, Some(24 * 60)).unwrap();
+    let token = User::create_token(&email.email, Some(24 * 60), "verification".into()).unwrap();
     let host = format!("{:?}", req.headers().get("host").unwrap());
     let path = get_url(&host, "api/auth/verify", &token);
 
@@ -167,7 +167,7 @@ pub async fn login(user: web::Json<SignInUser<'_>>) ->Result<HttpResponse, Error
                 ));
             */
             }
-            if !usr.verify_pass(user.get_password()).await.map_err(|e| atxErrs::ErrorInternalServerError(e))? {
+            if !usr.verify_pass(user.get_password()).await.map_err(|e| ErrorInternalServerError(e))? {
                 let status = http::StatusCode::UNAUTHORIZED;
                 return Ok(HttpResponse::build(status).json(response::JsonErrResponse::new(
                     status.to_string(),
@@ -255,7 +255,7 @@ pub fn send_reset_email(mut data: web::Json<UserEmail>, req: HttpRequest) -> Htt
         }
     };
     let user = &user[0];
-    let token = User::create_token(&user.email, Some(59)).unwrap();
+    let token = User::create_token(&user.email, Some(59), "password_reset".into()).unwrap();
     let host = format!("{:?}", req.headers().get("host").unwrap());
     let path = get_url(&host, "api/auth", &token);
     let context: Context = get_reset_context(&user, &path);
@@ -507,7 +507,7 @@ pub async fn register_g_oauth(req: HttpRequest) ->HttpResponse {
 
     match OauthGgUser::register_as_third_party(res) {
         Ok(data) => {
-            let token = User::create_token(&res.email, None).unwrap();
+            let token = User::create_token(&res.email, None, "auth".into()).unwrap();
 
             if let Some(dt) = &data {
                 // New oauth account
@@ -567,14 +567,14 @@ fn send_activation_link(
 async fn generate_tokens(usr: &User) -> Result<(String, String), Error> {
             let auth_tk_duration =  env::var("AUTH_TOKEN_DURATION").unwrap_or_else(|e| {
                 debug!("{}", e); "120".into()
-            }).parse::<i64>().map_err(|e| atxErrs::ErrorInternalServerError(e.to_string()))?;
-            let auth_token = User::create_token(&usr.email, Some(auth_tk_duration)).map_err(|e| atxErrs::ErrorInternalServerError(e.to_string()))?;
+            }).parse::<i64>().map_err(|e| ErrorInternalServerError(e.to_string()))?;
+            let auth_token = User::create_token(&usr.email, Some(auth_tk_duration), "auth".into()).map_err(|e| ErrorInternalServerError(e.to_string()))?;
 
             let rf_duration =  env::var("REFRESH_TOKEN_DURATION").unwrap_or_else(|e| {
                 debug!("{}", e); "42600".into()
             })
-            .parse::<i64>().map_err(|e| atxErrs::ErrorInternalServerError(e.to_string()))?;
+            .parse::<i64>().map_err(|e| ErrorInternalServerError(e.to_string()))?;
 
-            let refresh_tkn = User::create_token(&usr.email, Some(rf_duration)).map_err(|e| atxErrs::ErrorInternalServerError(e.to_string()))?;
+            let refresh_tkn = User::create_token(&usr.email, Some(rf_duration), "refresh".into()).map_err(|e| ErrorInternalServerError(e.to_string()))?;
             Ok((auth_token, refresh_tkn))
     }
