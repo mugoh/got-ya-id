@@ -162,7 +162,7 @@ pub async fn login(user: web::Json<SignInUser<'_>>) ->Result<HttpResponse, Error
                 ));
             */
             }
-            if !usr.verify_pass(user.get_password()).await.map_err(|e| ErrorInternalServerError(e))? {
+            if !usr.verify_pass(user.get_password()).await.map_err(ErrorInternalServerError)? {
                 let status = http::StatusCode::UNAUTHORIZED;
                 return Ok(HttpResponse::build(status).json(response::JsonErrResponse::new(
                     status.to_string(),
@@ -266,9 +266,9 @@ pub async fn send_reset_email(mut data: web::Json<UserEmail<'_>>, req: HttpReque
                 &user.username,
                 "Account password reset",
                 s.as_str(),
-            ).await.map_err(|e| ErrorInternalServerError(e))?; 
+            ).await.map_err(ErrorInternalServerError)?; 
 
-            mail.send().await.map_err(|e| ErrorInternalServerError(e))?;
+            mail.send().await.map_err(ErrorInternalServerError)?;
         }
 
         Err(e) => return err("500", e.to_string()).await,
@@ -553,13 +553,13 @@ async fn  send_activation_link(
     let context = get_context(user_name, reset_link);
     let mut username = "";
 
-    let s = TEMPLATE.render(template, &context).map_err(|e| ErrorInternalServerError(e))?;
+    let s = TEMPLATE.render(template, &context).map_err(ErrorInternalServerError)?;
     if let Some(name) = user_name {
         username = name;
     }
 
-    let mut mail = mail::Mail::new(user_email, username, "Email activation", &s).await.map_err(|e| ErrorInternalServerError(e))?;
-    mail.send().await.map_err(|e| ErrorInternalServerError(e))?;
+    let mut mail = mail::Mail::new(user_email, username, "Email activation", &s).await.map_err(ErrorInternalServerError)?;
+    mail.send().await.map_err(ErrorInternalServerError)?;
     Ok(())
 }
 

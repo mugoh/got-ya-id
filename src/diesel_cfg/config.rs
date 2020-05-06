@@ -14,7 +14,8 @@ lazy_static! {
         for key in &keys {
             db_vars.insert(
                 key,
-                env::var(key).expect(&format!("Missing Database config variable: {}", key)),
+                env::var(key)
+                    .unwrap_or_else(|_| panic!("Missing Database config variable: {}", key)),
             );
         }
 

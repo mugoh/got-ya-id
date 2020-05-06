@@ -103,6 +103,7 @@ where
 ///  #- Ok: HttpResponse
 ///  #- Err: dyn std::error::Error
 ///  ```
+#[allow(clippy::implicit_hasher)]
 pub fn respond<'c, T>(
     data: HashMap<&'c str, &'c str>,
     body: Option<T>,

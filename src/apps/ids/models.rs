@@ -137,7 +137,7 @@ impl PartialEq<Identification> for NewIdentification<'_> {
             self.posted_by.eq(&idt.posted_by),
         ];
 
-        let is_equal = comp_vec.into_iter().all(|v| v == true);
+        let is_equal = comp_vec.into_iter().all(|v| v);
 
         // Idts matching in the above details should have been found(logic being an Idt can be
         // relost)
@@ -158,7 +158,7 @@ impl PartialEq<NewIdentification<'_>> for Identification {
             self.posted_by.eq(&idt.posted_by),
         ];
 
-        let is_equal = comp_vec.into_iter().all(|v| v == true);
+        let is_equal = comp_vec.into_iter().all(|v| v);
         is_equal & !self.is_found
     }
 }

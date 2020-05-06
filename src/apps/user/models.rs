@@ -193,7 +193,7 @@ impl User {
     /// # Returns
     ///
     /// bool: True -> Verified, False -> Fail
-    pub async fn verify_pass<'a>(&self, pass: &'a str) -> Result<bool, String> {
+    pub async fn verify_pass(&self, pass: &str) -> Result<bool, String> {
         verify(pass, &self.password.as_ref().unwrap()).map_err(|e| {
             debug!("{:?}", e);
             e.to_string()
