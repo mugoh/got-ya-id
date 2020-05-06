@@ -4,7 +4,7 @@
 
 use super::models::{
     GoogleUser, NewUser, OClient, OauthGgUser, OauthInfo, ResetPassData, SignInUser, User,
-    UserEmail,
+    UserEmail, RefTokens
 };
 
 use super::utils::{err_response, get_context, get_reset_context, get_url, TEMPLATE};
@@ -75,7 +75,7 @@ pub async fn register_user(mut data: web::Json<NewUser<'_>>, req: HttpRequest) -
     ).await?;
     let res: response::JsonResponse<_> = response::JsonResponse::new(
         http::StatusCode::CREATED.to_string(),
-        format!("Success. An activation link sent to {}", &data.0.email),
+        format!("sucess. An activation link sent to {}", &data.0.email),
         json!({"email": &data.0.email, "username": &data.0.username, "token": &token}),
     );
 
@@ -108,7 +108,7 @@ pub async fn send_account_activation_link(email: web::Json<UserEmail<'_>>, req: 
 
     send_activation_link(&email.email, None, &path, "email_activation.html").await?;
 
-    let data = hashmap!["status" => "200", "message" => "Success. Activation link sent"];
+    let data = hashmap!["status" => "200", "message" => "sucess. Activation link sent"];
     Ok(respond(data, Some("".to_string()), None).unwrap())
 }
 
@@ -224,10 +224,14 @@ pub fn verify(path: web::Path<String>) -> HttpResponse {
 ///
 /// # Method
 /// `GET`
-pub async fn refresh_access_token<'a>(_ref_tkn: web::Path<&'a str>) -> Result<HttpResponse, Error> {
-    
-    Ok(HttpResponse::build(http::StatusCode::OK).body("OK"))
-    }
+pub async fn refresh_access_token<'a>(ref_tkn: web::Path<&'a str>) -> Result<HttpResponse, Error> {
+   let tokens = RefTokens::exchange_token(ref_tkn.into_inner())?;
+ 
+    let msg = hashmap![
+            "status" => "200",
+            "message" => "success. tokens updated"];
+   respond(msg, Some(tokens), None)?.await 
+}
 
 /// Sends a Password Reset Email
 ///
@@ -271,7 +275,7 @@ pub async fn send_reset_email(mut data: web::Json<UserEmail<'_>>, req: HttpReque
     };
     let res = response::JsonResponse::new(
         http::StatusCode::OK.to_string(),
-        format!("Success. A password reset link sent to {}", &user.email),
+        format!("sucess. A password reset link sent to {}", &user.email),
         json!({"email": &user.email, "username": &user.username, "link": &path, "token": token}),
     );
 
@@ -349,7 +353,7 @@ pub fn reset_password(
 pub fn get_user(id: web::Path<i32>) -> HttpResponse {
     match User::find_by_pk(*id, Some(1)) {
         Ok((usr, profile)) => {
-            let data = hashmap!["status" => "200", "message" => "Success. User and User profile retrieved"];
+            let data = hashmap!["status" => "200", "message" => "sucess. User and User profile retrieved"];
             respond(data, Some((usr, profile.unwrap())), None).unwrap()
         }
         Err(e) => err("404", e.to_string()),
@@ -448,7 +452,7 @@ pub fn google_auth_callback(
     match client.exchange_code(code) {
         Ok(token) => {
             let data = hashmap!["status" => "200",
-            "message" => "Success. Authorization token received"];
+            "message" => "sucess. Authorization token received"];
 
             respond(data, Some(token), None).unwrap()
         }
@@ -509,7 +513,7 @@ pub async fn register_g_oauth(req: HttpRequest) ->HttpResponse {
 
                 respond(
                     hashmap!["status" => "201",
-            "message" => "Success. Account created"],
+            "message" => "sucess. account created"],
                     Some(json!({
                         "email": & dt.0.email,
                         "token": &token,
@@ -522,7 +526,7 @@ pub async fn register_g_oauth(req: HttpRequest) ->HttpResponse {
                 // Existing
                 respond(
                     hashmap!["status" => "200",
-            "message" => "Success. Account updated"],
+            "message" => "sucess. account updated"],
                     Some(json!({
                         "email": & res.email,
                         "token": &token,

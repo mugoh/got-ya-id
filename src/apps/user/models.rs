@@ -11,11 +11,13 @@ use crate::config::configs as config;
 use crate::core::py_interface::remove_py_mod;
 use crate::diesel_cfg::{config::connect_to_db, schema::oath_users, schema::users, schema::refresh_tokens};
 
-use std::error::Error as stdError;
+use std::{env, error::Error as stdError};
 
 use serde::{Deserialize, Serialize};
 use validator::Validate;
 use validator_derive::Validate;
+
+use actix_web::{Error, error::{ErrorInternalServerError, ErrorForbidden}};
 
 use bcrypt::{hash, verify, DEFAULT_COST};
 use chrono::{prelude::*, Duration, NaiveDateTime};
@@ -125,6 +127,8 @@ pub struct RefTokens {
 #[table_name = "refresh_tokens"]
 pub struct NewRfToken { body: String }
 
+type Tokens = (String, String);
+
 impl<'a> NewUser<'a> {
     /// Saves a new user record to the db
     ///
@@ -229,15 +233,6 @@ impl User {
         Ok(encode(&header, &payload, key.as_ref())?)
     }
 
-    /// Verifies a given refresh token in exchange for
-    /// new auth and refresh tokens for the user
-    pub fn verify_refresh_token( given_tk: &str) -> Result<(), String> {
-        use crate::diesel_cfg::schema::refresh_tokens::dsl::*;
-
-        // let rf_t = refresh_tokens.filter(token.eq(given_tk))
-            Ok(())
-                
-        }
 
     /// Decodes the auth token representing a user
     /// to return an user object with a verified account
@@ -604,19 +599,65 @@ impl RefTokens {
     /// 
     /// # Arguments
     ///  given_tk: The refresh token to be verified
-    pub fn verify_token(given_tk: &str) -> Result<Self, String> {
+    pub fn exchange_token(given_tk: &str) -> Result<Tokens, Error> {
         use crate::diesel_cfg::schema::refresh_tokens::dsl::*;
         
         let token = refresh_tokens.filter(body.eq(given_tk))
-            .first::<RefTokens>(&connect_to_db())
+            .load::<RefTokens>(&connect_to_db())
             .unwrap();
-        if !token.valid {
-            return Err("Invalid Token".into())
+        if token.is_empty() || !&token[0].valid {
+            return Err(ErrorForbidden("Invalid Token".to_string()))
         };
 
-        let verified_tk = validate::decode_auth_token(&token.body, Some("refresh".into())).map_err(|e| return e.to_string());
-    verified_tk.I();
-        Ok(token)
+        let verified_tk = match validate::decode_auth_token(&token[0].body, Some("refresh".into())) {
+            Ok(t) => t,
+            Err(e) =>  return Err(ErrorForbidden(e.to_string()))
+        };
+
+        let (new_autht, new_ref_t) = RefTokens::generate_tokens(&verified_tk.sub)?;
+        if let Err(e) = diesel::delete(&token[0]).execute(&connect_to_db()) {
+            debug!("{}", e);
+            return Err(ErrorInternalServerError(e.to_string()))
+        }
+
+        let new_rf_stct = NewRfToken{body: new_ref_t};
+        if let Err(e) = new_rf_stct.save() {
+            return Err(ErrorInternalServerError(e))
+        }
+
+
+        Ok((new_autht, new_ref_t))
     
+    }
+
+    /// Generated auth and refresh tokens
+    ///  # Arguments
+    ///  sub_field: sub encoding field
+    fn generate_tokens(sub: &str) -> Result<(String, String), Error> {
+
+            let auth_tk_duration =  env::var("AUTH_TOKEN_DURATION").unwrap_or_else(|e| {
+                debug!("{}", e); "120".into()
+            }).parse::<i64>().map_err(|e| ErrorInternalServerError(e.to_string()))?;
+            let auth_token = User::create_token(sub, Some(auth_tk_duration), "auth".into()).map_err(|e| ErrorInternalServerError(e.to_string()))?;
+
+            let rf_duration =  env::var("REFRESH_TOKEN_DURATION").unwrap_or_else(|e| {
+                debug!("{}", e); "42600".into()
+            })
+            .parse::<i64>().map_err(|e| ErrorInternalServerError(e.to_string()))?;
+
+            let refresh_tkn = User::create_token(sub, Some(rf_duration), "refresh".into()).map_err(|e| ErrorInternalServerError(e.to_string()))?;
+            Ok((auth_token, refresh_tkn))
+    }
+}
+
+impl NewRfToken {
+    pub fn save(&self) -> Result<(), diesel::result::Error> {
+        if let Err(e) = diesel::insert_into(refresh_tokens::table)
+            .values(&*self)
+            .execute(&connect_to_db()) {
+                Err(e)
+        } else {
+            Ok(())
+        }
     }
 }
