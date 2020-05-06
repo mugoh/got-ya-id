@@ -22,7 +22,6 @@ use validator::Validate;
 
 use std::{
     env,
-    error::Error as stdError,
     sync::{Arc, Mutex},
 };
 
@@ -43,7 +42,7 @@ use actix_web_httpauth::headers::authorization::Bearer;
 /// - On Sucess: JSONResponse
 /// - On ERROR: JSONErrResponse
 ///
-pub fn register_user(mut data: web::Json<NewUser>, req: HttpRequest) -> HttpResponse {
+pub async fn register_user(mut data: web::Json<NewUser<'_>>, req: HttpRequest) -> Result<HttpResponse, Error> {
     let user_ = &data.0;
     let token = validate::encode_jwt_token(user_, "verification".into()).unwrap();
 
@@ -54,7 +53,7 @@ pub fn register_user(mut data: web::Json<NewUser>, req: HttpRequest) -> HttpResp
     if let Err(err) = data.validate() {
         let res: response::JsonErrResponse<_> =
             response::JsonErrResponse::new(http::StatusCode::BAD_REQUEST.to_string(), err);
-        return HttpResponse::build(http::StatusCode::BAD_REQUEST).json(&res);
+        return HttpResponse::build(http::StatusCode::BAD_REQUEST).json(&res).await;
         // Filter json where message is not null
     };
 
@@ -63,26 +62,24 @@ pub fn register_user(mut data: web::Json<NewUser>, req: HttpRequest) -> HttpResp
         Err(e) => {
             let res: response::JsonErrResponse<_> =
                 response::JsonErrResponse::new("409".to_string(), e.to_string());
-            return HttpResponse::build(http::StatusCode::CONFLICT).json(&res);
+            return HttpResponse::build(http::StatusCode::CONFLICT).json(&res).await;
         }
     };
 
     // Mail
-    if let Err(e) = send_activation_link(
+    send_activation_link(
         &data.email,
         Some(&data.username),
         &path,
         "email_activation.html",
-    ) {
-        return err("500", e.to_string());
-    }
+    ).await?;
     let res: response::JsonResponse<_> = response::JsonResponse::new(
         http::StatusCode::CREATED.to_string(),
         format!("Success. An activation link sent to {}", &data.0.email),
         json!({"email": &data.0.email, "username": &data.0.username, "token": &token}),
     );
 
-    HttpResponse::build(http::StatusCode::CREATED).json(&res)
+    HttpResponse::build(http::StatusCode::CREATED).json(&res).await
 }
 
 /// Sends an account activation link to a user email
@@ -97,24 +94,22 @@ pub fn register_user(mut data: web::Json<NewUser>, req: HttpRequest) -> HttpResp
 /// # method
 ///
 /// `POST`
-pub fn send_account_activation_link(email: web::Json<UserEmail>, req: HttpRequest) -> HttpResponse {
+pub async fn send_account_activation_link(email: web::Json<UserEmail<'_>>, req: HttpRequest) -> Result<HttpResponse, Error> {
     if let Err(e) = email.0.validate() {
-        return HttpResponse::build(http::StatusCode::BAD_REQUEST).json(e);
+        return HttpResponse::build(http::StatusCode::BAD_REQUEST).json(e).await;
     }
     if let Err(e) = User::find_by_email(&email.email) {
-        return HttpResponse::build(http::StatusCode::NOT_FOUND).json(e);
+        return HttpResponse::build(http::StatusCode::NOT_FOUND).json(e).await;
     }
 
     let token = User::create_token(&email.email, Some(24 * 60), "verification".into()).unwrap();
     let host = format!("{:?}", req.headers().get("host").unwrap());
     let path = get_url(&host, "api/auth/verify", &token);
 
-    if let Err(e) = send_activation_link(&email.email, None, &path, "email_activation.html") {
-        return err("500", e.to_string());
-    }
+    send_activation_link(&email.email, None, &path, "email_activation.html").await?;
 
     let data = hashmap!["status" => "200", "message" => "Success. Activation link sent"];
-    respond(data, Some("".to_string()), None).unwrap()
+    Ok(respond(data, Some("".to_string()), None).unwrap())
 }
 
 /// Logs in registered user
@@ -230,7 +225,7 @@ pub fn verify(path: web::Path<String>) -> HttpResponse {
 /// # Method
 /// `GET`
 pub async fn refresh_access_token<'a>(_ref_tkn: web::Path<&'a str>) -> Result<HttpResponse, Error> {
-    //
+    
     Ok(HttpResponse::build(http::StatusCode::OK).body("OK"))
     }
 
@@ -241,17 +236,18 @@ pub async fn refresh_access_token<'a>(_ref_tkn: web::Path<&'a str>) -> Result<Ht
 ///
 /// # Method
 /// ## POST
-pub fn send_reset_email(mut data: web::Json<UserEmail>, req: HttpRequest) -> HttpResponse {
+pub async fn send_reset_email(mut data: web::Json<UserEmail<'_>>, req: HttpRequest) -> Result<HttpResponse, Error> {
+
     if let Err(err) = data.validate() {
         let res = response::JsonErrResponse::new("400".to_string(), err);
-        return HttpResponse::build(http::StatusCode::BAD_REQUEST).json(&res);
+        return HttpResponse::build(http::StatusCode::BAD_REQUEST).json(&res).await;
     };
 
     let user = match User::find_by_email(&data.email.to_mut()) {
         Ok(usr) => usr,
         Err(e) => {
             let status = http::StatusCode::NOT_FOUND;
-            return HttpResponse::build(status).json(err_response(status.to_string(), e));
+            return HttpResponse::build(status).json(err_response(status.to_string(), e)).await;
         }
     };
     let user = &user[0];
@@ -266,13 +262,12 @@ pub fn send_reset_email(mut data: web::Json<UserEmail>, req: HttpRequest) -> Htt
                 &user.username,
                 "Account password reset",
                 s.as_str(),
-            )
-            .unwrap();
+            ).await.map_err(|e| ErrorInternalServerError(e))?; 
 
-            mail.send().unwrap();
+            mail.send().await.map_err(|e| ErrorInternalServerError(e))?;
         }
 
-        Err(e) => return err("500", e.to_string()),
+        Err(e) => return err("500", e.to_string()).await,
     };
     let res = response::JsonResponse::new(
         http::StatusCode::OK.to_string(),
@@ -280,7 +275,7 @@ pub fn send_reset_email(mut data: web::Json<UserEmail>, req: HttpRequest) -> Htt
         json!({"email": &user.email, "username": &user.username, "link": &path, "token": token}),
     );
 
-    HttpResponse::Created().json(&res)
+    HttpResponse::Created().json(&res).await
 }
 
 /// Allows reset of user account passwords
@@ -544,23 +539,23 @@ pub async fn register_g_oauth(req: HttpRequest) ->HttpResponse {
 }
 
 /// Sends an account activation link to a user email
-fn send_activation_link(
+async fn  send_activation_link(
     user_email: &str,
     user_name: Option<&str>,
     reset_link: &str,
     template: &str,
-) -> Result<(), Box<dyn stdError>> {
+) -> Result<(), Error> {
     //
     let context = get_context(user_name, reset_link);
     let mut username = "";
 
-    let s = TEMPLATE.render(template, &context)?;
+    let s = TEMPLATE.render(template, &context).map_err(|e| ErrorInternalServerError(e))?;
     if let Some(name) = user_name {
         username = name;
     }
 
-    let mut mail = mail::Mail::new(user_email, username, "Email activation", &s)?;
-    mail.send()?;
+    let mut mail = mail::Mail::new(user_email, username, "Email activation", &s).await.map_err(|e| ErrorInternalServerError(e))?;
+    mail.send().await.map_err(|e| ErrorInternalServerError(e))?;
     Ok(())
 }
 

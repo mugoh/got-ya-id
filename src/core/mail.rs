@@ -3,7 +3,7 @@ use lettre_email::Email;
 
 use lettre::smtp::authentication::Credentials;
 use lettre::{smtp, SmtpClient, SmtpTransport, Transport};
-use std::{env, error::Error as stdError, process};
+use std::{env, process};
 
 /// Enables sending of email
 ///
@@ -21,12 +21,12 @@ pub struct Mail {
 
 /// Returns a Mail struct
 impl Mail {
-    pub fn new<'a>(
+    pub async fn new<'a>(
         to_addr: &'a str,
         to_name: &'a str,
         subject: &'a str,
         content: &'a str,
-    ) -> Result<Mail, Box<dyn stdError>> {
+    ) -> Result<Mail, String> {
         // ENV
         //let SMTP_CLIENT;
         //let MAIL_USERNAME;
@@ -41,23 +41,31 @@ impl Mail {
             .from(mail_vars[1].as_str())
             .subject(subject)
             .html(content)
-            .build()?;
+            .build();
+        let email = match email {
+            Ok(em) => em,
+            Err(e) => return Err(e.to_string())
+        };
 
         let creds = Credentials::new(
             mail_vars.get(2).unwrap().into(),
             mail_vars.get(3).unwrap().into(),
         );
-        let mailer = SmtpClient::new_simple(
+        let mail_client = SmtpClient::new_simple(
             mail_vars[0].as_ref(), //smtpclient//
-        )?
-        .credentials(creds)
-        .transport();
+        );
 
-        Ok(Mail { email, mailer })
+        let mailer = if let Err(e) = mail_client {
+            return Err(e.to_string());
+        } else {
+            mail_client.unwrap().credentials(creds).transport()
+        };
+
+        Ok(Mail { email, mailer})
     }
 
     /// Sends the email
-    pub fn send(&mut self) -> Result<smtp::response::Response, smtp::error::Error> {
+    pub async fn send(&mut self) -> Result<smtp::response::Response, smtp::error::Error> {
         self.mailer.send(self.email.clone().into())
     }
 }
