@@ -126,7 +126,7 @@ pub struct Reftoken {
 /// The Refresh Tokens Insertable model
 #[derive(Serialize, Deserialize, Insertable)]
 #[table_name = "refresh_tokens"]
-pub struct NewRfToken<'a> { body: Cow<'a, str> }
+pub struct NewRfToken<'a> { pub body: Cow<'a, str> }
 
 type Tokens = (String, String);
 
@@ -600,11 +600,11 @@ impl Reftoken {
     /// 
     /// # Arguments
     ///  given_tk: The refresh token to be verified
-    pub fn exchange_token(given_tk: &str) -> Result<Tokens, Error> {
+    pub async fn exchange_token(given_tk: &str) -> Result<Tokens, Error> {
         use crate::diesel_cfg::schema::refresh_tokens::dsl::*;
         
-        let t_hash = hash(given_tk, DEFAULT_COST).map_err(ErrorInternalServerError)?;
-
+        // let t_hash = hash(given_tk, DEFAULT_COST).map_err(ErrorInternalServerError)?;
+        let t_hash = given_tk;
         let token = refresh_tokens.filter(body.eq(t_hash))
             .load::<Reftoken>(&connect_to_db())
             .map_err(ErrorInternalServerError)?;
@@ -625,9 +625,7 @@ impl Reftoken {
         })?;
 
         let mut new_rf_stct = NewRfToken{body: Cow::Borrowed(&new_ref_t)};
-        if let Err(e) = new_rf_stct.save() {
-            return Err(ErrorInternalServerError(e))
-        }
+        new_rf_stct.save().await.map_err(ErrorInternalServerError)?;
 
         Ok((new_autht, new_ref_t))
     
@@ -657,6 +655,7 @@ impl Reftoken {
     pub fn invalidate(token: &str) -> Result<usize, Error> {
         use crate::diesel_cfg::schema::refresh_tokens::dsl::*;
 
+     /*
         hash(token, DEFAULT_COST)
             .map(|t_hash| t_hash)
             .map_err(ErrorInternalServerError)
@@ -667,18 +666,20 @@ impl Reftoken {
         //    .get_result::<Reftoken>(&connect_to_db())
         diesel::delete(refresh_tokens.filter(body.eq(t_hash))).execute(&connect_to_db())
             .map_err(ErrorInternalServerError)
-    })
+    })*/
+        diesel::delete(refresh_tokens.filter(body.eq(token))).execute(&connect_to_db())
+            .map_err(ErrorInternalServerError)
 }
 }
 
 impl<'a> NewRfToken<'a> {
     
     /// Saves a new refresh token to the refresh tokens table
-    pub fn save(&mut self) -> Result<(), String> {
-        match hash(self.body.to_mut(), DEFAULT_COST) {
+    pub async fn save(&mut self) -> Result<(), String> {
+        /* match hash(self.body.to_mut(), DEFAULT_COST) {
             Ok(t) => self.body = Cow::Owned(t),
             Err(e) => return Err(e.to_string())
-        }
+        }*/
 
         if let Err(e) = diesel::insert_into(refresh_tokens::table)
             .values(&*self)

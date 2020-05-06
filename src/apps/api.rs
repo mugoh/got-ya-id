@@ -23,6 +23,9 @@ pub fn api(cfg: &mut web::ServiceConfig) {
                             .route(web::get().to(user::views::google_auth_callback)),
                     )
                     .service(
+                        web::resource("/logout/{token}").route(web::get().to(user::views::logout)),
+                    )
+                    .service(
                         web::resource("/verify/{token}").route(web::get().to(user::views::verify)),
                     )
                     .service(

@@ -1,10 +1,8 @@
 //! Handles views for User items
-//!
-//!
 
 use super::models::{
     GoogleUser, NewUser, OClient, OauthGgUser, OauthInfo, ResetPassData, SignInUser, User,
-    UserEmail, Reftoken
+    UserEmail, Reftoken, NewRfToken
 };
 
 use super::utils::{err_response, get_context, get_reset_context, get_url, TEMPLATE};
@@ -23,6 +21,7 @@ use validator::Validate;
 use std::{
     env,
     sync::{Arc, Mutex},
+    borrow::Cow,
 };
 
 use actix_web::http::header::Header;
@@ -170,6 +169,8 @@ pub async fn login(user: web::Json<SignInUser<'_>>) ->Result<HttpResponse, Error
                 )).await?);
             }
             let (auth_token, refresh_tkn) = generate_tokens(usr).await?;
+            let mut rf_struct = NewRfToken { body: Cow::Borrowed(&refresh_tkn) };
+            rf_struct.save().await.map_err(ErrorInternalServerError)?;
 
             response::JsonResponse::new(
                     http::StatusCode::OK.to_string(),
@@ -225,12 +226,18 @@ pub fn verify(path: web::Path<String>) -> HttpResponse {
 /// # Method
 /// `GET`
 pub async fn refresh_access_token(ref_tkn: web::Path<String>) -> Result<HttpResponse, Error> {
-   let tokens = Reftoken::exchange_token(&ref_tkn.into_inner())?;
+   let tokens = Reftoken::exchange_token(&ref_tkn.into_inner()).await?;
  
     let msg = hashmap![
             "status" => "200",
             "message" => "success. tokens updated"];
-   respond(msg, Some(tokens), None)?.await 
+
+    let data = json!({
+        "auth_token": tokens.0,
+        "refresh_tokens": tokens.1
+    });
+
+   respond(msg, Some(data), None)?.await 
 }
 
 /// Logs out authenticated users
@@ -242,8 +249,15 @@ pub async fn refresh_access_token(ref_tkn: web::Path<String>) -> Result<HttpResp
 /// # method
 /// `GET`
 pub async fn logout(ref_tkn: web::Path<String>) -> Result< HttpResponse, Error> {
-    Reftoken::invalidate(&ref_tkn.into_inner())?;
-    Ok(HttpResponse::build(http::StatusCode::OK).body("io"))
+    let res = Reftoken::invalidate(&ref_tkn.into_inner())?;
+    if res == 0 {
+        err("401", "Invalid token".to_string()).await
+    } else {
+        let msg = hashmap![
+            "status" => "200",
+            "message" => "success. tokens revoked"];
+       respond(msg, Some("".to_string()), None)?.await
+    }
 }
 
 
