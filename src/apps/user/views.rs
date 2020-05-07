@@ -51,7 +51,13 @@ pub async fn register_user(
     let token = validate::encode_jwt_token(user_, "verification".into()).unwrap();
 
     // -> Extract host info from req Headers
-    let host = format!("{:?}", req.headers().get("host").unwrap());
+    // let host = format!("{:?}", req.headers().get("host").unwrap());
+    let req_header = req.headers().get("host");
+    let host = if let Some(rq) = req_header {
+        format!("{:?}", rq)
+    } else {
+        "http::/127.0.0.1:8888".into()
+    };
     let path = get_url(&host, "api/auth/verify", &token);
 
     if let Err(err) = data.validate() {
