@@ -82,27 +82,24 @@ where
 /// Constructs a HttpResponse
 ///
 /// # Arguments
+///
 /// ## data: Hashmap<&'static str, &'static str>
-///     - message: Response message during 2** status (Success) response
+/// message: Response message during 2** status (Success) response
 ///             Ignored for Error responses
-///     - status:
-///         Status code. e.g "200"
+/// status: Status code. e.g "200"
 ///
 /// ## body: T
-///     The data to be contained in the success reponse
-///     - It ought to be JSON Serializable
+/// The data to be contained in the success reponse
+/// It ought to be JSON Serializable
 ///
 /// ## err: Option<&'a str>
-///     The error to hold in the response for
-///     error type HttpResponses
+/// The error to hold in the response for error type HttpResponses
 ///
 /// # Returns
 ///  Result:
 ///
-///  ```
-///  #- Ok: HttpResponse
-///  #- Err: dyn std::error::Error
-///  ```
+///  Ok: HttpResponse
+///  Err: dyn std::error::Error
 #[allow(clippy::implicit_hasher)]
 pub fn respond<'c, T>(
     data: HashMap<&'c str, &'c str>,

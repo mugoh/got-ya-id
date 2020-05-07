@@ -155,15 +155,14 @@ pub fn err_response<T>(status: String, msg: T) -> response::JsonErrResponse<T> {
 ///
 /// # Arguments
 /// ## host: str
-///     - The host part of the URL
+/// The host part of the URL
 ///
 /// ## path: str
-///     - Path of the request
+/// Path of the request
 ///
 /// ## id: str
-///     - Parameter to append to complete the url path
+/// Parameter to append to complete the url path
 pub fn get_url<'a>(host: &'a str, path: &'a str, id: &'a str) -> String {
-    //
     format!(
         r#"http://{host}/{path}/{id}"#,
         host = host,

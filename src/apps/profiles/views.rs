@@ -41,7 +41,7 @@ pub fn get_profile(id: web::Path<i32>) -> HttpResponse {
 /// ## `/users/profiles`
 ///
 /// # method
-///     GET
+/// GET
 pub fn get_all_profiles() -> HttpResponse {
     match Profile::retrieve_all() {
         Ok(vec) => {
@@ -59,7 +59,7 @@ pub fn get_all_profiles() -> HttpResponse {
 /// ## `/user/{id}/profile`
 ///
 /// # Method
-///     PUT
+/// PUT
 ///
 pub fn update_profile(data: web::Json<UpdtProfile>, id: web::Path<i32>) -> HttpResponse {
     match Profile::find_by_key(*id) {
