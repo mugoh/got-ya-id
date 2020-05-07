@@ -4,28 +4,29 @@ use super::views::*;
 use actix_web::{http, test, web, App};
 use std::{borrow::Cow, env};
 
-const base: &str = "/api";
+const BASE: &str = "/api";
 lazy_static! {
-    static ref DB_URL: String = {
-        let test_db = env::var("TESTi_DATABASE_URL").expect("Missing database url");
-        env::set_var("DATABASE_URL", test_db);
+    #[derive(Debug)]
+    pub static ref DB_URL: String = {
+        let test_db = env::var("TEST_DATABASE_URL").expect("Missing env variable TEST_DATABASE_URL");
+        env::set_var("DATABASE_URL", &test_db);
+        assert_eq!(env::var("DATABASE_URL"), Ok(test_db));
+
         env::var("TEST_DATABASE_URL").expect("Missing database url")
     };
 }
 
-#[actix_rt::test]
-async fn register_valid_user() {
-    &DB_URL;
+async fn _register_valid_user() {
+    let _ = *DB_URL;
     // let url = "http://localhost:8888".to_owned() +
-    let url = base.to_owned() + "/auth";
-    println!("URL: {}", url);
+    let url = BASE.to_owned() + "/auth";
 
     let mut app = test::init_service(App::new().route(&url, web::post().to(register_user))).await;
     let body = NewUser {
         email: Cow::Borrowed("user@f.co"),
         password: Cow::Borrowed("password"),
-        username: Cow::Borrowed("user"),
-        access_level: None,
+        username: Cow::Borrowed("user1"),
+        access_level: Some(2),
     };
     let req = test::TestRequest::post()
         .set_json(&body)
@@ -33,7 +34,66 @@ async fn register_valid_user() {
         .to_request();
     let resp = test::call_service(&mut app, req).await;
 
-    println!("RES: {:?}", resp);
-    assert!(resp.status().is_success());
+    assert_eq!(resp.status(), http::StatusCode::CONFLICT);
 }
-//test::TestRequest::post().set_json().to_request
+
+#[actix_rt::test]
+async fn register_invalid_user() {
+    let _ = *DB_URL;
+    let url = BASE.to_owned() + "/auth";
+
+    let mut app = test::init_service(App::new().route(&url, web::post().to(register_user))).await;
+    let invalid_named = NewUser {
+        email: Cow::Borrowed("user@f.co"),
+        password: Cow::Borrowed("password"),
+        username: Cow::Borrowed("sh"),
+        access_level: Some(2),
+    };
+    let invalid_emailed = NewUser {
+        email: Cow::Borrowed("invalid_email"),
+        password: Cow::Borrowed("password"),
+        username: Cow::Borrowed("saddh"),
+        access_level: Some(2),
+    };
+
+    let req = test::TestRequest::post()
+        .set_json(&invalid_named)
+        .uri(&url)
+        .to_request();
+    let resp = test::call_service(&mut app, req).await;
+
+    let resp2 = test::TestRequest::post()
+        .set_json(&invalid_emailed)
+        .uri(&url)
+        .to_request();
+    let resp2 = test::call_service(&mut app, resp2).await;
+
+    assert_eq!(resp.status(), http::StatusCode::BAD_REQUEST);
+    assert_eq!(resp2.status(), http::StatusCode::BAD_REQUEST);
+}
+
+#[actix_rt::test]
+async fn register_user_twice() {
+    let _ = *DB_URL;
+    let url = BASE.to_owned() + "/auth";
+
+    let mut app = test::init_service(App::new().route(&url, web::post().to(register_user))).await;
+    let body = NewUser {
+        email: Cow::Borrowed("user@f.co"),
+        password: Cow::Borrowed("password"),
+        username: Cow::Borrowed("user1"),
+        access_level: Some(2),
+    };
+    let req = test::TestRequest::post()
+        .set_json(&body)
+        .uri(&url)
+        .to_request();
+    let _resp = test::call_service(&mut app, req).await;
+    let req = test::TestRequest::post()
+        .set_json(&body)
+        .uri(&url)
+        .to_request();
+    let resp = test::call_service(&mut app, req).await;
+
+    assert_eq!(resp.status(), http::StatusCode::CONFLICT);
+}
