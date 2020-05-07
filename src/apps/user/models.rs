@@ -9,7 +9,9 @@ use crate::apps::auth::validate::{self, Claims};
 use crate::apps::profiles::models::{Avatar, NewProfile, Profile};
 use crate::config::configs as config;
 use crate::core::py_interface::remove_py_mod;
-use crate::diesel_cfg::{config::connect_to_db, schema::oath_users, schema::users, schema::refresh_tokens};
+use crate::diesel_cfg::{
+    config::connect_to_db, schema::oath_users, schema::refresh_tokens, schema::users,
+};
 
 use std::{env, error::Error as stdError};
 
@@ -17,7 +19,10 @@ use serde::{Deserialize, Serialize};
 use validator::Validate;
 use validator_derive::Validate;
 
-use actix_web::{Error, error::{ErrorInternalServerError, ErrorForbidden}};
+use actix_web::{
+    error::{ErrorForbidden, ErrorInternalServerError},
+    Error,
+};
 
 use bcrypt::{hash, verify, DEFAULT_COST};
 
@@ -31,7 +36,7 @@ use url::Url;
 
 /// User Object
 /// Holds user data
-#[derive(Queryable, Serialize, AsChangeset, Deserialize, Identifiable, Validate)]
+#[derive(Debug, Queryable, Serialize, AsChangeset, Deserialize, Identifiable, Validate)]
 #[table_name = "users"]
 pub struct User {
     pub id: i32,
@@ -112,23 +117,39 @@ pub struct OClient {
     pub client: oauth2::basic::BasicClient,
 }
 
-
 /// The Refresh tokens Queryable model
 #[derive(Queryable, Serialize, Deserialize, Identifiable)]
 #[table_name = "refresh_tokens"]
 pub struct Reftoken {
     id: i64,
     body: String,
-    valid: bool
+    valid: bool,
 }
-
 
 /// The Refresh Tokens Insertable model
 #[derive(Serialize, Deserialize, Insertable)]
 #[table_name = "refresh_tokens"]
-pub struct NewRfToken<'a> { pub body: Cow<'a, str> }
+pub struct NewRfToken<'a> {
+    pub body: Cow<'a, str>,
+}
 
 type Tokens = (String, String);
+
+pub enum AccessLevel {
+    Admin,
+    Moderator,
+    Usualuser,
+}
+
+#[derive(Validate, Deserialize, Serialize)]
+pub struct NewUserLevel<'a> {
+    /// Email of the account whose level is to be altered
+    #[validate(email(message = "Email format not invented yet"))]
+    pub email: Cow<'a, str>,
+    /// User access level to change to
+    #[validate(range(min = 0, max = 2))]
+    new_level: i32,
+}
 
 impl<'a> NewUser<'a> {
     /// Saves a new user record to the db
@@ -208,7 +229,7 @@ impl User {
     pub fn create_token(
         user_cred: &str,
         duration_min: Option<i64>,
-        issuer: String
+        issuer: String,
     ) -> Result<String, jsonwebtoken::errors::Error> {
         let dur = if let Some(time) = duration_min {
             time
@@ -219,7 +240,7 @@ impl User {
             sub: user_cred.to_owned(),
             iat: (Utc::now()).timestamp() as usize,
             exp: (Utc::now() + Duration::minutes(dur)).timestamp() as usize,
-            iss: issuer
+            iss: issuer,
         };
 
         // ENV Configuration
@@ -233,7 +254,6 @@ impl User {
 
         Ok(encode(&header, &payload, key.as_ref())?)
     }
-
 
     /// Decodes the auth token representing a user
     /// to return an user object with a verified account
@@ -399,6 +419,42 @@ impl User {
         Ok(Avatar::belonging_to(self)
             .load::<Avatar>(&connect_to_db())?
             .pop())
+    }
+
+    /// Change the access level of a given user
+    /// The account being used to change the user level must be of
+    /// a higher level or equal to the one requested
+    pub fn alter_access_level(level: &NewUserLevel, auth_tk: &str) -> Result<User, String> {
+        use crate::diesel_cfg::schema::users::dsl::*;
+
+        let grant_email = match validate::decode_auth_token(auth_tk, Some("auth".into())) {
+            Ok(claims) => claims.sub,
+            Err(e) => return Err(e.to_string()),
+        };
+        let granter = users
+            .filter(email.eq(grant_email))
+            .load::<User>(&connect_to_db())
+            .unwrap();
+
+        let granter = if !granter.is_empty() {
+            &granter[0]
+        } else {
+            return Err("Invalid token. Problem finding user".into());
+        };
+
+        if level.new_level < granter.access_level
+            || granter.access_level == AccessLevel::Usualuser as i32
+        {
+            return Err("Oopsy! You are not allowed to do that".into());
+        }
+
+        let user_result = diesel::update(users.filter(email.eq(&level.email)))
+            .set(access_level.eq(level.new_level))
+            .get_result::<User>(&connect_to_db());
+        match user_result {
+            Ok(user) => Ok(user),
+            Err(e) => Err(e.to_string()),
+        }
     }
 }
 
@@ -594,60 +650,71 @@ fn remove_old_url(pub_id: &str) -> Result<String, ()> {
 }
 
 impl Reftoken {
-    
     /// Verifies a given refresh token in exchange for
     /// new auth and refresh tokens for the user
-    /// 
+    ///
     /// # Arguments
     ///  given_tk: The refresh token to be verified
     pub async fn exchange_token(given_tk: &str) -> Result<Tokens, Error> {
         use crate::diesel_cfg::schema::refresh_tokens::dsl::*;
-        
+
         // let t_hash = hash(given_tk, DEFAULT_COST).map_err(ErrorInternalServerError)?;
         let t_hash = given_tk;
-        let token = refresh_tokens.filter(body.eq(t_hash))
+        let token = refresh_tokens
+            .filter(body.eq(t_hash))
             .load::<Reftoken>(&connect_to_db())
             .map_err(ErrorInternalServerError)?;
         if token.is_empty() || !&token[0].valid {
-            return Err(ErrorForbidden("Invalid Token".to_string()))
+            return Err(ErrorForbidden("Invalid Token".to_string()));
         };
 
         let verified_tk = match validate::decode_auth_token(given_tk, Some("refresh".into())) {
             Ok(t) => t,
-            Err(e) =>  return Err(ErrorForbidden(e.to_string()))
+            Err(e) => return Err(ErrorForbidden(e.to_string())),
         };
 
         let (new_autht, new_ref_t) = Reftoken::generate_tokens(&verified_tk.sub)?;
-        
-        diesel::delete(&token[0]).execute(&connect_to_db()).map_err(|e| {
-            debug!("{}", e);
-            ErrorInternalServerError::<String>(e.to_string())
-        })?;
 
-        let mut new_rf_stct = NewRfToken{body: Cow::Borrowed(&new_ref_t)};
+        diesel::delete(&token[0])
+            .execute(&connect_to_db())
+            .map_err(|e| {
+                debug!("{}", e);
+                ErrorInternalServerError::<String>(e.to_string())
+            })?;
+
+        let mut new_rf_stct = NewRfToken {
+            body: Cow::Borrowed(&new_ref_t),
+        };
         new_rf_stct.save().await.map_err(ErrorInternalServerError)?;
 
         Ok((new_autht, new_ref_t))
-    
     }
 
     /// Generated auth and refresh tokens
     ///  # Arguments
     ///  sub_field: sub encoding field
     fn generate_tokens(sub: &str) -> Result<(String, String), Error> {
-
-            let auth_tk_duration =  env::var("AUTH_TOKEN_DURATION").unwrap_or_else(|e| {
-                debug!("{}", e); "120".into()
-            }).parse::<i64>().map_err(|e| ErrorInternalServerError(e.to_string()))?;
-            let auth_token = User::create_token(sub, Some(auth_tk_duration), "auth".into()).map_err(|e| ErrorInternalServerError(e.to_string()))?;
-
-            let rf_duration =  env::var("REFRESH_TOKEN_DURATION").unwrap_or_else(|e| {
-                debug!("{}", e); "42600".into()
+        let auth_tk_duration = env::var("AUTH_TOKEN_DURATION")
+            .unwrap_or_else(|e| {
+                debug!("{}", e);
+                "120".into()
             })
-            .parse::<i64>().map_err(|e| ErrorInternalServerError(e.to_string()))?;
+            .parse::<i64>()
+            .map_err(|e| ErrorInternalServerError(e.to_string()))?;
+        let auth_token = User::create_token(sub, Some(auth_tk_duration), "auth".into())
+            .map_err(|e| ErrorInternalServerError(e.to_string()))?;
 
-            let refresh_tkn = User::create_token(sub, Some(rf_duration), "refresh".into()).map_err(|e| ErrorInternalServerError(e.to_string()))?;
-            Ok((auth_token, refresh_tkn))
+        let rf_duration = env::var("REFRESH_TOKEN_DURATION")
+            .unwrap_or_else(|e| {
+                debug!("{}", e);
+                "42600".into()
+            })
+            .parse::<i64>()
+            .map_err(|e| ErrorInternalServerError(e.to_string()))?;
+
+        let refresh_tkn = User::create_token(sub, Some(rf_duration), "refresh".into())
+            .map_err(|e| ErrorInternalServerError(e.to_string()))?;
+        Ok((auth_token, refresh_tkn))
     }
 
     /// __ Marks a refresh token as invalid__
@@ -655,25 +722,25 @@ impl Reftoken {
     pub fn invalidate(token: &str) -> Result<usize, Error> {
         use crate::diesel_cfg::schema::refresh_tokens::dsl::*;
 
-     /*
-        hash(token, DEFAULT_COST)
-            .map(|t_hash| t_hash)
+        /*
+            hash(token, DEFAULT_COST)
+                .map(|t_hash| t_hash)
+                .map_err(ErrorInternalServerError)
+                .and_then(|t_hash| {
+
+            // diesel::update(refresh_tokens.filter(body.eq(token)))
+            //     .set(valid.eq(false))
+            //    .get_result::<Reftoken>(&connect_to_db())
+            diesel::delete(refresh_tokens.filter(body.eq(t_hash))).execute(&connect_to_db())
+                .map_err(ErrorInternalServerError)
+        })*/
+        diesel::delete(refresh_tokens.filter(body.eq(token)))
+            .execute(&connect_to_db())
             .map_err(ErrorInternalServerError)
-            .and_then(|t_hash| {
-        
-        // diesel::update(refresh_tokens.filter(body.eq(token)))
-        //     .set(valid.eq(false))
-        //    .get_result::<Reftoken>(&connect_to_db())
-        diesel::delete(refresh_tokens.filter(body.eq(t_hash))).execute(&connect_to_db())
-            .map_err(ErrorInternalServerError)
-    })*/
-        diesel::delete(refresh_tokens.filter(body.eq(token))).execute(&connect_to_db())
-            .map_err(ErrorInternalServerError)
-}
+    }
 }
 
 impl<'a> NewRfToken<'a> {
-    
     /// Saves a new refresh token to the refresh tokens table
     pub async fn save(&mut self) -> Result<(), String> {
         /* match hash(self.body.to_mut(), DEFAULT_COST) {
@@ -683,8 +750,9 @@ impl<'a> NewRfToken<'a> {
 
         if let Err(e) = diesel::insert_into(refresh_tokens::table)
             .values(&*self)
-            .execute(&connect_to_db()) {
-                Err(e.to_string())
+            .execute(&connect_to_db())
+        {
+            Err(e.to_string())
         } else {
             Ok(())
         }

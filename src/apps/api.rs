@@ -23,6 +23,10 @@ pub fn api(cfg: &mut web::ServiceConfig) {
                             .route(web::get().to(user::views::google_auth_callback)),
                     )
                     .service(
+                        web::resource("/access")
+                            .route(web::post().to(user::views::change_user_access_level)),
+                    )
+                    .service(
                         web::resource("/logout/{token}").route(web::get().to(user::views::logout)),
                     )
                     .service(

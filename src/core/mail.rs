@@ -44,7 +44,7 @@ impl Mail {
             .build();
         let email = match email {
             Ok(em) => em,
-            Err(e) => return Err(e.to_string())
+            Err(e) => return Err(e.to_string()),
         };
 
         let creds = Credentials::new(
@@ -61,7 +61,7 @@ impl Mail {
             mail_client.unwrap().credentials(creds).transport()
         };
 
-        Ok(Mail { email, mailer})
+        Ok(Mail { email, mailer })
     }
 
     /// Sends the email

@@ -1,8 +1,11 @@
-use actix_web::{Error, HttpResponse, Result, web, };
 use actix_web::error::ErrorConflict;
+use actix_web::{web, Error, HttpResponse, Result};
 
-use super::models::{ NewIdentification};
-use crate::{hashmap, core::response::{err, respond}};
+use super::models::NewIdentification;
+use crate::{
+    core::response::{err, respond},
+    hashmap,
+};
 
 use validator::Validate;
 
@@ -13,18 +16,16 @@ use validator::Validate;
 /// ``
 /// # method
 /// `POST`
-pub async fn create_new_identification(new_idt: web::Json<NewIdentification<'_>>) -> Result<HttpResponse, Error> {
-   if let Err(e) = new_idt.0.validate() {
-       //return Ok(respond::<serde_json::Value>(hashmap!["status" => "400"], None, Some(&e.to_string())).unwrap());
-       return Ok(err("400", e.to_string()))
-   }
-   new_idt
-       .save()
-       .map_err(ErrorConflict)
-       .map( move|idt| {
-            let res = hashmap!["status" => "201",
-            "message" => "Success. Indentification created"];
-            respond(res, Some(idt), None).unwrap()
-       })
-
+pub async fn create_new_identification(
+    new_idt: web::Json<NewIdentification<'_>>,
+) -> Result<HttpResponse, Error> {
+    if let Err(e) = new_idt.0.validate() {
+        //return Ok(respond::<serde_json::Value>(hashmap!["status" => "400"], None, Some(&e.to_string())).unwrap());
+        return Ok(err("400", e.to_string()));
     }
+    new_idt.save().map_err(ErrorConflict).map(move |idt| {
+        let res = hashmap!["status" => "201",
+            "message" => "Success. Indentification created"];
+        respond(res, Some(idt), None).unwrap()
+    })
+}

@@ -4,7 +4,10 @@ use super::models::{Profile, UpdtProfile};
 use super::utils::make_temp_file;
 
 use crate::apps::user::models::User;
-use crate::core::{response::{err, respond}, py_interface::create_py_mod};
+use crate::core::{
+    py_interface::create_py_mod,
+    response::{err, respond},
+};
 use crate::hashmap;
 
 use actix_multipart::Multipart;
@@ -12,7 +15,6 @@ use actix_web::{http::StatusCode, web, Error, HttpResponse};
 
 use futures::{StreamExt, TryStreamExt};
 use std::io::Write;
-
 
 /// Retrieves the profile matching the given user ID
 ///
@@ -96,9 +98,9 @@ pub async fn upload_avatar(
 ) -> Result<HttpResponse, Error> {
     let mut path = "".into();
 
-    let user = match User::find_by_pk(*id, None){
+    let user = match User::find_by_pk(*id, None) {
         Ok(usr) => usr.0,
-    Err(e) =>return  Ok(err("400", e.to_string()))
+        Err(e) => return Ok(err("400", e.to_string())),
     };
 
     // iterate over multipart stream
@@ -106,14 +108,13 @@ pub async fn upload_avatar(
         let content_type = field.content_disposition().unwrap();
         let filename = content_type.get_filename().unwrap().to_string();
 
-
         // let filepath = format!("./tmp/");
         // File::create is blocking operation, use threadpool
-        
+
         // let  f = web::block(|| std::fs::File::create(filepath))
         //    .await
         //    .unwrap();
-        let  ( mut f, filepath) = web::block(|| make_temp_file(Some(filename))).await?;
+        let (mut f, filepath) = web::block(|| make_temp_file(Some(filename))).await?;
         // Field in turn is stream of *Bytes* object
         while let Some(chunk) = field.next().await {
             let data = chunk.unwrap();
@@ -122,16 +123,19 @@ pub async fn upload_avatar(
         }
 
         path = create_py_mod(filepath, "got_ya_id/avatars/")?;
-
     }
 
     if !path.is_empty() {
         match user.save_avatar(&path) {
             Ok(_) => Ok(HttpResponse::Ok().json(path)),
-            Err(e) => Ok(HttpResponse::build(StatusCode::INTERNAL_SERVER_ERROR).json(e.to_string())),
+            Err(e) => {
+                Ok(HttpResponse::build(StatusCode::INTERNAL_SERVER_ERROR).json(e.to_string()))
+            }
         }
-        } else {Ok(HttpResponse::build(StatusCode::BAD_REQUEST).json("File upload failed, big man. File upload failed"))}
-
+    } else {
+        Ok(HttpResponse::build(StatusCode::BAD_REQUEST)
+            .json("File upload failed, big man. File upload failed"))
+    }
 }
 
 /// Retrieves an avatar url of a user profile
