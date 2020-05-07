@@ -67,9 +67,10 @@ pub struct NewUser<'b> {
     )]
     pub username: Cow<'b, str>,
     #[validate(length(min = 6, message = "Insecure password. Give it at least 6 characters"))]
-    password: Cow<'b, str>,
+    pub password: Cow<'b, str>,
     #[validate(email(message = "Email format not invented yet"))]
     pub email: Cow<'b, str>,
+    pub access_level: Option<i32>,
 }
 
 /// Holds Sign-In user details

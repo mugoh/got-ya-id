@@ -3,9 +3,11 @@ db_port=
 db_host=''
 db_pass=''
 db_name=''
+export test_db_name=''
 
 
 export DATABASE_URL=postgres://$(db_username):$(db_pass)@$(db_host):$(db_port)/$(db_name)
+export TEST_DATABASE_URL=postgres://$db_username:$db_pass@$db_host:$db_port/$test_db_name
 # DATABASE_URL=
 
 export CLOUDINARY_URL=
@@ -23,6 +25,11 @@ export mail_pass=
 # In minutes
 export REFRESH_TOKEN_DURATION=43200
 export AUTH_TOKEN_DURATION=120
+
+export ADMIN_USERNAME=
+export ADMIN_PASSWORD=
+export ADMIN_EMAIL=
+
 
 # export RUST_LOG=debug
 # export actix_web=debug

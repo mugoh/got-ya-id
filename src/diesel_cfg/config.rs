@@ -3,7 +3,9 @@
 use diesel::{pg::PgConnection, prelude::*};
 use dotenv::dotenv;
 use std::collections::HashMap;
-use std::env;
+use std::{borrow::Cow, env};
+
+use crate::apps::user::models::NewUser;
 
 lazy_static! {
     static ref DB_URL: String = {
@@ -32,4 +34,37 @@ lazy_static! {
 
 pub fn connect_to_db() -> PgConnection {
     PgConnection::establish(&DB_URL).expect("Error Initializing the database connection")
+}
+
+/// Seeds a user with admin access level to the database
+pub async fn seed_admin_user() {
+    let uname = env::var("ADMIN_USERNAME").unwrap_or({
+        debug!("Missing env variable: ADMIN_USERNAME. Using default");
+        "admin".into()
+    });
+    let email = env::var("ADMIN_EMAIL").unwrap_or({
+        debug!("Missing env variable: ADMIN_EMAIL. Using default");
+        "admin@gyid.cow".into()
+    });
+    let pass = env::var("ADMIN_PASSWORD").unwrap_or({
+        debug!("Missing env variable: ADMIN_PASSWORD. Using default");
+        "admin".into()
+    });
+
+    let mut admin = NewUser {
+        username: Cow::Borrowed(&uname),
+        email: Cow::Borrowed(&email),
+        password: Cow::Borrowed(&pass),
+        access_level: Some(0),
+    };
+    match admin.save() {
+        Ok(_) => debug!("Saved admin user\n"),
+        Err(e) => {
+            if e.to_string().contains("already") {
+                debug!("Admin user present");
+            } else {
+                error!("Error saving admin user {:?}", e)
+            }
+        }
+    }
 }
