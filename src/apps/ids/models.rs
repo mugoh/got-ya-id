@@ -69,7 +69,7 @@ pub struct Identification {
 }
 
 /// The Insertable new Identification record
-#[derive(Insertable, Debug, Serialize, Deserialize, Validate)]
+#[derive(Insertable, Deserialize, Validate)]
 #[table_name = "identifications"]
 #[serde(deny_unknown_fields)]
 pub struct NewIdentification<'a> {
@@ -103,6 +103,42 @@ pub struct NewIdentification<'a> {
     about: Option<Cow<'a, str>>,
 }
 
+/// Identification model to be used in updating
+/// changes to existing identifications
+#[derive(AsChangeset, Validate, Deserialize)]
+#[table_name = "identifications"]
+// #[changeset_for(identifications, behaviour_when_none = "skip")]
+// changeset_for unreleased
+pub struct UpdatableIdentification<'a> {
+    #[validate(regex(path = "regexes::ALPHA_REGEX", message = "should just have letters"))]
+    pub name: Option<Cow<'a, str>>,
+
+    #[validate(regex(path = "regexes::ALPHA_REGEX", message = "should just have letters"))]
+    pub course: Option<Cow<'a, str>>,
+
+    pub valid_from: Option<NaiveDate>,
+    pub valid_till: Option<NaiveDate>,
+
+    #[validate(regex(path = "regexes::ALPHA_REGEX", message = "should just have letters"))]
+    institution: Option<Cow<'a, str>>,
+
+    #[validate(regex(
+        path = "regexes::LOCATION_REGEX",
+        message = "should have letters, digits or -_`"
+    ))]
+    campus: Option<Cow<'a, str>>,
+
+    #[validate(regex(
+        path = "regexes::LOCATION_REGEX",
+        message = "should have letters, digits or -_`"
+    ))]
+    location_name: Option<Cow<'a, str>>,
+
+    #[serde(flatten, with = "serde_pg_point")]
+    location_point: Option<PgPoint>,
+    posted_by: Option<i32>,
+    about: Option<Cow<'a, str>>,
+}
 impl PartialEq<Identification> for NewIdentification<'_> {
     fn eq(&self, idt: &Identification) -> bool {
         let comp_vec = vec![
@@ -207,5 +243,13 @@ impl Identification {
             idt.save_changes::<Identification>(&connect_to_db())?;
             Ok(idt)
         }
+    }
+
+    /// Updates the Idt with the given data
+    pub fn update(&self, data: &UpdatableIdentification) -> Result<Identification, ResError> {
+        let new_idt = diesel::update(&*self)
+            .set(data)
+            .get_result::<Identification>(&connect_to_db())?;
+        Ok(new_idt)
     }
 }

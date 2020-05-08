@@ -76,7 +76,11 @@ pub fn api(cfg: &mut web::ServiceConfig) {
                         web::resource("/new")
                             .route(web::post().to(ids::views::create_new_identification)),
                     )
-                    .service(web::resource("/{pk}").route(web::get().to(ids::views::get_idt)))
+                    .service(
+                        web::resource("/{pk}")
+                            .route(web::get().to(ids::views::get_idt))
+                            .route(web::put().to(ids::views::update_idt)),
+                    )
                     .service(web::resource("").route(web::get().to(ids::views::get_all_idts)))
                     .service(
                         web::resource("/found/{pk}")
