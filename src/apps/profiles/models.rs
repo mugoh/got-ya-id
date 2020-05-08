@@ -37,8 +37,9 @@ impl<'a> Profile<'a> {
     ///   {avatar: url_to_profile avatar}
     ///  )
     pub fn find_by_key(pk: i32) -> Result<(Vec<Profile<'a>>, value::Value), Box<dyn error::Error>> {
-        use schema::avatars::dsl::*;
-        use schema::profiles::dsl::*;
+        use schema::avatars::dsl::avatars;
+        use schema::profiles::dsl::profiles;;
+
         let profile = profiles.find(pk).load(&connect_to_db())?;
         if profile.is_empty() {
             return Err(format!("User of ID {} non-existent", pk).into());
@@ -52,9 +53,8 @@ impl<'a> Profile<'a> {
     }
 
     /// Retrieves all existing User profiles
-    ///
     pub fn retrieve_all<'b>() -> Result<Vec<Profile<'b>>, Box<dyn error::Error>> {
-        use crate::diesel_cfg::schema::profiles::dsl::*;
+        use crate::diesel_cfg::schema::profiles::dsl::profiles;
         let prof_vec = profiles.load::<Profile<'b>>(&connect_to_db())?;
 
         Ok(prof_vec)
