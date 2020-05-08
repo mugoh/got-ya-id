@@ -1,7 +1,7 @@
 use actix_web::error::ErrorConflict;
 use actix_web::{web, Error, HttpResponse, Result};
 
-use super::models::NewIdentification;
+use super::models::{Identification, NewIdentification};
 use crate::{
     core::response::{err, respond},
     hashmap,
@@ -28,4 +28,13 @@ pub async fn create_new_identification(
             "message" => "Success. Indentification created"];
         respond(res, Some(idt), None).unwrap()
     })
+}
+
+///Retrives a single Identification using its PK
+pub async fn get_idt(pk: web::Path<i32>) -> Result<HttpResponse, Error> {
+    let idt = Identification::find_by_id(*pk)?;
+
+    let msg = hashmap!["status" => "201",
+            "message" => "Success. Indentification created"];
+    respond(msg, Some(idt), None).unwrap().await
 }

@@ -70,9 +70,14 @@ pub fn api(cfg: &mut web::ServiceConfig) {
             .service(web::scope("/users").service(
                 web::resource("/profiles").route(web::get().to(profiles::views::get_all_profiles)),
             ))
-            .service(web::scope("/ids").service(
-                web::resource("/new").route(web::post().to(ids::views::create_new_identification)),
-            ))
+            .service(
+                web::scope("/ids")
+                    .service(
+                        web::resource("/new")
+                            .route(web::post().to(ids::views::create_new_identification)),
+                    )
+                    .service(web::resource("/{pk}").route(web::get().to(ids::views::get_idt))),
+            )
             .service(web::resource("/").route(web::get().to(|| HttpResponse::Ok().body("Aha"))))
             .default_service(
                 // 404 GET

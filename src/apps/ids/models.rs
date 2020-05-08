@@ -11,7 +11,12 @@ use validator::Validate;
 use validator_derive::Validate;
 
 use diesel_geometry::data_types::PgPoint;
+
 use std::{borrow::Cow, error::Error as stdErr};
+
+use actix_web::{http::StatusCode, HttpResponse, ResponseError};
+use serde_json::{json, to_string_pretty};
+use std::fmt::{Display, Formatter, Result as FmtResult};
 
 /// Represents the Queryable IDentification data model
 /// matching the database `identification` schema
@@ -92,37 +97,6 @@ pub struct NewIdentification<'a> {
     posted_by: Option<i32>,
 }
 
-impl<'a> NewIdentification<'a> {
-    /// Saves a new ID record to the Identifications table
-    pub fn save(&self) -> Result<Identification, Box<dyn stdErr>> {
-        //
-        use crate::diesel_cfg::schema::identifications::dsl::{
-            campus, course, identifications as _identifications, institution, name,
-        };
-        let presents = _identifications
-            .filter(
-                name.eq(&self.name)
-                    .and(course.eq(&self.course))
-                    .and(institution.eq(&self.institution))
-                    .and(campus.eq(&self.campus)),
-            )
-            .load::<Identification>(&connect_to_db())?;
-        for ident in &presents {
-            if ident == self {
-                return Err(
-                    "You seem to have saved an Identification matching these details".into(),
-                );
-            }
-        }
-
-        let idt = diesel::insert_into(identifications::table)
-            .values(&*self)
-            .get_result::<Identification>(&connect_to_db())?;
-
-        Ok(idt)
-    }
-}
-
 impl PartialEq<Identification> for NewIdentification<'_> {
     fn eq(&self, idt: &Identification) -> bool {
         let comp_vec = vec![
@@ -160,5 +134,78 @@ impl PartialEq<NewIdentification<'_>> for Identification {
 
         let is_equal = comp_vec.into_iter().all(|v| v);
         is_equal & !self.is_found
+    }
+}
+impl<'a> NewIdentification<'a> {
+    /// Saves a new ID record to the Identifications table
+    pub fn save(&self) -> Result<Identification, Box<dyn stdErr>> {
+        //
+        use crate::diesel_cfg::schema::identifications::dsl::{
+            campus, course, identifications as _identifications, institution, name,
+        };
+        let presents = _identifications
+            .filter(
+                name.eq(&self.name)
+                    .and(course.eq(&self.course))
+                    .and(institution.eq(&self.institution))
+                    .and(campus.eq(&self.campus)),
+            )
+            .load::<Identification>(&connect_to_db())?;
+        for ident in &presents {
+            if ident == self {
+                return Err(
+                    "You seem to have saved an Identification matching these details".into(),
+                );
+            }
+        }
+
+        let idt = diesel::insert_into(identifications::table)
+            .values(&*self)
+            .get_result::<Identification>(&connect_to_db())?;
+
+        Ok(idt)
+    }
+}
+
+impl Identification {
+    /// Finds an Identification by its primary key
+    pub fn find_by_id(key: i32) -> Result<Identification, ResError> {
+        use crate::diesel_cfg::schema::identifications::dsl::identifications;
+
+        let idt = identifications
+            .find(key)
+            .get_result::<Identification>(&connect_to_db())?;
+        Ok(idt)
+    }
+}
+
+/// Custom Error to send in http responses
+#[derive(Serialize, Debug)]
+pub struct ResError {
+    /// Error message
+    msg: String,
+    /// Status code
+    status: u16,
+}
+
+impl ResponseError for ResError {
+    /// Builds the sendable response
+    fn error_response(&self) -> HttpResponse {
+        let er = json!({"errors": self.msg,"status": self.status});
+        HttpResponse::build(StatusCode::from_u16(self.status).unwrap()).json2(&er)
+    }
+}
+
+impl Display for ResError {
+    fn fmt(&self, f: &mut Formatter) -> FmtResult {
+        write!(f, "{}", to_string_pretty(self).unwrap())
+    }
+}
+
+impl std::convert::From<diesel::result::Error> for ResError {
+    fn from(er: diesel::result::Error) -> Self {
+        let msg = er.to_string();
+        let status = if msg.contains("NotFound") { 404 } else { 500 };
+        Self { msg, status }
     }
 }
