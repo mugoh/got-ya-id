@@ -176,4 +176,10 @@ impl Identification {
             .get_result::<Identification>(&connect_to_db())?;
         Ok(idt)
     }
+
+    pub fn retrieve_all() -> Result<Vec<Identification>, ResError> {
+        use crate::diesel_cfg::schema::identifications::dsl::identifications;
+
+        Ok(identifications.load::<Identification>(&connect_to_db())?)
+    }
 }

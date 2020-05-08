@@ -31,10 +31,30 @@ pub async fn create_new_identification(
 }
 
 ///Retrives a single Identification using its PK
+///
+/// # url
+/// `/ids/{id_key}`
+///
+/// # Method
+///  `GET`
 pub async fn get_idt(pk: web::Path<i32>) -> Result<HttpResponse, Error> {
     let idt = Identification::find_by_id(*pk)?;
 
     let msg = hashmap!["status" => "201",
             "message" => "Success. Indentification created"];
     respond(msg, Some(idt), None).unwrap().await
+}
+
+/// Retrieves all existing Identifications
+/// # Url
+/// `/ids`
+///
+/// # Method
+/// `GET`
+pub async fn get_all_idts() -> Result<HttpResponse, Error> {
+    let data = Identification::retrieve_all()?;
+    let msg = hashmap!["status" => "201",
+            "message" => "Success. Indentification created"];
+
+    respond(msg, Some(data), None).unwrap().await
 }
