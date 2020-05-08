@@ -19,7 +19,7 @@ use std::{borrow::Cow, error::Error as stdErr};
 
 /// Represents the Queryable IDentification data model
 /// matching the database `identification` schema
-#[derive(Queryable, Serialize, Deserialize, Identifiable)]
+#[derive(Queryable, Serialize, Deserialize, AsChangeset, Identifiable)]
 #[table_name = "identifications"]
 pub struct Identification {
     pub id: i32,
@@ -57,8 +57,10 @@ pub struct Identification {
     is_found: bool,
 
     #[serde(deserialize_with = "from_timestamp")]
+    //    #[serde(with = "naive_date_format")]
     created_at: NaiveDateTime,
     #[serde(deserialize_with = "from_timestamp")]
+    //  #[serde(with = "naive_date_format")]
     updated_at: NaiveDateTime,
 }
 
@@ -177,9 +179,28 @@ impl Identification {
         Ok(idt)
     }
 
+    /// Retrieves all existing Identifications
+    /// # Returns
+    /// An empty vec if none is present
     pub fn retrieve_all() -> Result<Vec<Identification>, ResError> {
         use crate::diesel_cfg::schema::identifications::dsl::identifications;
 
         Ok(identifications.load::<Identification>(&connect_to_db())?)
+    }
+
+    /// Marks the identification matching the given key as found
+    pub fn mark_found(pk: i32) -> Result<Identification, ResError> {
+        let mut idt = Self::find_by_id(pk)?;
+
+        if idt.is_found {
+            Err(ResError {
+                msg: "Identification found status is True".into(),
+                status: 409,
+            })
+        } else {
+            idt.is_found = true;
+            idt.save_changes::<Identification>(&connect_to_db())?;
+            Ok(idt)
+        }
     }
 }

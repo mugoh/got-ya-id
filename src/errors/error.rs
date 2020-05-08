@@ -11,9 +11,9 @@ use std::fmt::{Display, Formatter, Result as FmtResult};
 #[derive(Serialize, Debug)]
 pub struct ResError {
     /// Error message
-    msg: String,
+    pub msg: String,
     /// Status code
-    status: u16,
+    pub status: u16,
 }
 
 impl ResponseError for ResError {

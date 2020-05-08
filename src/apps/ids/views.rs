@@ -41,7 +41,7 @@ pub async fn get_idt(pk: web::Path<i32>) -> Result<HttpResponse, Error> {
     let idt = Identification::find_by_id(*pk)?;
 
     let msg = hashmap!["status" => "201",
-            "message" => "Success. Indentification created"];
+            "message" => "Success. Indentification retrived"];
     respond(msg, Some(idt), None).unwrap().await
 }
 
@@ -53,8 +53,28 @@ pub async fn get_idt(pk: web::Path<i32>) -> Result<HttpResponse, Error> {
 /// `GET`
 pub async fn get_all_idts() -> Result<HttpResponse, Error> {
     let data = Identification::retrieve_all()?;
-    let msg = hashmap!["status" => "201",
-            "message" => "Success. Indentification created"];
+    let msg = hashmap!["status" => "200",
+            "message" => "Success. Indentifications retrieved"];
 
     respond(msg, Some(data), None).unwrap().await
+}
+
+/// Marks an Identification as `found`
+///
+/// A found IDt is assumed to have been acquired by
+/// the its owner
+///
+/// # Url
+/// `/ids/found/{key}`
+///
+/// # METHOD
+/// `POST`
+///
+pub async fn is_now_found(pk: web::Path<i32>) -> Result<HttpResponse, Error> {
+    let idt = Identification::mark_found(pk.into_inner())?;
+
+    let msg = hashmap!["status" => "200",
+            "message" => "Success. Indentification status marked FOUND"];
+
+    respond(msg, Some(idt), None).unwrap().await
 }
