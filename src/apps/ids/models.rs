@@ -62,6 +62,10 @@ pub struct Identification {
     #[serde(deserialize_with = "from_timestamp")]
     //  #[serde(with = "naive_date_format")]
     updated_at: NaiveDateTime,
+
+    /// Any more relevant info or DESCRIPTION on
+    /// the IDt
+    about: Option<String>,
 }
 
 /// The Insertable new Identification record
@@ -96,6 +100,7 @@ pub struct NewIdentification<'a> {
     #[serde(flatten, with = "serde_pg_point")]
     location_point: Option<PgPoint>,
     posted_by: Option<i32>,
+    about: Option<Cow<'a, str>>,
 }
 
 impl PartialEq<Identification> for NewIdentification<'_> {
