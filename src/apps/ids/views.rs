@@ -25,7 +25,7 @@ pub async fn create_new_identification(
     }
     new_idt.save().map_err(ErrorConflict).map(move |idt| {
         let res = hashmap!["status" => "201",
-            "message" => "Success. Indentification created"];
+            "message" => "Success. Identification created"];
         respond(res, Some(idt), None).unwrap()
     })
 }
@@ -41,7 +41,7 @@ pub async fn get_idt(pk: web::Path<i32>) -> Result<HttpResponse, Error> {
     let idt = Identification::find_by_id(*pk)?;
 
     let msg = hashmap!["status" => "201",
-            "message" => "Success. Indentification retrived"];
+            "message" => "Success. Identification retrived"];
     respond(msg, Some(idt), None).unwrap().await
 }
 
@@ -54,7 +54,7 @@ pub async fn get_idt(pk: web::Path<i32>) -> Result<HttpResponse, Error> {
 pub async fn get_all_idts() -> Result<HttpResponse, Error> {
     let data = Identification::retrieve_all()?;
     let msg = hashmap!["status" => "200",
-            "message" => "Success. Indentifications retrieved"];
+            "message" => "Success. Identifications retrieved"];
 
     respond(msg, Some(data), None).unwrap().await
 }
@@ -74,7 +74,7 @@ pub async fn is_now_found(pk: web::Path<i32>) -> Result<HttpResponse, Error> {
     let idt = Identification::mark_found(pk.into_inner())?;
 
     let msg = hashmap!["status" => "200",
-            "message" => "Success. Indentification status marked FOUND"];
+            "message" => "Success. Identification status marked FOUND"];
 
     respond(msg, Some(idt), None).unwrap().await
 }
@@ -97,7 +97,7 @@ pub async fn update_idt(
     let saved = idt.update(&new_data)?;
 
     let msg = hashmap!["status" => "200",
-            "message" => "Success. Indentification updated"];
+            "message" => "Success. Identification updated"];
 
     respond(msg, Some(saved), None).unwrap().await
 }

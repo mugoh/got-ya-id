@@ -11,9 +11,7 @@ use serde_json::{json, value};
 use std::{borrow::Cow, error};
 
 /// Holds the User Profile Record
-#[derive(
-    Queryable, Identifiable, AsChangeset, Associations, Deserialize, Default, Serialize, Debug,
-)]
+#[derive(Queryable, Identifiable, AsChangeset, Associations, Deserialize, Default, Serialize)]
 #[belongs_to(User)]
 pub struct Profile<'a> {
     id: i32,
@@ -73,7 +71,7 @@ impl<'a> Profile<'a> {
 }
 
 /// Holds a new User Profile Record
-#[derive(Insertable, Deserialize, Default, Serialize, Debug)]
+#[derive(Insertable, Deserialize, Default, Serialize)]
 #[table_name = "profiles"]
 #[serde(deny_unknown_fields)]
 pub struct NewProfile<'a> {
@@ -122,7 +120,7 @@ impl<'a> NewProfile<'a> {
 }
 
 /// Updatable profile object
-#[derive(AsChangeset, Serialize, Deserialize)]
+#[derive(AsChangeset, Deserialize)]
 #[table_name = "profiles"]
 pub struct UpdtProfile<'a> {
     phone: Option<Cow<'a, str>>,
@@ -134,7 +132,7 @@ pub struct UpdtProfile<'a> {
 }
 
 /// User Profile Avatar struct
-#[derive(Queryable, Identifiable, AsChangeset, Associations, Deserialize, Serialize, Debug)]
+#[derive(Queryable, Identifiable, AsChangeset, Associations, Deserialize, Serialize)]
 #[belongs_to(User)]
 pub struct Avatar<'a> {
     id: i32,
@@ -144,7 +142,7 @@ pub struct Avatar<'a> {
 }
 
 /// Insertible profile avatar data
-#[derive(Insertable, Deserialize, Serialize, Debug)]
+#[derive(Insertable, Deserialize)]
 #[table_name = "avatars"]
 pub struct NewAvatar<'a> {
     url: Option<Cow<'a, str>>,
