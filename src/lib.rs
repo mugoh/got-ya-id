@@ -3,6 +3,7 @@ pub mod apps;
 pub mod config;
 pub mod core;
 pub mod diesel_cfg;
+pub mod errors;
 
 #[macro_use(lazy_static)]
 extern crate lazy_static;

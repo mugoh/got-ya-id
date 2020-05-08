@@ -1,8 +1,11 @@
 //! Identification card models
 
 use super::{utils::serde_pg_point, validators::regexes};
-use crate::apps::user::utils::from_timestamp;
-use crate::diesel_cfg::{config::connect_to_db, schema::identifications};
+use crate::{
+    apps::user::utils::from_timestamp,
+    diesel_cfg::{config::connect_to_db, schema::identifications},
+    errors::error::ResError,
+};
 
 use chrono::{NaiveDate, NaiveDateTime};
 use diesel::{self, prelude::*};
@@ -13,10 +16,6 @@ use validator_derive::Validate;
 use diesel_geometry::data_types::PgPoint;
 
 use std::{borrow::Cow, error::Error as stdErr};
-
-use actix_web::{http::StatusCode, HttpResponse, ResponseError};
-use serde_json::{json, to_string_pretty};
-use std::fmt::{Display, Formatter, Result as FmtResult};
 
 /// Represents the Queryable IDentification data model
 /// matching the database `identification` schema
@@ -176,36 +175,5 @@ impl Identification {
             .find(key)
             .get_result::<Identification>(&connect_to_db())?;
         Ok(idt)
-    }
-}
-
-/// Custom Error to send in http responses
-#[derive(Serialize, Debug)]
-pub struct ResError {
-    /// Error message
-    msg: String,
-    /// Status code
-    status: u16,
-}
-
-impl ResponseError for ResError {
-    /// Builds the sendable response
-    fn error_response(&self) -> HttpResponse {
-        let er = json!({"errors": self.msg,"status": self.status});
-        HttpResponse::build(StatusCode::from_u16(self.status).unwrap()).json2(&er)
-    }
-}
-
-impl Display for ResError {
-    fn fmt(&self, f: &mut Formatter) -> FmtResult {
-        write!(f, "{}", to_string_pretty(self).unwrap())
-    }
-}
-
-impl std::convert::From<diesel::result::Error> for ResError {
-    fn from(er: diesel::result::Error) -> Self {
-        let msg = er.to_string();
-        let status = if msg.contains("NotFound") { 404 } else { 500 };
-        Self { msg, status }
     }
 }
