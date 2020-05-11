@@ -466,13 +466,13 @@ impl User {
 
         let grant_email = validate::decode_auth_token(auth_tk, Some("auth".into()))?.sub;
 
-        let granter = users
+        let mut granter = users
             .filter(email.eq(grant_email))
             .load::<User>(&connect_to_db())
             .unwrap();
 
         if !granter.is_empty() {
-            Ok(granter[0])
+            Ok(granter.pop().unwrap())
         } else {
             Err(ResError::new(
                 "Invalid token. Problem finding user".into(),

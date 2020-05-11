@@ -3,9 +3,9 @@ use actix_web::{web, Error, HttpRequest, HttpResponse, Result};
 
 use super::models::{Identification, NewIdentification, UpdatableIdentification};
 use crate::{
+    apps::user::models::User,
     core::response::{err, respond},
     hashmap,
-    apps::user::models::User;
 };
 
 use validator::Validate;
@@ -122,6 +122,10 @@ pub async fn get_user_idts(req: HttpRequest) -> Result<HttpResponse, Error> {
     let token = &auth.split(' ').collect::<Vec<&str>>()[1];
 
     let user = User::from_token(token);
+
+    HttpResponse::build(actix_web::http::StatusCode::OK)
+        .body("ok")
+        .await
 }
 
 /// Extracts the bearer authorization header

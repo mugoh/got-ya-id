@@ -2,6 +2,7 @@
 
 use super::{utils::serde_pg_point, validators::regexes};
 use crate::{
+    apps::user::models::User,
     apps::user::utils::from_timestamp,
     diesel_cfg::{config::connect_to_db, schema::identifications},
     errors::error::ResError,
@@ -19,8 +20,8 @@ use std::{borrow::Cow, error::Error as stdErr};
 
 /// Represents the Queryable IDentification data model
 /// matching the database `identification` schema
-#[derive(Queryable, Serialize, Deserialize, AsChangeset, Identifiable)]
-#[table_name = "identifications"]
+#[derive(Queryable, Associations, Serialize, Deserialize, AsChangeset, Identifiable)]
+#[belongs_to(User, foreign_key = "posted_by")]
 pub struct Identification {
     pub id: i32,
     /// Full name on Identification
@@ -66,6 +67,9 @@ pub struct Identification {
     /// Any more relevant info or DESCRIPTION on
     /// the IDt
     about: Option<String>,
+
+    /// The user the Identification belongs to
+    owner: Option<i32>,
 }
 
 /// The Insertable new Identification record

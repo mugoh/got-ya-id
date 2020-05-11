@@ -1,4 +1,4 @@
-#![recursion_limit = "128"]
+#![recursion_limit = "256"]
 pub mod apps;
 pub mod config;
 pub mod core;
