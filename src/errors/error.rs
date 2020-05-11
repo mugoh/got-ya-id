@@ -5,7 +5,10 @@ use actix_web::{http::StatusCode, HttpResponse, ResponseError};
 use serde::Serialize;
 use serde_json::{json, to_string_pretty};
 
-use std::fmt::{Display, Formatter, Result as FmtResult};
+use std::{
+    convert::From,
+    fmt::{Display, Formatter, Result as FmtResult},
+};
 
 /// Custom Error to send in http responses
 #[derive(Serialize, Debug)]
@@ -14,6 +17,13 @@ pub struct ResError {
     pub msg: String,
     /// Status code
     pub status: u16,
+}
+
+impl ResError {
+    /// Create a new instance of the ResError
+    pub fn new(msg: String, status: u16) -> Self {
+        Self { msg, status }
+    }
 }
 
 impl ResponseError for ResError {
@@ -30,10 +40,19 @@ impl Display for ResError {
     }
 }
 
-impl std::convert::From<diesel::result::Error> for ResError {
+impl From<diesel::result::Error> for ResError {
     fn from(er: diesel::result::Error) -> Self {
         let msg = er.to_string();
         let status = if msg.contains("NotFound") { 404 } else { 500 };
+        Self { msg, status }
+    }
+}
+
+impl From<jsonwebtoken::errors::Error> for ResError {
+    fn from(er: jsonwebtoken::errors::Error) -> Self {
+        let msg = er.to_string();
+        let status = 401;
+
         Self { msg, status }
     }
 }
