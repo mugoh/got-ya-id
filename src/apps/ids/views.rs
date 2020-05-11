@@ -1,13 +1,18 @@
 use actix_web::error::ErrorConflict;
-use actix_web::{web, Error, HttpResponse, Result};
+use actix_web::{web, Error, HttpRequest, HttpResponse, Result};
 
 use super::models::{Identification, NewIdentification, UpdatableIdentification};
 use crate::{
     core::response::{err, respond},
     hashmap,
+    apps::user::models::User;
 };
 
 use validator::Validate;
+
+use actix_web::http::header::Header;
+use actix_web_httpauth::headers::authorization::Authorization;
+use actix_web_httpauth::headers::authorization::Bearer;
 
 /// Receives a json NewIdentification data struct which is
 /// used to POST a new Identification
@@ -100,4 +105,27 @@ pub async fn update_idt(
             "message" => "Success. Identification updated"];
 
     respond(msg, Some(saved), None).unwrap().await
+}
+
+/// Retrieves Identifications belonging to the user
+///
+/// # Url
+/// `/idts/mine`
+///
+/// # Method
+/// GET
+///
+/// ## Authorization required
+pub async fn get_user_idts(req: HttpRequest) -> Result<HttpResponse, Error> {
+    let auth = extract_auth_header(&req)?;
+
+    let token = &auth.split(' ').collect::<Vec<&str>>()[1];
+
+    let user = User::from_token(token);
+}
+
+/// Extracts the bearer authorization header
+fn extract_auth_header(req: &HttpRequest) -> Result<String, actix_web::error::ParseError> {
+    let auth_header = Authorization::<Bearer>::parse(req)?;
+    Ok(auth_header.into_scheme().to_string())
 }

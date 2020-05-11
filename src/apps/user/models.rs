@@ -12,6 +12,7 @@ use crate::core::py_interface::remove_py_mod;
 use crate::diesel_cfg::{
     config::connect_to_db, schema::oath_users, schema::refresh_tokens, schema::users,
 };
+use crate::errors::error::ResError;
 
 use std::{env, error::Error as stdError};
 
@@ -264,7 +265,7 @@ impl User {
             Ok(user_detail) => user_detail.sub,
             Err(e) => {
                 // return (status code, e)
-                return Err(e);
+                return Err(e.into());
             }
         };
         let user = diesel::update(users.filter(email.eq(&user)))
@@ -282,7 +283,7 @@ impl User {
 
         let user = match validate::decode_auth_token(token, Some("password_reset".to_string())) {
             Ok(usr) => usr.sub,
-            Err(e) => return Err(e),
+            Err(e) => return Err(e.into()),
         };
         let pass_hash = match hash(new_password, DEFAULT_COST) {
             Ok(h) => h,
@@ -455,6 +456,28 @@ impl User {
         match user_result {
             Ok(user) => Ok(user),
             Err(e) => Err(e.to_string()),
+        }
+    }
+
+    /// Gives the User matching the authorization token
+    pub fn from_token(auth_tk: &str) -> Result<Self, ResError> {
+        //
+        use crate::diesel_cfg::schema::users::dsl::*;
+
+        let grant_email = validate::decode_auth_token(auth_tk, Some("auth".into()))?.sub;
+
+        let granter = users
+            .filter(email.eq(grant_email))
+            .load::<User>(&connect_to_db())
+            .unwrap();
+
+        if !granter.is_empty() {
+            Ok(granter[0])
+        } else {
+            Err(ResError::new(
+                "Invalid token. Problem finding user".into(),
+                401,
+            ))
         }
     }
 }
