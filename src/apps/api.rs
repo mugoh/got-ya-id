@@ -84,6 +84,9 @@ pub fn api(cfg: &mut web::ServiceConfig) {
                     )
                     .service(web::resource("").route(web::get().to(ids::views::get_all_idts)))
                     .service(
+                        web::resource("/lose/{pk}").route(web::post().to(ids::views::lose_idt)),
+                    )
+                    .service(
                         web::resource("/found/{pk}")
                             .route(web::post().to(ids::views::is_now_found)),
                     ),

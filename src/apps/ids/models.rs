@@ -253,6 +253,22 @@ impl Identification {
         }
     }
 
+    /// Marks the identification matching the given key as NOT found
+    pub fn is_lost(pk: i32) -> Result<Identification, ResError> {
+        let mut idt = Self::find_by_id(pk)?;
+
+        if !idt.is_found {
+            Err(ResError {
+                msg: "Identification found status already False".into(),
+                status: 409,
+            })
+        } else {
+            idt.is_found = false;
+            idt.save_changes::<Identification>(&connect_to_db())?;
+            Ok(idt)
+        }
+    }
+
     /// Updates the Idt with the given data
     pub fn update(
         &self,

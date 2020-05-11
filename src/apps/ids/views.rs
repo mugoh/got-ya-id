@@ -70,7 +70,7 @@ pub async fn get_all_idts() -> Result<HttpResponse, Error> {
 /// Marks an Identification as `found`
 ///
 /// A found IDt is assumed to have been acquired by
-/// the its owner
+/// its owner
 ///
 /// # Url
 /// `/ids/found/{key}`
@@ -83,6 +83,26 @@ pub async fn is_now_found(pk: web::Path<i32>) -> Result<HttpResponse, Error> {
 
     let msg = hashmap!["status" => "200",
             "message" => "Success. Identification status marked FOUND"];
+
+    respond(msg, Some(idt), None).unwrap().await
+}
+
+/// Marks an Identification as `not found`
+///
+/// A found IDt is assumed to be marked as lost by
+/// its owner
+///
+/// # Url
+/// `/ids/lose/{key}`
+///
+/// # METHOD
+/// `POST`
+///
+pub async fn lose_idt(pk: web::Path<i32>) -> Result<HttpResponse, Error> {
+    let idt = Identification::is_lost(pk.into_inner())?;
+
+    let msg = hashmap!["status" => "200",
+            "message" => "Success. Identification status marked NOT FOUND"];
 
     respond(msg, Some(idt), None).unwrap().await
 }
