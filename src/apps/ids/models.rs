@@ -2,7 +2,7 @@
 
 use super::{utils::serde_pg_point, validators::regexes};
 use crate::{
-    apps::user::models::User,
+    apps::user::models::{AccessLevel, User},
     apps::user::utils::from_timestamp,
     diesel_cfg::{config::connect_to_db, schema::identifications},
     errors::error::ResError,
@@ -254,7 +254,18 @@ impl Identification {
     }
 
     /// Updates the Idt with the given data
-    pub fn update(&self, data: &UpdatableIdentification) -> Result<Identification, ResError> {
+    pub fn update(
+        &self,
+        auth_tk: &str,
+        data: &UpdatableIdentification,
+    ) -> Result<Identification, ResError> {
+        let this_user = User::from_token(auth_tk)?;
+        if let Some(pu_id) = self.posted_by {
+            if this_user.id != pu_id && this_user.id != AccessLevel::Moderator as i32 {
+                return Err(ResError::unauthorized());
+            }
+        }
+
         let new_idt = diesel::update(&*self)
             .set(data)
             .get_result::<Identification>(&connect_to_db())?;

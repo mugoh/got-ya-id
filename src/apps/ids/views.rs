@@ -97,12 +97,16 @@ pub async fn is_now_found(pk: web::Path<i32>) -> Result<HttpResponse, Error> {
 pub async fn update_idt(
     pk: web::Path<i32>,
     new_data: web::Json<UpdatableIdentification<'_>>,
+    req: HttpRequest,
 ) -> Result<HttpResponse, Error> {
+    let auth = extract_auth_header(&req)?;
+    let token = &auth.split(' ').collect::<Vec<&str>>()[1];
+
     if let Err(e) = new_data.validate() {
         return err("400", e.to_string()).await;
     };
     let idt = Identification::find_by_id(pk.into_inner())?;
-    let saved = idt.update(&new_data)?;
+    let saved = idt.update(token, &new_data)?;
 
     let msg = hashmap!["status" => "200",
             "message" => "Success. Identification updated"];
