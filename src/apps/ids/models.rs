@@ -256,4 +256,12 @@ impl Identification {
             .get_result::<Identification>(&connect_to_db())?;
         Ok(new_idt)
     }
+
+    /// Retrieves the idenfications that belong to the passed user instance.
+    ///
+    /// These are idts whose `owner` matches the user's `id`
+    pub fn show_mine(usr: &User) -> Result<Vec<Identification>, ResError> {
+        let idts = Identification::belonging_to(usr).load::<Identification>(&connect_to_db())?;
+        Ok(idts)
+    }
 }

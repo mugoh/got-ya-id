@@ -118,14 +118,15 @@ pub async fn update_idt(
 /// ## Authorization required
 pub async fn get_user_idts(req: HttpRequest) -> Result<HttpResponse, Error> {
     let auth = extract_auth_header(&req)?;
-
     let token = &auth.split(' ').collect::<Vec<&str>>()[1];
 
-    let user = User::from_token(token);
+    let user = User::from_token(token)?;
+    let idts = Identification::show_mine(&user)?;
 
-    HttpResponse::build(actix_web::http::StatusCode::OK)
-        .body("ok")
-        .await
+    let msg = hashmap!["status" => "200",
+            "message" => "Success. Identifications retrieved"];
+
+    respond(msg, Some(idts), None).unwrap().await
 }
 
 /// Extracts the bearer authorization header
