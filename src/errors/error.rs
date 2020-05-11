@@ -24,6 +24,15 @@ impl ResError {
     pub fn new(msg: String, status: u16) -> Self {
         Self { msg, status }
     }
+
+    /// Returns an Unauthorized error response
+    /// Status: 401
+    pub fn unauthorized() -> Self {
+        Self {
+            msg: "Oopsy! It seems you are not allowed to do that".into(),
+            status: 401,
+        }
+    }
 }
 
 impl ResponseError for ResError {
