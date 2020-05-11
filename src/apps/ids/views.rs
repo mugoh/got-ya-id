@@ -1,4 +1,3 @@
-use actix_web::error::ErrorConflict;
 use actix_web::{web, Error, HttpRequest, HttpResponse, Result};
 
 use super::models::{Identification, NewIdentification, UpdatableIdentification};
@@ -22,13 +21,17 @@ use actix_web_httpauth::headers::authorization::Bearer;
 /// # method
 /// `POST`
 pub async fn create_new_identification(
-    new_idt: web::Json<NewIdentification<'_>>,
+    mut new_idt: web::Json<NewIdentification<'_>>,
+    req: HttpRequest,
 ) -> Result<HttpResponse, Error> {
+    let auth = extract_auth_header(&req)?;
+    let token = &auth.split(' ').collect::<Vec<&str>>()[1];
+
     if let Err(e) = new_idt.0.validate() {
         //return Ok(respond::<serde_json::Value>(hashmap!["status" => "400"], None, Some(&e.to_string())).unwrap());
         return Ok(err("400", e.to_string()));
     }
-    new_idt.save().map_err(ErrorConflict).map(move |idt| {
+    new_idt.save(token).map_err(|e| e.into()).map(move |idt| {
         let res = hashmap!["status" => "201",
             "message" => "Success. Identification created"];
         respond(res, Some(idt), None).unwrap()

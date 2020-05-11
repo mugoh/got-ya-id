@@ -16,7 +16,7 @@ use validator_derive::Validate;
 
 use diesel_geometry::data_types::PgPoint;
 
-use std::{borrow::Cow, error::Error as stdErr};
+use std::borrow::Cow;
 
 /// Represents the Queryable IDentification data model
 /// matching the database `identification` schema
@@ -184,7 +184,7 @@ impl PartialEq<NewIdentification<'_>> for Identification {
 }
 impl<'a> NewIdentification<'a> {
     /// Saves a new ID record to the Identifications table
-    pub fn save(&self) -> Result<Identification, Box<dyn stdErr>> {
+    pub fn save(&mut self, auth_tk: &str) -> Result<Identification, ResError> {
         //
         use crate::diesel_cfg::schema::identifications::dsl::{
             campus, course, identifications as _identifications, institution, name,
@@ -199,11 +199,15 @@ impl<'a> NewIdentification<'a> {
             .load::<Identification>(&connect_to_db())?;
         for ident in &presents {
             if ident == self {
-                return Err(
+                return Err(ResError::new(
                     "You seem to have saved an Identification matching these details".into(),
-                );
+                    409,
+                ));
             }
         }
+
+        let usr_id = User::from_token(auth_tk)?.id;
+        self.posted_by = Some(usr_id);
 
         let idt = diesel::insert_into(identifications::table)
             .values(&*self)
