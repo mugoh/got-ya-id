@@ -65,3 +65,12 @@ impl From<jsonwebtoken::errors::Error> for ResError {
         Self { msg, status }
     }
 }
+
+impl From<actix_web::error::ParseError> for ResError {
+    fn from(er: actix_web::error::ParseError) -> Self {
+        let msg = er.to_string();
+        let status = 400;
+
+        Self { msg, status }
+    }
+}

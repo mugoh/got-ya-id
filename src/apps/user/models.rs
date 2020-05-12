@@ -22,8 +22,12 @@ use validator_derive::Validate;
 
 use actix_web::{
     error::{ErrorForbidden, ErrorInternalServerError},
-    Error,
+    Error, HttpRequest,
 };
+
+use actix_web::http::header::Header as acHeader;
+use actix_web_httpauth::headers::authorization::Authorization;
+use actix_web_httpauth::headers::authorization::Bearer;
 
 use bcrypt::{hash, verify, DEFAULT_COST};
 
@@ -460,9 +464,12 @@ impl User {
     }
 
     /// Gives the User matching the authorization token
-    pub fn from_token(auth_tk: &str) -> Result<Self, ResError> {
+    pub fn from_token(auth_header: &HttpRequest) -> Result<Self, ResError> {
         //
         use crate::diesel_cfg::schema::users::dsl::*;
+
+        let auth = User::extract_auth_header(auth_header)?;
+        let auth_tk = &auth.split(' ').collect::<Vec<&str>>()[1];
 
         let grant_email = validate::decode_auth_token(auth_tk, Some("auth".into()))?.sub;
 
@@ -479,6 +486,11 @@ impl User {
                 401,
             ))
         }
+    }
+    /// Extracts the bearer authorization header
+    fn extract_auth_header(req: &HttpRequest) -> Result<String, actix_web::error::ParseError> {
+        let auth_header = Authorization::<Bearer>::parse(req)?;
+        Ok(auth_header.into_scheme().to_string())
     }
 }
 

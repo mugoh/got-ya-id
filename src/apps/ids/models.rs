@@ -18,6 +18,8 @@ use diesel_geometry::data_types::PgPoint;
 
 use std::borrow::Cow;
 
+use actix_web::HttpRequest;
+
 /// Represents the Queryable IDentification data model
 /// matching the database `identification` schema
 #[derive(Queryable, Associations, Serialize, Deserialize, AsChangeset, Identifiable)]
@@ -184,7 +186,7 @@ impl PartialEq<NewIdentification<'_>> for Identification {
 }
 impl<'a> NewIdentification<'a> {
     /// Saves a new ID record to the Identifications table
-    pub fn save(&mut self, auth_tk: &str) -> Result<Identification, ResError> {
+    pub fn save(&mut self, auth_tk: &HttpRequest) -> Result<Identification, ResError> {
         //
         use crate::diesel_cfg::schema::identifications::dsl::{
             campus, course, identifications as _identifications, institution, name,
@@ -272,7 +274,7 @@ impl Identification {
     /// Updates the Idt with the given data
     pub fn update(
         &self,
-        auth_tk: &str,
+        auth_tk: &HttpRequest,
         data: &UpdatableIdentification,
     ) -> Result<Identification, ResError> {
         let this_user = User::from_token(auth_tk)?;
@@ -294,5 +296,25 @@ impl Identification {
     pub fn show_mine(usr: &User) -> Result<Vec<Identification>, ResError> {
         let idts = Identification::belonging_to(usr).load::<Identification>(&connect_to_db())?;
         Ok(idts)
+    }
+
+    /// Mark an Idt's `owner` as the given user
+    ///
+    /// The User's details should match those of the Identification, to some (probably to be agreed) extent.
+    pub fn is_now_mine(&self, usr: &User) -> Result<Identification, ResError> {
+        //
+        is_truly_yours = false;
+
+        let truth_check = vec![
+            self.name.eq(&usr.name),
+            self.course.eq(&idt.course),
+            self.valid_from.eq(&idt.valid_from),
+            self.valid_till.eq(&idt.valid_till),
+            self.institution.eq(&idt.institution),
+            self.campus.eq(&idt.campus),
+            self.location_name.eq(&idt.location_name),
+            self.location_point.eq(&idt.location_point),
+            self.posted_by.eq(&idt.posted_by),
+        ];
     }
 }
