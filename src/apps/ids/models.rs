@@ -4,7 +4,10 @@ use super::{utils::serde_pg_point, validators::regexes};
 use crate::{
     apps::user::models::{AccessLevel, User},
     apps::user::utils::from_timestamp,
-    diesel_cfg::{config::connect_to_db, schema::identifications},
+    diesel_cfg::{
+        config::connect_to_db,
+        schema::{claimed_identifications, identifications},
+    },
     errors::error::ResError,
 };
 
@@ -145,6 +148,77 @@ pub struct UpdatableIdentification<'a> {
     posted_by: Option<i32>,
     about: Option<Cow<'a, str>>,
 }
+
+/// The queryable model of claimed identifications
+///
+/// A Claimable Identification should allow a user to
+/// claim ownership of an existing Identification, or
+/// to be notified once an Identification matching their
+/// particular claim is found.
+#[derive(Queryable, Associations, Serialize, Deserialize, AsChangeset, Identifiable)]
+#[table_name = "claimed_identifications"]
+pub struct ClaimableIdentification {
+    pub id: i32,
+    pub user_id: i32,
+    pub name: String,
+    pub course: String,
+    entry_year: Option<NaiveDate>,
+    graduation_year: Option<NaiveDate>,
+    institution: String,
+    campus_location: String,
+}
+
+/// The Insertable model of Claimable Identifications
+#[derive(Insertable, Deserialize, Validate)]
+#[table_name = "claimed_identifications"]
+#[serde(deny_unknown_fields)]
+pub struct NewClaimableIdt {
+    pub user_id: i32,
+
+    #[validate(regex(path = "regexes::ALPHA_REGEX", message = "should just have letters"))]
+    pub name: String,
+
+    #[validate(regex(path = "regexes::ALPHA_REGEX", message = "should just have letters"))]
+    pub course: String,
+
+    entry_year: Option<NaiveDate>,
+    graduation_year: Option<NaiveDate>,
+
+    #[validate(regex(path = "regexes::ALPHA_REGEX", message = "should just have letters"))]
+    institution: String,
+
+    #[validate(regex(
+        path = "regexes::LOCATION_REGEX",
+        message = "should have letters, digits or -_`"
+    ))]
+    campus_location: String,
+}
+
+/// The Insertable model to be used in updating
+/// changes to a user-claimed Identifications
+#[derive(AsChangeset, Deserialize, Validate)]
+#[table_name = "claimed_identifications"]
+#[serde(deny_unknown_fields)]
+pub struct UpdatableClaimableIdt {
+    #[validate(regex(path = "regexes::ALPHA_REGEX", message = "should just have letters"))]
+    pub name: String,
+
+    #[validate(regex(path = "regexes::ALPHA_REGEX", message = "should just have letters"))]
+    pub course: String,
+
+    entry_year: Option<NaiveDate>,
+    graduation_year: Option<NaiveDate>,
+
+    #[validate(regex(path = "regexes::ALPHA_REGEX", message = "should just have letters"))]
+    institution: String,
+
+    #[validate(regex(
+        path = "regexes::LOCATION_REGEX",
+        message = "should have letters, digits or -_`"
+    ))]
+    campus_location: String,
+}
+
 impl PartialEq<Identification> for NewIdentification<'_> {
     fn eq(&self, idt: &Identification) -> bool {
         let comp_vec = vec![
@@ -301,20 +375,8 @@ impl Identification {
     /// Mark an Idt's `owner` as the given user
     ///
     /// The User's details should match those of the Identification, to some (probably to be agreed) extent.
-    pub fn is_now_mine(&self, usr: &User) -> Result<Identification, ResError> {
-        //
-        is_truly_yours = false;
-
-        let truth_check = vec![
-            self.name.eq(&usr.name),
-            self.course.eq(&idt.course),
-            self.valid_from.eq(&idt.valid_from),
-            self.valid_till.eq(&idt.valid_till),
-            self.institution.eq(&idt.institution),
-            self.campus.eq(&idt.campus),
-            self.location_name.eq(&idt.location_name),
-            self.location_point.eq(&idt.location_point),
-            self.posted_by.eq(&idt.posted_by),
-        ];
+    pub fn is_now_mine(&self, usr: &User) -> Result<(), ResError> {
+        let is_truly_yours = false;
+        Ok(())
     }
 }
