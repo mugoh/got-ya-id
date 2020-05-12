@@ -176,16 +176,16 @@ pub async fn claim_idt(idt_key: web::Path<&str>, req: HttpRequest) -> Result<Htt
 /// # Method
 /// `POST`
 pub async fn create_idt_claim(
-    req: &HttpRequest,
+    req: HttpRequest,
     mut new_idt: web::Json<NewClaimableIdt<'_>>,
 ) -> Result<HttpResponse, Error> {
     if let Err(e) = new_idt.validate() {
         return err("400", e.to_string()).await;
     }
 
-    new_idt.save(req).map_err(|e| e.into()).map(|res_data| {
-        let msg = hashmap!["status" => "200",
-            "message" => "Success. Claim updated"];
+    new_idt.save(&req).map_err(|e| e.into()).map(|res_data| {
+        let msg = hashmap!["status" => "201",
+            "message" => "Success. Claim saved"];
         respond(msg, Some(res_data), None).unwrap()
     })
 }
@@ -199,7 +199,7 @@ pub async fn create_idt_claim(
 /// `PUT`
 pub async fn update_idt_claim(
     pk: web::Path<i32>,
-    req: &HttpRequest,
+    req: HttpRequest,
     idt_data: web::Json<UpdatableClaimableIdt<'_>>,
 ) -> Result<HttpResponse, Error> {
     if let Err(e) = idt_data.validate() {
@@ -209,7 +209,7 @@ pub async fn update_idt_claim(
         .map_err(|e| e.into())
         .map(|claimed_idt| {
             claimed_idt
-                .update(req, idt_data.into_inner())
+                .update(&req, idt_data.into_inner())
                 .map(|updated| {
                     let msg = hashmap!["status" => "200",
             "message" => "Success. Claim updated"];
@@ -219,4 +219,21 @@ pub async fn update_idt_claim(
                 .map_err(|e| e.into())
         })
         .and_then(|res| res)
+}
+
+/// Retrieves Claimable Identifications by PK
+///
+/// # Url
+/// `/ids/{pk}`
+///
+/// # Method
+/// `GET`
+pub async fn retrieve_claim(req: HttpRequest, pk: web::Path<i32>) -> Result<HttpResponse, Error> {
+    User::from_token(&req)?;
+
+    let idt_claim = ClaimableIdentification::find_by_id(*pk)?;
+    let msg = hashmap!["status" => "200",
+            "message" => "Success. Claim  retrieved"];
+
+    respond(msg, Some(idt_claim), None).unwrap().await
 }
