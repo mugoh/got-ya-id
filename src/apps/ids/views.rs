@@ -1,6 +1,9 @@
 use actix_web::{web, Error, HttpRequest, HttpResponse, Result};
 
-use super::models::{Identification, NewClaimableIdt, NewIdentification, UpdatableIdentification};
+use super::models::{
+    ClaimableIdentification, Identification, NewClaimableIdt, NewIdentification,
+    UpdatableClaimableIdt, UpdatableIdentification,
+};
 use crate::{
     apps::user::models::User,
     core::response::{err, respond},
@@ -8,10 +11,6 @@ use crate::{
 };
 
 use validator::Validate;
-
-use actix_web::http::header::Header;
-use actix_web_httpauth::headers::authorization::Authorization;
-use actix_web_httpauth::headers::authorization::Bearer;
 
 /// Receives a json NewIdentification data struct which is
 /// used to POST a new Identification
@@ -150,7 +149,7 @@ pub async fn get_user_idts(req: HttpRequest) -> Result<HttpResponse, Error> {
 /// Allows a user to claim an Identification as belonging to them
 ///
 /// # Url
-/// `/ids/claim`
+/// `/ids/claim/mine`
 ///
 /// # Method
 /// `POST`
@@ -158,18 +157,66 @@ pub async fn get_user_idts(req: HttpRequest) -> Result<HttpResponse, Error> {
 /// # Arguments
 /// idt_data: The Identification information to be used in matching
 /// the Identification of `idt_key` to the user sending the request
-pub async fn claim_idt(
-    idt_key: web::Path<&str>,
-    idt_data: web::Json<NewClaimableIdt<'_>>,
-    req: HttpRequest,
-) -> Result<HttpResponse, Error> {
+pub async fn claim_idt(idt_key: web::Path<&str>, req: HttpRequest) -> Result<HttpResponse, Error> {
     HttpResponse::build(actix_web::http::StatusCode::OK)
         .body("Hee")
         .await
 }
 
-/// Extracts the bearer authorization header
-fn extract_auth_header(req: &HttpRequest) -> Result<String, actix_web::error::ParseError> {
-    let auth_header = Authorization::<Bearer>::parse(req)?;
-    Ok(auth_header.into_scheme().to_string())
+/// Created a claim to an identification
+/// The claim should have data similar-ish to the Identification
+/// the owner of the claim is in search of.
+///
+/// The Identification the user wants <b>shouldn't neccesarily have been
+/// found</b> at the time the claim is being created.
+///
+/// # Url
+/// `/ids/claim/new`
+///
+/// # Method
+/// `POST`
+pub async fn create_idt_claim(
+    req: &HttpRequest,
+    mut new_idt: web::Json<NewClaimableIdt<'_>>,
+) -> Result<HttpResponse, Error> {
+    if let Err(e) = new_idt.validate() {
+        return err("400", e.to_string()).await;
+    }
+
+    new_idt.save(req).map_err(|e| e.into()).map(|res_data| {
+        let msg = hashmap!["status" => "200",
+            "message" => "Success. Claim updated"];
+        respond(msg, Some(res_data), None).unwrap()
+    })
+}
+
+/// Updates existing Claims
+///
+/// # Url
+/// `idts/claim/{key}`
+///
+/// # Method
+/// `PUT`
+pub async fn update_idt_claim(
+    pk: web::Path<i32>,
+    req: &HttpRequest,
+    idt_data: web::Json<UpdatableClaimableIdt<'_>>,
+) -> Result<HttpResponse, Error> {
+    if let Err(e) = idt_data.validate() {
+        return err("400", e.to_string()).await;
+    }
+    ClaimableIdentification::find_by_id(*pk)
+        .map_err(|e| e.into())
+        .map(|claimed_idt| {
+            claimed_idt
+                .update(req, idt_data.into_inner())
+                .map(|updated| {
+                    let msg = hashmap!["status" => "200",
+            "message" => "Success. Claim updated"];
+
+                    respond(msg, Some(updated), None).unwrap()
+                })
+                .map_err(|e| e.into())
+        })
+        .and_then(|res| res)
 }

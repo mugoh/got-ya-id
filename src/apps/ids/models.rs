@@ -178,6 +178,7 @@ pub struct ClaimableIdentification {
 #[table_name = "claimed_identifications"]
 #[serde(deny_unknown_fields)]
 pub struct NewClaimableIdt<'a> {
+    #[serde(skip_serializing)]
     pub user_id: i32,
 
     #[validate(regex(path = "regexes::ALPHA_REGEX", message = "should just have letters"))]
@@ -397,5 +398,36 @@ impl<'a> NewClaimableIdt<'a> {
             .get_result::<ClaimableIdentification>(&connect_to_db())?;
 
         Ok(idt_claim)
+    }
+}
+
+impl ClaimableIdentification {
+    /// Finds an Identification by its primary key
+    pub fn find_by_id(key: i32) -> Result<Self, ResError> {
+        use crate::diesel_cfg::schema::claimed_identifications::dsl::claimed_identifications;
+
+        let idt = claimed_identifications
+            .find(key)
+            .get_result::<ClaimableIdentification>(&connect_to_db())?;
+        Ok(idt)
+    }
+
+    /// Updates the Identification with the passed data
+    pub fn update(
+        &self,
+        auth_tk: &HttpRequest,
+        data: UpdatableClaimableIdt,
+    ) -> Result<Self, ResError> {
+        let this_user = User::from_token(auth_tk)?;
+
+        if this_user.id != self.user_id {
+            return Err(ResError::unauthorized());
+        }
+
+        let updated_idt = diesel::update(&*self)
+            .set(data)
+            .get_result::<Self>(&connect_to_db())?;
+
+        Ok(updated_idt)
     }
 }
