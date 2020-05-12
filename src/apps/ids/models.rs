@@ -172,26 +172,26 @@ pub struct ClaimableIdentification {
 #[derive(Insertable, Deserialize, Validate)]
 #[table_name = "claimed_identifications"]
 #[serde(deny_unknown_fields)]
-pub struct NewClaimableIdt {
+pub struct NewClaimableIdt<'a> {
     pub user_id: i32,
 
     #[validate(regex(path = "regexes::ALPHA_REGEX", message = "should just have letters"))]
-    pub name: String,
+    pub name: Option<Cow<'a, str>>,
 
     #[validate(regex(path = "regexes::ALPHA_REGEX", message = "should just have letters"))]
-    pub course: String,
+    pub course: Option<Cow<'a, str>>,
 
     entry_year: Option<NaiveDate>,
     graduation_year: Option<NaiveDate>,
 
     #[validate(regex(path = "regexes::ALPHA_REGEX", message = "should just have letters"))]
-    institution: String,
+    institution: Option<Cow<'a, str>>,
 
     #[validate(regex(
         path = "regexes::LOCATION_REGEX",
         message = "should have letters, digits or -_`"
     ))]
-    campus_location: String,
+    campus_location: Option<Cow<'a, str>>,
 }
 
 /// The Insertable model to be used in updating
@@ -199,24 +199,24 @@ pub struct NewClaimableIdt {
 #[derive(AsChangeset, Deserialize, Validate)]
 #[table_name = "claimed_identifications"]
 #[serde(deny_unknown_fields)]
-pub struct UpdatableClaimableIdt {
+pub struct UpdatableClaimableIdt<'a> {
     #[validate(regex(path = "regexes::ALPHA_REGEX", message = "should just have letters"))]
-    pub name: String,
+    pub name: Option<Cow<'a, str>>,
 
     #[validate(regex(path = "regexes::ALPHA_REGEX", message = "should just have letters"))]
-    pub course: String,
+    pub course: Option<Cow<'a, str>>,
 
     entry_year: Option<NaiveDate>,
     graduation_year: Option<NaiveDate>,
 
     #[validate(regex(path = "regexes::ALPHA_REGEX", message = "should just have letters"))]
-    institution: String,
+    institution: Option<Cow<'a, str>>,
 
     #[validate(regex(
         path = "regexes::LOCATION_REGEX",
         message = "should have letters, digits or -_`"
     ))]
-    campus_location: String,
+    campus_location: Option<Cow<'a, str>>,
 }
 
 impl PartialEq<Identification> for NewIdentification<'_> {
