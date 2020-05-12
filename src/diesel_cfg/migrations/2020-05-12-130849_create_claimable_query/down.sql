@@ -1,0 +1,1 @@
+DROP TABLE claimed_identifications
