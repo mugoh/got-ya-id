@@ -1,6 +1,6 @@
 CREATE TABLE claimed_identifications (
-    id SERIAL PRIMARY KEY,
-    user_id INTEGER REFERENCES users (id) ON DELETE CASCADE,
+    id SERIAL PRIMARY KEY NOT NULL,
+    user_id INTEGER REFERENCES users (id) ON DELETE CASCADE NOT NULL,
     name VARCHAR NOT NULL,
     course VARCHAR NOT NULL,
     entry_year DATE,

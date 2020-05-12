@@ -166,6 +166,11 @@ pub struct ClaimableIdentification {
     graduation_year: Option<NaiveDate>,
     institution: String,
     campus_location: String,
+
+    #[serde(deserialize_with = "from_timestamp")]
+    created_at: NaiveDateTime,
+    #[serde(deserialize_with = "from_timestamp")]
+    updated_at: NaiveDateTime,
 }
 
 /// The Insertable model of Claimable Identifications
@@ -378,5 +383,19 @@ impl Identification {
     pub fn is_now_mine(&self, usr: &User) -> Result<(), ResError> {
         let is_truly_yours = false;
         Ok(())
+    }
+}
+
+impl<'a> NewClaimableIdt<'a> {
+    /// Saves a new user Identification Claim to db
+    pub fn save(&mut self, auth_tk: &HttpRequest) -> Result<ClaimableIdentification, ResError> {
+        let this_user = User::from_token(auth_tk)?;
+        self.user_id = this_user.id;
+
+        let idt_claim = diesel::insert_into(claimed_identifications::table)
+            .values(&*self)
+            .get_result::<ClaimableIdentification>(&connect_to_db())?;
+
+        Ok(idt_claim)
     }
 }

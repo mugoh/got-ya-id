@@ -1,6 +1,6 @@
 use actix_web::{web, Error, HttpRequest, HttpResponse, Result};
 
-use super::models::{Identification, NewIdentification, UpdatableIdentification};
+use super::models::{Identification, NewClaimableIdt, NewIdentification, UpdatableIdentification};
 use crate::{
     apps::user::models::User,
     core::response::{err, respond},
@@ -154,7 +154,15 @@ pub async fn get_user_idts(req: HttpRequest) -> Result<HttpResponse, Error> {
 ///
 /// # Method
 /// `POST`
-pub async fn claim_idt(idt_key: web::Path<&str>, req: HttpRequest) -> Result<HttpResponse, Error> {
+///
+/// # Arguments
+/// idt_data: The Identification information to be used in matching
+/// the Identification of `idt_key` to the user sending the request
+pub async fn claim_idt(
+    idt_key: web::Path<&str>,
+    idt_data: web::Json<NewClaimableIdt<'_>>,
+    req: HttpRequest,
+) -> Result<HttpResponse, Error> {
     HttpResponse::build(actix_web::http::StatusCode::OK)
         .body("Hee")
         .await
