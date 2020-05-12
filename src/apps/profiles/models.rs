@@ -17,9 +17,8 @@ pub struct Profile<'a> {
     id: i32,
     user_id: i32,
     phone: Option<String>,
-    first_name: Option<String>,
-    middle_name: Option<String>,
-    last_name: Option<String>,
+    /// Full name
+    name: Option<String>,
     institution: Option<String>,
     about: Option<String>,
     found_ids: Option<Cow<'a, i32>>,
@@ -77,9 +76,7 @@ impl<'a> Profile<'a> {
 pub struct NewProfile<'a> {
     user_id: i32,
     phone: Option<Cow<'a, str>>,
-    first_name: Option<Cow<'a, str>>,
-    middle_name: Option<Cow<'a, str>>,
-    last_name: Option<Cow<'a, str>>,
+    name: Option<Cow<'a, str>>,
     institution: Option<Cow<'a, str>>,
     about: Option<Cow<'a, str>>,
 }
@@ -124,9 +121,7 @@ impl<'a> NewProfile<'a> {
 #[table_name = "profiles"]
 pub struct UpdtProfile<'a> {
     phone: Option<Cow<'a, str>>,
-    first_name: Option<Cow<'a, str>>,
-    middle_name: Option<Cow<'a, str>>,
-    last_name: Option<Cow<'a, str>>,
+    name: Option<Cow<'a, str>>,
     institution: Option<Cow<'a, str>>,
     about: Option<Cow<'a, str>>,
 }
