@@ -229,7 +229,6 @@ pub struct UpdatableClaimableIdt<'a> {
 impl PartialEq<NewClaimableIdt<'_>> for ClaimableIdentification {
     fn eq(&self, claim: &NewClaimableIdt) -> bool {
         let match_fields = [
-            self.user_id.eq(&claim.user_id),
             self.entry_year.eq(&claim.entry_year),
             self.graduation_year.eq(&claim.graduation_year),
             if claim.course.is_some() {
@@ -261,7 +260,6 @@ impl PartialEq<NewClaimableIdt<'_>> for ClaimableIdentification {
 impl PartialEq<ClaimableIdentification> for NewClaimableIdt<'_> {
     fn eq(&self, claim: &ClaimableIdentification) -> bool {
         let match_fields = [
-            self.user_id.eq(&claim.user_id),
             self.entry_year.eq(&claim.entry_year),
             self.graduation_year.eq(&claim.graduation_year),
             if self.course.is_some() {
@@ -467,13 +465,26 @@ impl Identification {
 impl<'a> NewClaimableIdt<'a> {
     /// Saves a new user Identification Claim to db
     pub fn save(&mut self, auth_tk: &HttpRequest) -> Result<ClaimableIdentification, ResError> {
+        use crate::diesel_cfg::schema::claimed_identifications::dsl::{
+            claimed_identifications as cl_idt_table, course as c_course,
+            institution as c_institution, name as c_name,
+        };
+
         let this_user = User::from_token(auth_tk)?;
         self.user_id = this_user.id;
+        self.has_claim(&this_user)?;
 
-        let existing_claims = ClaimableIdentification::belonging_to(&this_user)
-            .load::<ClaimableIdentification>(&connect_to_db())?;
-
-        self.is_unique(&existing_claims)?;
+        if self.name.is_some() && self.institution.is_some() && self.course.is_some() {
+            let existing_claims = cl_idt_table
+                .filter(
+                    c_name
+                        .eq(self.name.as_ref().unwrap())
+                        .and(c_course.eq(self.course.as_ref().unwrap()))
+                        .and(c_institution.eq(self.institution.as_ref().unwrap())),
+                )
+                .load::<ClaimableIdentification>(&connect_to_db())?;
+            self.is_unique(&existing_claims)?;
+        }
 
         let idt_claim = diesel::insert_into(claimed_identifications::table)
             .values(&*self)
@@ -490,11 +501,28 @@ impl<'a> NewClaimableIdt<'a> {
         let duplicate = existing_claims.into_iter().any(|claim| claim == self);
         if duplicate {
             Err(ResError {
-                msg: "Dude, you created this claim some while back".into(),
+                msg: "A similar Identification claim seems to exist",
                 status: 409,
             })
         } else {
             Ok(!duplicate)
+        }
+    }
+
+    /// Checks if a User has an existing claim.
+    ///
+    /// Users should make just one claim by default,
+    /// which they can then give controlled edits.
+    pub fn has_claim(&self, current_user: &User) -> Result<bool, ResError> {
+        //
+        let user_claims = ClaimableIdentification::belonging_to(current_user)
+            .load::<ClaimableIdentification>(&connect_to_db())?;
+        match user_claims.is_empty() {
+            false => Err(ResError {
+                msg: "Dude, you created a claim some while back".into(),
+                status: 409,
+            }),
+            true => Ok(false),
         }
     }
 }

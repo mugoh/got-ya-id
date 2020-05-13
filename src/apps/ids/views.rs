@@ -50,7 +50,7 @@ pub async fn create_new_identification(
 pub async fn get_idt(pk: web::Path<i32>) -> Result<HttpResponse, Error> {
     let idt = Identification::find_by_id(*pk)?;
 
-    let msg = hashmap!["status" => "201",
+    let msg = hashmap!["status" => "200",
             "message" => "Success. Identification retrived"];
     respond(msg, Some(idt), None).unwrap().await
 }
