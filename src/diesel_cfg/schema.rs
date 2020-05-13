@@ -442,6 +442,7 @@ table! {
 
 joinable!(avatars -> users (user_id));
 joinable!(claimed_identifications -> users (user_id));
+joinable!(identifications -> users (owner));
 joinable!(profiles -> users (user_id));
 
 allow_tables_to_appear_in_same_query!(

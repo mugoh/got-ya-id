@@ -371,11 +371,24 @@ impl Identification {
         Ok(new_idt)
     }
 
+    /// Retrieves the idenfications that have been posted by the passed user instance.
+    ///
+    /// These are idts whose `posted_by` matches the user's `id`
+    pub fn show_posted_by_me(usr: &User) -> Result<Vec<Identification>, ResError> {
+        use crate::diesel_cfg::schema::identifications::dsl::{identifications, posted_by};
+        let idts = identifications
+            .filter(posted_by.eq(usr.id))
+            .load::<Self>(&connect_to_db())?;
+        Ok(idts)
+    }
     /// Retrieves the idenfications that belong to the passed user instance.
     ///
     /// These are idts whose `owner` matches the user's `id`
     pub fn show_mine(usr: &User) -> Result<Vec<Identification>, ResError> {
-        let idts = Identification::belonging_to(usr).load::<Identification>(&connect_to_db())?;
+        use crate::diesel_cfg::schema::identifications::dsl::{identifications, owner};
+        let idts = identifications
+            .filter(owner.eq(usr.id))
+            .load::<Self>(&connect_to_db())?;
         Ok(idts)
     }
 

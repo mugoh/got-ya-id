@@ -78,6 +78,10 @@ pub fn api(cfg: &mut web::ServiceConfig) {
                     )
                     .service(web::resource("/mine").route(web::get().to(ids::views::get_user_idts)))
                     .service(
+                        web::resource("/posted/me")
+                            .route(web::get().to(ids::views::get_user_posted_idts)),
+                    )
+                    .service(
                         web::resource("/claim/user")
                             .route(web::get().to(ids::views::retrieve_user_claim)),
                     )

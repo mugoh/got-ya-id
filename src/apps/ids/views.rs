@@ -29,11 +29,18 @@ pub async fn create_new_identification(
         //return Ok(respond::<serde_json::Value>(hashmap!["status" => "400"], None, Some(&e.to_string())).unwrap());
         return Ok(err("400", e.to_string()));
     }
-    new_idt.save(&req).map_err(|e| e.into()).map(move |idt| {
-        let res = hashmap!["status" => "201",
+    new_idt
+        .save(&req)
+        .map_err(|e| {
+            println!("Err: {}", e);
+            e.into()
+        })
+        .map(move |idt| {
+            let res = hashmap!["status" => "201",
             "message" => "Success. Identification created"];
-        respond(res, Some(idt), None).unwrap()
-    })
+            respond(res, Some(idt), None).unwrap()
+        })
+        .and_then(|ok| Ok(ok))
 }
 
 ///Retrives a single Identification using its PK
@@ -141,6 +148,25 @@ pub async fn update_idt(
 pub async fn get_user_idts(req: HttpRequest) -> Result<HttpResponse, Error> {
     let user = User::from_token(&req)?;
     let idts = Identification::show_mine(&user)?;
+
+    let msg = hashmap!["status" => "200",
+            "message" => "Success. Identifications retrieved"];
+
+    respond(msg, Some(idts), None).unwrap().await
+}
+
+/// Retrieves Identifications posted (found) by the user
+///
+/// # Url
+/// `/ids/posted/me`
+///
+/// # Method
+/// GET
+///
+/// ## Authorization required
+pub async fn get_user_posted_idts(req: HttpRequest) -> Result<HttpResponse, Error> {
+    let user = User::from_token(&req)?;
+    let idts = Identification::show_posted_by_me(&user)?;
 
     let msg = hashmap!["status" => "200",
             "message" => "Success. Identifications retrieved"];
