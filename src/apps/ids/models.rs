@@ -226,6 +226,70 @@ pub struct UpdatableClaimableIdt<'a> {
     campus_location: Option<Cow<'a, str>>,
 }
 
+impl PartialEq<NewClaimableIdt<'_>> for ClaimableIdentification {
+    fn eq(&self, claim: &NewClaimableIdt) -> bool {
+        let match_fields = [
+            self.user_id.eq(&claim.user_id),
+            self.entry_year.eq(&claim.entry_year),
+            self.graduation_year.eq(&claim.graduation_year),
+            if claim.course.is_some() {
+                self.course.eq(claim.course.as_ref().unwrap())
+            } else {
+                false
+            },
+            if let Some(ref loc) = claim.campus_location {
+                self.campus_location.eq(loc)
+            } else {
+                false
+            },
+            if let Some(ref inst) = claim.institution {
+                self.institution.eq(inst)
+            } else {
+                false
+            },
+            if let Some(ref name) = claim.name {
+                self.name.eq(name)
+            } else {
+                false
+            },
+        ];
+
+        match_fields.iter().all(|&field| field)
+    }
+}
+
+impl PartialEq<ClaimableIdentification> for NewClaimableIdt<'_> {
+    fn eq(&self, claim: &ClaimableIdentification) -> bool {
+        let match_fields = [
+            self.user_id.eq(&claim.user_id),
+            self.entry_year.eq(&claim.entry_year),
+            self.graduation_year.eq(&claim.graduation_year),
+            if self.course.is_some() {
+                self.course.as_ref().unwrap().eq(&claim.course)
+            } else {
+                false
+            },
+            if let Some(loc) = &self.campus_location {
+                claim.campus_location.eq(loc)
+            } else {
+                false
+            },
+            if let Some(inst) = self.institution.as_ref() {
+                claim.institution.eq(inst)
+            } else {
+                false
+            },
+            if let Some(name) = self.name.as_ref() {
+                claim.name.eq(name)
+            } else {
+                false
+            },
+        ];
+
+        match_fields.iter().all(|&field| field)
+    }
+}
+
 impl PartialEq<Identification> for NewIdentification<'_> {
     fn eq(&self, idt: &Identification) -> bool {
         let comp_vec = vec![
@@ -406,11 +470,32 @@ impl<'a> NewClaimableIdt<'a> {
         let this_user = User::from_token(auth_tk)?;
         self.user_id = this_user.id;
 
+        let existing_claims = ClaimableIdentification::belonging_to(&this_user)
+            .load::<ClaimableIdentification>(&connect_to_db())?;
+
+        self.is_unique(&existing_claims)?;
+
         let idt_claim = diesel::insert_into(claimed_identifications::table)
             .values(&*self)
             .get_result::<ClaimableIdentification>(&connect_to_db())?;
 
         Ok(idt_claim)
+    }
+
+    /// Checks whether a new Claim has fields, which ought to be unique,  matching another
+    pub fn is_unique(
+        &self,
+        existing_claims: &Vec<ClaimableIdentification>,
+    ) -> Result<bool, ResError> {
+        let duplicate = existing_claims.into_iter().any(|claim| claim == self);
+        if duplicate {
+            Err(ResError {
+                msg: "Dude, you created this claim some while back".into(),
+                status: 409,
+            })
+        } else {
+            Ok(!duplicate)
+        }
     }
 }
 
