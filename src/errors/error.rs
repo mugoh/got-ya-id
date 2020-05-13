@@ -33,6 +33,15 @@ impl ResError {
             status: 401,
         }
     }
+
+    /// Returns a NOT FOUND error response
+    /// Status: 404
+    pub fn not_found() -> Self {
+        Self {
+            msg: "Resource not found".into(),
+            status: 404,
+        }
+    }
 }
 
 impl ResponseError for ResError {
