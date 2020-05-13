@@ -1,3 +1,5 @@
+//! Implementations of Http enpoints for the Identifications resource
+
 use actix_web::{web, Error, HttpRequest, HttpResponse, Result};
 
 use super::models::{
@@ -193,7 +195,7 @@ pub async fn create_idt_claim(
 /// Updates existing Claims
 ///
 /// # Url
-/// `idts/claim/{key}`
+/// `ids/claim/{key}`
 ///
 /// # Method
 /// `PUT`
@@ -224,7 +226,7 @@ pub async fn update_idt_claim(
 /// Retrieves Claimable Identifications by PK
 ///
 /// # Url
-/// `/ids/{pk}`
+/// `/ids/claim/{pk}`
 ///
 /// # Method
 /// `GET`
@@ -232,6 +234,23 @@ pub async fn retrieve_claim(req: HttpRequest, pk: web::Path<i32>) -> Result<Http
     User::from_token(&req)?;
 
     let idt_claim = ClaimableIdentification::find_by_id(*pk)?;
+    let msg = hashmap!["status" => "200",
+            "message" => "Success. Claim  retrieved"];
+
+    respond(msg, Some(idt_claim), None).unwrap().await
+}
+/// Retrieves a Claimable Identification belonging to a
+/// given user.
+///
+/// # Url
+/// `/ids/claim/user`
+///
+/// # Method
+/// `GET`
+pub async fn retrieve_user_claim(req: HttpRequest) -> Result<HttpResponse, Error> {
+    let user = User::from_token(&req)?;
+
+    let idt_claim = ClaimableIdentification::belonging_to_me(&user)?;
     let msg = hashmap!["status" => "200",
             "message" => "Success. Claim  retrieved"];
 

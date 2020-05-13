@@ -156,6 +156,7 @@ pub struct UpdatableIdentification<'a> {
 /// to be notified once an Identification matching their
 /// particular claim is found.
 #[derive(Queryable, Associations, Serialize, Deserialize, AsChangeset, Identifiable)]
+#[belongs_to(User, foreign_key = "user_id")]
 #[table_name = "claimed_identifications"]
 pub struct ClaimableIdentification {
     pub id: i32,
@@ -429,5 +430,17 @@ impl ClaimableIdentification {
             .get_result::<Self>(&connect_to_db())?;
 
         Ok(updated_idt)
+    }
+
+    /// Get the Claimed Identification that belongs to
+    /// this user
+    pub fn belonging_to_me(usr: &User) -> Result<Self, ResError> {
+        let mut idt_claim =
+            ClaimableIdentification::belonging_to(usr).load::<Self>(&connect_to_db())?;
+        if idt_claim.is_empty() {
+            Err(ResError::not_found())
+        } else {
+            Ok(idt_claim.pop().unwrap())
+        }
     }
 }
