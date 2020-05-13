@@ -25,7 +25,7 @@ use actix_web::HttpRequest;
 
 /// Represents the Queryable IDentification data model
 /// matching the database `identification` schema
-#[derive(Queryable, Associations, Serialize, Deserialize, AsChangeset, Identifiable)]
+#[derive(Queryable, Associations, Debug, Serialize, Deserialize, AsChangeset, Identifiable)]
 #[belongs_to(User, foreign_key = "posted_by")]
 pub struct Identification {
     pub id: i32,
@@ -179,7 +179,7 @@ pub struct ClaimableIdentification {
 #[table_name = "claimed_identifications"]
 #[serde(deny_unknown_fields)]
 pub struct NewClaimableIdt<'a> {
-    #[serde(skip_serializing)]
+    #[serde(skip_deserializing)]
     pub user_id: i32,
 
     #[validate(regex(path = "regexes::ALPHA_REGEX", message = "should just have letters"))]
@@ -268,10 +268,12 @@ impl PartialEq<NewIdentification<'_>> for Identification {
 impl<'a> NewIdentification<'a> {
     /// Saves a new ID record to the Identifications table
     pub fn save(&mut self, auth_tk: &HttpRequest) -> Result<Identification, ResError> {
-        //
         use crate::diesel_cfg::schema::identifications::dsl::{
             campus, course, identifications as _identifications, institution, name,
         };
+        let usr_id = User::from_token(auth_tk)?.id;
+        self.posted_by = Some(usr_id);
+
         let presents = _identifications
             .filter(
                 name.eq(&self.name)
@@ -288,9 +290,6 @@ impl<'a> NewIdentification<'a> {
                 ));
             }
         }
-
-        let usr_id = User::from_token(auth_tk)?.id;
-        self.posted_by = Some(usr_id);
 
         let idt = diesel::insert_into(identifications::table)
             .values(&*self)

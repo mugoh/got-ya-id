@@ -91,8 +91,7 @@ pub fn api(cfg: &mut web::ServiceConfig) {
                             .route(web::get().to(ids::views::retrieve_claim)),
                     )
                     .service(
-                        web::resource("/claim/new")
-                            .route(web::post().to(ids::views::create_idt_claim)),
+                        web::resource("/claim").route(web::post().to(ids::views::create_idt_claim)),
                     )
                     .service(
                         web::resource("/{pk}")

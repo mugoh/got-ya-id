@@ -31,10 +31,7 @@ pub async fn create_new_identification(
     }
     new_idt
         .save(&req)
-        .map_err(|e| {
-            println!("Err: {}", e);
-            e.into()
-        })
+        .map_err(|e| e.into())
         .map(move |idt| {
             let res = hashmap!["status" => "201",
             "message" => "Success. Identification created"];
@@ -199,7 +196,7 @@ pub async fn claim_idt(idt_key: web::Path<&str>, req: HttpRequest) -> Result<Htt
 /// found</b> at the time the claim is being created.
 ///
 /// # Url
-/// `/ids/claim/new`
+/// `/ids/claim`
 ///
 /// # Method
 /// `POST`
