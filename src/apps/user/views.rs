@@ -111,10 +111,14 @@ pub async fn register_user(
 /// # method
 ///
 /// `POST`
+///
+/// ### Authentication Required
 pub async fn send_account_activation_link(
     email: web::Json<UserEmail<'_>>,
     req: HttpRequest,
 ) -> Result<HttpResponse, Error> {
+    User::decode_auth_header(&req)?;
+
     if let Err(e) = email.0.validate() {
         return HttpResponse::build(http::StatusCode::BAD_REQUEST)
             .json(e)
@@ -142,7 +146,6 @@ pub async fn send_account_activation_link(
 ///
 /// # url
 /// ## `auth/login`
-///
 pub async fn login(user: web::Json<SignInUser<'_>>) -> Result<HttpResponse, Error> {
     if let Err(err) = user.validate() {
         let res = response::JsonErrResponse::new("400".to_string(), err);
@@ -247,7 +250,6 @@ pub async fn login(user: web::Json<SignInUser<'_>>) -> Result<HttpResponse, Erro
 ///
 /// # Method
 /// ## GET
-///
 pub fn verify(path: web::Path<String>) -> HttpResponse {
     match User::verify_user(&path) {
         Ok(_) => HttpResponse::build(http::StatusCode::OK).body("Yay! Your account is now verified"),
@@ -423,14 +425,16 @@ pub fn reset_password(
 ///
 /// # url
 /// ## `/user/{ID}`
-pub fn get_user(id: web::Path<i32>) -> HttpResponse {
-    match User::find_by_pk(*id, Some(1)) {
+pub async fn get_user(id: web::Path<i32>, req: HttpRequest) -> Result<HttpResponse, Error> {
+    match User::find_by_pk_authenticated(*id, Some(1), &req) {
         Ok((usr, profile)) => {
             let data =
                 hashmap!["status" => "200", "message" => "sucess. User and User profile retrieved"];
-            respond(data, Some((usr, profile.unwrap())), None).unwrap()
+            respond(data, Some((usr, profile.unwrap())), None)
+                .unwrap()
+                .await
         }
-        Err(e) => err("404", e.to_string()),
+        Err(e) => Err(e.into()),
     }
 }
 
@@ -444,6 +448,8 @@ pub fn get_user(id: web::Path<i32>) -> HttpResponse {
 ///
 /// # method
 ///  PATCH
+///
+/// ### Authentication Required
 pub async fn change_activation_status(req: HttpRequest) -> Result<HttpResponse, Error> {
     let user = User::from_token(&req)?;
     user.alter_activation_status()
@@ -612,7 +618,6 @@ async fn send_activation_link(
     reset_link: &str,
     template: &str,
 ) -> Result<(), Error> {
-    //
     let context = get_context(user_name, reset_link);
     let mut username = "";
 
@@ -662,9 +667,8 @@ async fn generate_tokens(usr: &User) -> Result<(String, String), Error> {
 ///
 /// # url
 /// `/auth/access`
-/// ## Authorization required
-/// # Arguments
-/// req: Authorization Bearer token
+///
+/// ### Authentication Required
 pub async fn change_user_access_level(
     req: HttpRequest,
     data: web::Json<NewUserLevel<'_>>,

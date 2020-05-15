@@ -335,7 +335,6 @@ impl User {
         pk: i32,
         include_profile: Option<i32>,
     ) -> Result<(User, Option<Profile<'a>>), Box<dyn stdError>> {
-        //
         use crate::diesel_cfg::schema::users::dsl::*;
         let user = users.find(pk).get_result::<User>(&connect_to_db())?;
 
@@ -348,6 +347,29 @@ impl User {
             return Err(format!("User of ID {id} non existent", id = pk).into());
         }
         Ok((user, usr_profile.pop()))
+    }
+
+    /// Searches for the User and (optionally) their Profile
+    /// using the PK.
+    ///
+    /// Same as User::find_by_pk but required authentication.
+    /// This should be in response to a http request
+    pub fn find_by_pk_authenticated(
+        pk: i32,
+        include_profile: Option<i32>,
+        auth_header: &HttpRequest,
+    ) -> Result<(User, Option<Profile>), ResError> {
+        let user = Self::from_token(auth_header)?;
+        if user.id != pk {
+            return Err(ResError::unauthorized());
+        }
+
+        if include_profile.is_none() {
+            return Ok((user, None));
+        }
+
+        let mut usr_profile = Profile::belonging_to(&user).first::<Profile>(&connect_to_db())?;
+        Ok((user, Some(usr_profile)))
     }
 
     /// Retrieves all existing User profiles
@@ -462,10 +484,25 @@ impl User {
         }
     }
 
-    /// Gives the User matching the authorization token
+    /// Attempts to extract and decode and Authentication Bearer Header from the request.
+    ///
+    /// The issuer used in decoding is **"auth"**, for authentication access
+    /// purposed only
+    ///
+    /// Returns an Error if the Header is missing or decode fails
+    pub fn decode_auth_header(auth_header: &HttpRequest) -> Result<(), ResError> {
+        let auth = User::extract_auth_header(auth_header)?;
+        let auth_tk = &auth.split(' ').collect::<Vec<&str>>()[1];
+
+        validate::decode_auth_token(auth_tk, Some("auth".into()))?;
+
+        Ok(())
+    }
+
+    /// Gives the User whose email matches the subject of the decoded
+    /// authorization token
     pub fn from_token(auth_header: &HttpRequest) -> Result<Self, ResError> {
-        //
-        use crate::diesel_cfg::schema::users::dsl::*;
+        use crate::diesel_cfg::schema::users::dsl::{email, users};
 
         let auth = User::extract_auth_header(auth_header)?;
         let auth_tk = &auth.split(' ').collect::<Vec<&str>>()[1];
@@ -474,8 +511,7 @@ impl User {
 
         let mut granter = users
             .filter(email.eq(grant_email))
-            .load::<User>(&connect_to_db())
-            .unwrap();
+            .load::<User>(&connect_to_db())?;
 
         if !granter.is_empty() {
             Ok(granter.pop().unwrap())
