@@ -501,7 +501,7 @@ impl<'a> NewClaimableIdt<'a> {
         let duplicate = existing_claims.into_iter().any(|claim| claim == self);
         if duplicate {
             Err(ResError {
-                msg: "A similar Identification claim seems to exist",
+                msg: "A similar Identification claim seems to exist".into(),
                 status: 409,
             })
         } else {

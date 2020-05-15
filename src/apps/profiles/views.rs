@@ -11,7 +11,7 @@ use crate::core::{
 use crate::hashmap;
 
 use actix_multipart::Multipart;
-use actix_web::{http::StatusCode, web, Error, HttpResponse};
+use actix_web::{http::StatusCode, web, Error, HttpRequest, HttpResponse, Result};
 
 use futures::{StreamExt, TryStreamExt};
 use std::io::Write;
@@ -24,14 +24,17 @@ use std::io::Write;
 /// # method
 ///   GET
 ///
-pub fn get_profile(id: web::Path<i32>) -> HttpResponse {
+/// #### Authentication Required
+pub async fn get_profile(id: web::Path<i32>, req: HttpRequest) -> Result<HttpResponse, Error> {
+    User::decode_auth_header(&req)?;
+
     match Profile::find_by_key(*id) {
         Ok(mut prof_vec) => {
             let data = hashmap!["status" => "200",
             "message" => "Success. Profile retreived"];
-            respond(data, Some(prof_vec.0.pop()), None).unwrap()
+            respond(data, Some(prof_vec.0.pop()), None).unwrap().await
         }
-        Err(e) => err("404", e.to_string()),
+        Err(e) => err("404", e.to_string()).await,
     }
 }
 
@@ -56,30 +59,44 @@ pub fn get_all_profiles() -> HttpResponse {
 /// Updates the details of an existing User profile
 ///
 /// # url
-/// ## `/user/{id}/profile`
+/// ## `/user/profile/{id}`
 ///
 /// # Method
 /// PUT
 ///
-pub fn update_profile(data: web::Json<UpdtProfile>, id: web::Path<i32>) -> HttpResponse {
+/// #### Authentication Required
+pub async fn update_profile(
+    data: web::Json<UpdtProfile<'_>>,
+    id: web::Path<i32>,
+    req: HttpRequest,
+) -> Result<HttpResponse, Error> {
+    let this_user = User::from_token(&req)?;
+
     match Profile::find_by_key(*id) {
         Ok(p_vec) => {
             let profile = &p_vec.0[0];
-            let resp_data = hashmap!["status" => "200", "message" => "Success. Profile updated"];
+
+            if profile.user_id != this_user.id {
+                return err("401", "You are not allowed to do that".to_string()).await;
+            }
 
             match profile.update(data.0) {
-                Ok(p) => respond(resp_data, Some(p), None).unwrap(),
-                Err(e) => err("500", e.to_string()),
+                Ok(p) => {
+                    let resp_data = hashmap!["status" => "200",
+                    "message" => "Success. Profile updated"];
+                    respond(resp_data, Some(p), None).unwrap().await
+                }
+                Err(e) => err("500", e.to_string()).await,
             }
         }
-        Err(e) => err("404", e.to_string()),
+        Err(e) => err("404", e.to_string()).await,
     }
 }
 
 /// Uploads a file for use as the user's avatar
 ///
 /// # url
-/// ## `user/{id}/profile/avatar`
+/// ## `user/profile/avatar/{user_id}`
 ///
 /// # Arguments
 ///
@@ -92,29 +109,29 @@ pub fn update_profile(data: web::Json<UpdtProfile>, id: web::Path<i32>) -> HttpR
 ///
 /// # Method
 ///    PUT
+///
+/// #### Authentication Required
 pub async fn upload_avatar(
-    id: web::Path<i32>,
+    pk: web::Path<i32>,
     mut multipart: Multipart,
+    req: HttpRequest,
 ) -> Result<HttpResponse, Error> {
     let mut path = "".into();
+    let user = User::from_token(&req)?;
 
-    let user = match User::find_by_pk(*id, None) {
-        Ok(usr) => usr.0,
-        Err(e) => return Ok(err("400", e.to_string())),
-    };
+    if user.id != pk.into_inner() {
+        return err("401", "Oopsy. You are not allowed to do that".to_string()).await;
+    }
 
     // iterate over multipart stream
     while let Ok(Some(mut field)) = multipart.try_next().await {
         let content_type = field.content_disposition().unwrap();
         let filename = content_type.get_filename().unwrap().to_string();
 
-        // let filepath = format!("./tmp/");
         // File::create is blocking operation, use threadpool
 
-        // let  f = web::block(|| std::fs::File::create(filepath))
-        //    .await
-        //    .unwrap();
         let (mut f, filepath) = web::block(|| make_temp_file(Some(filename))).await?;
+
         // Field in turn is stream of *Bytes* object
         while let Some(chunk) = field.next().await {
             let data = chunk.unwrap();
@@ -141,23 +158,37 @@ pub async fn upload_avatar(
 /// Retrieves an avatar url of a user profile
 ///
 /// # url
-/// ## `/user/{user_id}/profile/avatar`
+/// ## `/user/profile/avatar/{user_id}`
 ///
 /// # method
 /// GET
-pub fn retrieve_profile_avatar(id: web::Path<i32>) -> HttpResponse {
-    let user = match User::find_by_pk(*id, None) {
-        Ok(usr) => usr.0,
-        Err(e) => return err("404", e.to_string()),
+///
+/// #### Authentication Required
+pub async fn retrieve_profile_avatar(
+    id: web::Path<i32>,
+    req: HttpRequest,
+) -> Result<HttpResponse, Error> {
+    let user = User::from_token(&req)?;
+
+    match User::find_by_pk(*id, None) {
+        Ok(usr) => {
+            if usr.0.id != user.id {
+                return err("401", "Permission denied".to_string()).await;
+            }
+        }
+        Err(e) => return err("404", e.to_string()).await,
     };
 
     match user.get_avatar() {
-        Ok(avatar) => respond(
-            hashmap!["status" => "200", "message" => "Success. Avatar retrieved"],
-            avatar,
-            None,
-        )
-        .unwrap(),
-        Err(e) => err("500", e.to_string()),
+        Ok(avatar) => {
+            respond(
+                hashmap!["status" => "200", "message" => "Success. Avatar retrieved"],
+                avatar,
+                None,
+            )
+            .unwrap()
+            .await
+        }
+        Err(e) => err("500", e.to_string()).await,
     }
 }

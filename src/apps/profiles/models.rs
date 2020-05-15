@@ -15,7 +15,7 @@ use std::{borrow::Cow, error};
 #[belongs_to(User)]
 pub struct Profile<'a> {
     id: i32,
-    user_id: i32,
+    pub user_id: i32,
     phone: Option<String>,
     /// Full name
     name: Option<String>,

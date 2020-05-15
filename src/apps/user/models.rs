@@ -368,7 +368,7 @@ impl User {
             return Ok((user, None));
         }
 
-        let mut usr_profile = Profile::belonging_to(&user).first::<Profile>(&connect_to_db())?;
+        let usr_profile = Profile::belonging_to(&user).first::<Profile>(&connect_to_db())?;
         Ok((user, Some(usr_profile)))
     }
 

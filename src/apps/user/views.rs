@@ -1,16 +1,20 @@
 //! Handles views for User items
 
-use super::models::{
-    GoogleUser, NewRfToken, NewUser, NewUserLevel, OClient, OauthGgUser, OauthInfo, Reftoken,
-    ResetPassData, SignInUser, User, UserEmail,
+use super::{
+    models::{
+        GoogleUser, NewRfToken, NewUser, NewUserLevel, OClient, OauthGgUser, OauthInfo, Reftoken,
+        ResetPassData, SignInUser, User, UserEmail,
+    },
+    utils::{err_response, get_context, get_reset_context, get_url, TEMPLATE},
 };
-
-use super::utils::{err_response, get_context, get_reset_context, get_url, TEMPLATE};
-
-use crate::apps::auth::validate;
-use crate::core::mail;
-use crate::core::response::{self, err, respond};
-use crate::hashmap;
+use crate::{
+    apps::auth::validate,
+    core::{
+        mail,
+        response::{self, err, respond},
+    },
+    hashmap,
+};
 
 use tera::{self, Context};
 
