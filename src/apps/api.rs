@@ -56,13 +56,13 @@ pub fn api(cfg: &mut web::ServiceConfig) {
             .service(
                 web::scope("/user")
                     .service(
-                        web::resource("/{id}/profile")
+                        web::resource("/profile/{id}")
                             .route(web::get().to(profiles::views::get_profile))
                             .route(web::put().to(profiles::views::update_profile)),
                     )
                     .service(web::resource("/{id}").route(web::get().to(user::views::get_user)))
                     .service(
-                        web::resource("/{id}/profile/avatar")
+                        web::resource("/profile/avatar/{id}")
                             .route(web::put().to(profiles::views::upload_avatar))
                             .route(web::get().to(profiles::views::retrieve_profile_avatar)),
                     ),
