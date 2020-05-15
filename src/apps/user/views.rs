@@ -444,31 +444,20 @@ pub fn get_user(id: web::Path<i32>) -> HttpResponse {
 ///
 /// # method
 ///  PATCH
-pub fn change_activation_status(mut data: web::Json<UserEmail>) -> HttpResponse {
-    if let Err(err) = data.validate() {
-        let res = response::JsonErrResponse::new("400".to_string(), err);
-        return HttpResponse::build(http::StatusCode::BAD_REQUEST).json(&res);
-    };
-    match User::find_by_email(data.email.to_mut()) {
-        Ok(vec) => {
-            let user = &vec[0];
-            match user.alter_activation_status() {
-                Ok(usr) => {
-                    let data =
-                        hashmap!["status" => "200", "message" => "User activation status changed"];
-                    let body = json!({
-                        "email": usr.email,
-                        "username": usr.username,
-                        "is_active": usr.is_active
-                    });
+pub async fn change_activation_status(req: HttpRequest) -> Result<HttpResponse, Error> {
+    let user = User::from_token(&req)?;
+    user.alter_activation_status()
+        .map(|usr| {
+            let data = hashmap!["status" => "200", "message" => "User activation status changed"];
+            let body = json!({
+                "email": usr.email,
+                "username": usr.username,
+                "is_active": usr.is_active
+            });
 
-                    respond(data, Some(body), None).unwrap()
-                }
-                Err(e) => err("500", e.to_string()),
-            }
-        }
-        Err(e) => err("404", e),
-    }
+            respond(data, Some(body), None).unwrap()
+        })
+        .map_err(|e| e.into())
 }
 
 /// Oauth authentication

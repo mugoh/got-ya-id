@@ -382,9 +382,8 @@ impl User {
 
     /// Alters an account activation status
     /// Activates or Deactivates a User account
-    pub fn alter_activation_status(&self) -> Result<User, Box<dyn stdError>> {
-        //
-        use crate::diesel_cfg::schema::users::dsl::*;
+    pub fn alter_activation_status(&self) -> Result<User, ResError> {
+        use crate::diesel_cfg::schema::users::dsl::is_active;
         Ok(diesel::update(&*self)
             .set(is_active.eq(!self.is_active))
             .get_result::<User>(&connect_to_db())?)
