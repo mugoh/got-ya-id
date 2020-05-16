@@ -1,5 +1,6 @@
 #![recursion_limit = "256"]
 pub mod apps;
+pub mod cmp;
 pub mod config;
 pub mod core;
 pub mod diesel_cfg;
