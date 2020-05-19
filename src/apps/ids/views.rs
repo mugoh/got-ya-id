@@ -182,6 +182,8 @@ pub async fn get_user_posted_idts(req: HttpRequest) -> Result<HttpResponse, Erro
 /// # Arguments
 /// idt_data: The Identification information to be used in matching
 /// the Identification of `idt_key` to the user sending the request
+///
+///This data should be an existing Identification Claim
 pub async fn claim_idt(idt_key: web::Path<&str>, req: HttpRequest) -> Result<HttpResponse, Error> {
     HttpResponse::build(actix_web::http::StatusCode::OK)
         .body("Hee")

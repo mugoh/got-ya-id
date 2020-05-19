@@ -1,0 +1,1 @@
+DROP TABLE matched_identifications
