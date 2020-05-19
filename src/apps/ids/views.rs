@@ -210,11 +210,15 @@ pub async fn create_idt_claim(
         return err("400", e.to_string()).await;
     }
 
-    new_idt.save(&req).map_err(|e| e.into()).map(|res_data| {
-        let msg = hashmap!["status" => "201",
+    new_idt
+        .save(&req)
+        .await
+        .map_err(|e| e.into())
+        .map(|res_data| {
+            let msg = hashmap!["status" => "201",
             "message" => "Success. Claim saved"];
-        respond(msg, Some(res_data), None).unwrap()
-    })
+            respond(msg, Some(res_data), None).unwrap()
+        })
 }
 
 /// Updates existing Claims

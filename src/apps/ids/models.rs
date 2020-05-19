@@ -6,9 +6,10 @@ use crate::{
     apps::user::utils::from_timestamp,
     diesel_cfg::{
         config::connect_to_db,
-        schema::{claimed_identifications, identifications},
+        schema::{claimed_identifications, identifications, matched_identifications},
     },
     errors::error::ResError,
+    similarity::cosine::cosine_similarity,
 };
 
 use chrono::{NaiveDate, NaiveDateTime};
@@ -23,9 +24,20 @@ use std::borrow::Cow;
 
 use actix_web::HttpRequest;
 
+/// Represents a matched Identification-Claim
+#[derive(Queryable, Serialize, Deserialize, Identifiable)]
+#[table_name = "matched_identifications"]
+struct MatchedIDt {
+    pub id: i64,
+    claim_id: i32,
+    identification_id: i32,
+
+    #[serde(deserialize_with = "from_timestamp")]
+    created_at: NaiveDateTime,
+}
 /// Represents the Queryable IDentification data model
 /// matching the database `identification` schema
-#[derive(Queryable, Associations, Debug, Serialize, Deserialize, AsChangeset, Identifiable)]
+#[derive(Queryable, Associations, Serialize, Deserialize, AsChangeset, Identifiable)]
 #[belongs_to(User, foreign_key = "posted_by")]
 pub struct Identification {
     pub id: i32,
@@ -183,7 +195,7 @@ pub struct NewClaimableIdt<'a> {
     pub user_id: i32,
 
     #[validate(regex(path = "regexes::ALPHA_REGEX", message = "should just have letters"))]
-    pub name: Option<Cow<'a, str>>,
+    pub name: Cow<'a, str>,
 
     #[validate(regex(path = "regexes::ALPHA_REGEX", message = "should just have letters"))]
     pub course: Option<Cow<'a, str>>,
@@ -192,7 +204,7 @@ pub struct NewClaimableIdt<'a> {
     graduation_year: Option<NaiveDate>,
 
     #[validate(regex(path = "regexes::ALPHA_REGEX", message = "should just have letters"))]
-    institution: Option<Cow<'a, str>>,
+    institution: Cow<'a, str>,
 
     #[validate(regex(
         path = "regexes::LOCATION_REGEX",
@@ -241,16 +253,8 @@ impl PartialEq<NewClaimableIdt<'_>> for ClaimableIdentification {
             } else {
                 false
             },
-            if let Some(ref inst) = claim.institution {
-                self.institution.eq(inst)
-            } else {
-                false
-            },
-            if let Some(ref name) = claim.name {
-                self.name.eq(name)
-            } else {
-                false
-            },
+            self.institution.eq(&claim.institution),
+            self.name.eq(&claim.name),
         ];
 
         match_fields.iter().all(|&field| field)
@@ -261,6 +265,8 @@ impl PartialEq<ClaimableIdentification> for NewClaimableIdt<'_> {
     fn eq(&self, claim: &ClaimableIdentification) -> bool {
         let match_fields = [
             self.entry_year.eq(&claim.entry_year),
+            self.institution.eq(&claim.institution),
+            self.name.eq(&claim.name),
             self.graduation_year.eq(&claim.graduation_year),
             if self.course.is_some() {
                 self.course.as_ref().unwrap().eq(&claim.course)
@@ -269,16 +275,6 @@ impl PartialEq<ClaimableIdentification> for NewClaimableIdt<'_> {
             },
             if let Some(loc) = &self.campus_location {
                 claim.campus_location.eq(loc)
-            } else {
-                false
-            },
-            if let Some(inst) = self.institution.as_ref() {
-                claim.institution.eq(inst)
-            } else {
-                false
-            },
-            if let Some(name) = self.name.as_ref() {
-                claim.name.eq(name)
             } else {
                 false
             },
@@ -464,27 +460,26 @@ impl Identification {
 
 impl<'a> NewClaimableIdt<'a> {
     /// Saves a new user Identification Claim to db
-    pub fn save(&mut self, auth_tk: &HttpRequest) -> Result<ClaimableIdentification, ResError> {
+    pub async fn save(
+        &mut self,
+        auth_tk: &HttpRequest,
+    ) -> Result<ClaimableIdentification, ResError> {
         use crate::diesel_cfg::schema::claimed_identifications::dsl::{
-            claimed_identifications as cl_idt_table, course as c_course,
-            institution as c_institution, name as c_name,
+            claimed_identifications as cl_idt_table, institution as c_institution, name as c_name,
         };
 
         let this_user = User::from_token(auth_tk)?;
         self.user_id = this_user.id;
-        self.has_claim(&this_user)?;
+        self.has_claim(&this_user).await?;
 
-        if self.name.is_some() && self.institution.is_some() && self.course.is_some() {
-            let existing_claims = cl_idt_table
-                .filter(
-                    c_name
-                        .eq(self.name.as_ref().unwrap())
-                        .and(c_course.eq(self.course.as_ref().unwrap()))
-                        .and(c_institution.eq(self.institution.as_ref().unwrap())),
-                )
-                .load::<ClaimableIdentification>(&connect_to_db())?;
-            self.is_unique(&existing_claims)?;
-        }
+        let existing_claims = cl_idt_table
+            .filter(
+                c_name
+                    .eq(self.name.as_ref())
+                    .and(c_institution.eq(self.institution.as_ref())),
+            )
+            .load::<ClaimableIdentification>(&connect_to_db())?;
+        self.is_unique(&existing_claims)?;
 
         let idt_claim = diesel::insert_into(claimed_identifications::table)
             .values(&*self)
@@ -513,7 +508,7 @@ impl<'a> NewClaimableIdt<'a> {
     ///
     /// Users should make just one claim by default,
     /// which they can then give controlled edits.
-    pub fn has_claim(&self, current_user: &User) -> Result<bool, ResError> {
+    pub async fn has_claim(&self, current_user: &User) -> Result<bool, ResError> {
         //
         let user_claims = ClaimableIdentification::belonging_to(current_user)
             .load::<ClaimableIdentification>(&connect_to_db())?;
@@ -567,5 +562,98 @@ impl ClaimableIdentification {
         } else {
             Ok(idt_claim.pop().unwrap())
         }
+    }
+
+    /// Matches Identifications that would belong to a claim.
+    ///
+    /// Match criteria is based on similarity between the Identification
+    /// details and those given on the Claim, more weight being given
+    /// to some fields deemed to be commonly unique, (such as the holder's name)
+    ///
+    /// The Identifications selected for match are selected from the name of the
+    /// institution given in the Claim.
+    pub async fn match_idt(&self) -> Result<(), ResError> {
+        use crate::diesel_cfg::schema::identifications::dsl::{
+            campus, identifications, institution, is_found,
+        };
+
+        let idts = if !self.campus_location.is_empty() {
+            let campus_loc = &self.campus_location;
+            identifications
+                .filter(
+                    institution
+                        .eq(&self.institution)
+                        .and(campus.eq(campus_loc))
+                        .and(is_found.eq(false)),
+                )
+                .load::<Identification>(&connect_to_db())?
+        } else {
+            identifications
+                .filter(institution.eq(&self.institution).and(is_found.eq(false)))
+                .load::<Identification>(&connect_to_db())?
+        };
+
+        self.find_similarity(idts).await?;
+        Ok(())
+    }
+
+    /// Compares the fields of a claim to given Identifications to ascertain
+    /// if the claim could refer to any of them.
+    ///
+    /// The similarity metric is cosine distance of the Identification and the
+    /// Claim fields
+    async fn find_similarity(
+        &self,
+        idents: Vec<Identification>,
+    ) -> Result<(), diesel::result::Error> {
+        use crate::diesel_cfg::schema::matched_identifications::dsl::*;
+
+        for idt in idents.iter() {
+            if self.is_matching_idt(idt).await {
+                //save matches
+                diesel::insert_into(matched_identifications)
+                    .values(&(claim_id.eq(self.id), identification_id.eq(idt.id)))
+                    .execute(&connect_to_db())?;
+            }
+        }
+        Ok(())
+    }
+
+    /// Finds the similarity between a Claim and an Identification,
+    /// returning true if they match.
+    ///
+    /// Cosine threshold: .90
+    async fn is_matching_idt(&self, idt: &Identification) -> bool {
+        // Use cosine similarity here
+        // name, course,
+        // valid-from, valid-till
+        // Assign an overall percentage match for each of the used fields
+        // Significance: name: .55, course: .15, valids: .3 each
+
+        let mut overall_significance: f64 = 0.0;
+
+        // Min threshold from matching name only -> .90*.6
+        let min_threshold = 0.54;
+
+        let nm_sig: f64 = 0.6; // Cosine of 1 contributes .60
+        let crse_sig: f64 = 0.25; // Cosine of 1 contributes .25
+        let tm_sig: f64 = 0.15; // Valid from, Valid till each contribute tm_sig/2
+
+        let name_s = cosine_similarity(self.name.as_ref(), &idt.name).await;
+        overall_significance += name_s * nm_sig;
+
+        let course_s = cosine_similarity(self.course.as_ref(), &idt.course).await;
+        overall_significance += course_s * crse_sig;
+
+        if idt.valid_from.is_some() && self.entry_year.is_some() {
+            if self.entry_year.unwrap().eq(&idt.valid_from.unwrap()) {
+                overall_significance += tm_sig / 2.;
+            }
+        } else if idt.valid_till.is_some() && self.graduation_year.is_some() {
+            if self.graduation_year.unwrap().eq(&idt.valid_till.unwrap()) {
+                overall_significance += tm_sig / 2.;
+            }
+        }
+        overall_significance >= min_threshold
     }
 }
