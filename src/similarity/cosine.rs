@@ -11,10 +11,12 @@ use std::collections::HashSet;
 /// # Arguments
 /// text1, text2
 ///
+/// REMOVED in favour of a uniform alphanumeric pattern
 /// regex: Name of the Mathing pattern
 /// The default metric used is similarity in the string's alphaneumerics ("\w").
 /// To base the similarity on words("\w+") instead, specify regex=words
-pub fn cosine_similarity(text1: &str, text2: &str, regex: &str) -> f64 {
+pub async fn cosine_similarity(text1: &str, text2: &str) -> f64 {
+    let regex = "alpha";
     let pattern = if regex == "words" { r"\w+" } else { r"\w" };
     let re = Regex::new(pattern).unwrap();
 
