@@ -238,6 +238,15 @@ pub struct UpdatableClaimableIdt<'a> {
     campus_location: Option<Cow<'a, str>>,
 }
 
+/// Json Model for an Identification claim request
+#[derive(Serialize)]
+pub struct MatchedIdtJson {
+    /// The identification ID a User wants to claim
+    idt: i32,
+    /// A (possibly) matching Claimable Identification ID
+    claim: i32,
+}
+
 impl PartialEq<NewClaimableIdt<'_>> for ClaimableIdentification {
     fn eq(&self, claim: &NewClaimableIdt) -> bool {
         let match_fields = [
@@ -455,6 +464,36 @@ impl Identification {
     pub fn is_now_mine(&self, usr: &User) -> Result<(), ResError> {
         let is_truly_yours = false;
         Ok(())
+    }
+
+    /// Checks if the Identification and Claim IDs given in
+    /// the MatchedIdtJson request match each other.
+    pub fn search_matching_claims(
+        data: &MatchedIdtJson,
+        usr: &User,
+    ) -> Result<Identification, ResError> {
+        use crate::diesel_cfg::schema::claimed_identifications::dsl::claimed_identifications;
+        use crate::diesel_cfg::schema::identifications::dsl::identifications;
+        use crate::diesel_cfg::schema::matched_identifications::dsl::*;
+
+        let idt_match = matched_identifications
+            .filter(claim_id.eq(data.claim).and(identification_id.eq(data.idt)))
+            .first::<MatchedIDt>(&connect_to_db())?;
+
+        let this_claim = claimed_identifications
+            .find(data.idt)
+            .first::<ClaimableIdentification>(&connect_to_db())?;
+
+        if this_claim.user_id != usr.id {
+            return Err(ResError::unauthorized());
+        }
+
+        let mut this_idt = identifications
+            .find(data.claim)
+            .first::<Identification>(&connect_to_db())?;
+        this_idt.owner = Some(usr.id);
+        let saved_idt = this_idt.save_changes::<Identification>(&connect_to_db())?;
+        Ok(saved_idt)
     }
 }
 

@@ -3,7 +3,7 @@
 use actix_web::{web, Error, HttpRequest, HttpResponse, Result};
 
 use super::models::{
-    ClaimableIdentification, Identification, NewClaimableIdt, NewIdentification,
+    ClaimableIdentification, Identification, MatchedIdtJson, NewClaimableIdt, NewIdentification,
     UpdatableClaimableIdt, UpdatableIdentification,
 };
 use crate::{
@@ -184,7 +184,11 @@ pub async fn get_user_posted_idts(req: HttpRequest) -> Result<HttpResponse, Erro
 /// the Identification of `idt_key` to the user sending the request
 ///
 ///This data should be an existing Identification Claim
-pub async fn claim_idt(idt_key: web::Path<&str>, req: HttpRequest) -> Result<HttpResponse, Error> {
+pub async fn claim_idt(
+    req: HttpRequest,
+    data: web::Json<MatchedIdtJson>,
+) -> Result<HttpResponse, Error> {
+    Identification::search_matching_claims(&data, &User::from_token(&req)?)?;
     HttpResponse::build(actix_web::http::StatusCode::OK)
         .body("Hee")
         .await
