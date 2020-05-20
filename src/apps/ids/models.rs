@@ -485,6 +485,8 @@ impl<'a> NewClaimableIdt<'a> {
             .values(&*self)
             .get_result::<ClaimableIdentification>(&connect_to_db())?;
 
+        idt_claim.match_idt().await?;
+
         Ok(idt_claim)
     }
 
@@ -534,10 +536,10 @@ impl ClaimableIdentification {
     }
 
     /// Updates the Identification with the passed data
-    pub fn update(
+    pub async fn update(
         &self,
         auth_tk: &HttpRequest,
-        data: UpdatableClaimableIdt,
+        data: UpdatableClaimableIdt<'_>,
     ) -> Result<Self, ResError> {
         let this_user = User::from_token(auth_tk)?;
 
@@ -548,6 +550,7 @@ impl ClaimableIdentification {
         let updated_idt = diesel::update(&*self)
             .set(data)
             .get_result::<Self>(&connect_to_db())?;
+        self.match_idt().await?;
 
         Ok(updated_idt)
     }
@@ -607,12 +610,17 @@ impl ClaimableIdentification {
         idents: Vec<Identification>,
     ) -> Result<(), diesel::result::Error> {
         use crate::diesel_cfg::schema::matched_identifications::dsl::*;
+        use diesel::pg::upsert::on_constraint;
 
         for idt in idents.iter() {
             if self.is_matching_idt(idt).await {
-                //save matches
+                //
+                // unique (claim_id, identification_id)
+                // Ignore this, it's bound to happen
                 diesel::insert_into(matched_identifications)
                     .values(&(claim_id.eq(self.id), identification_id.eq(idt.id)))
+                    .on_conflict(on_constraint("matched_claim_id_unique"))
+                    .do_nothing()
                     .execute(&connect_to_db())?;
             }
         }

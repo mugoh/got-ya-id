@@ -236,20 +236,19 @@ pub async fn update_idt_claim(
     if let Err(e) = idt_data.validate() {
         return err("400", e.to_string()).await;
     }
-    ClaimableIdentification::find_by_id(*pk)
-        .map_err(|e| e.into())
-        .map(|claimed_idt| {
-            claimed_idt
-                .update(&req, idt_data.into_inner())
-                .map(|updated| {
-                    let msg = hashmap!["status" => "200",
+    let claimed_idt = ClaimableIdentification::find_by_id(*pk)?;
+
+    claimed_idt
+        .update(&req, idt_data.into_inner())
+        .await
+        .map(|updated| {
+            let msg = hashmap!["status" => "200",
             "message" => "Success. Claim updated"];
 
-                    respond(msg, Some(updated), None).unwrap()
-                })
-                .map_err(|e| e.into())
+            respond(msg, Some(updated), None).unwrap()
         })
-        .and_then(|res| res)
+        .map_err(|e| e.into())
+        .and_then(|res| Ok(res))
 }
 
 /// Retrieves Claimable Identifications by PK
