@@ -101,7 +101,14 @@ pub fn api(cfg: &mut web::ServiceConfig) {
                             .route(web::get().to(ids::views::get_idt))
                             .route(web::put().to(ids::views::update_idt)),
                     )
-                    .service(web::resource("").route(web::get().to(ids::views::get_all_idts)))
+                    .service(web::resource("/all").route(web::get().to(ids::views::get_all_idts)))
+                    .service(
+                        web::resource("/missing")
+                            .route(web::get().to(ids::views::get_missing_idts)),
+                    )
+                    .service(
+                        web::resource("/found").route(web::get().to(ids::views::get_found_idts)),
+                    )
                     .service(
                         web::resource("/lose/{pk}").route(web::post().to(ids::views::lose_idt)),
                     )

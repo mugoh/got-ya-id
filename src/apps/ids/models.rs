@@ -378,12 +378,34 @@ impl Identification {
     }
 
     /// Retrieves all existing Identifications
+    ///
+    /// # Arguments
+    /// ## status: &str
+    /// found - Retrieve found Idts
+    /// missing - Retrieve non-found Idts
+    /// all - Retrieve all idts
+    ///
+    /// The default is missing, for a status argument that
+    /// does not match any of the three options.
+    ///
     /// # Returns
     /// An empty vec if none is present
-    pub fn retrieve_all() -> Result<Vec<Identification>, ResError> {
-        use crate::diesel_cfg::schema::identifications::dsl::identifications;
+    pub fn retrieve_all(status: &str) -> Result<Vec<Identification>, ResError> {
+        use crate::diesel_cfg::schema::identifications::dsl::{identifications, is_found as found};
 
-        Ok(identifications.load::<Identification>(&connect_to_db())?)
+        let idts = if status == "all" {
+            identifications.load::<Identification>(&connect_to_db())?
+        } else if status == "found" {
+            identifications
+                .filter(found.eq(true))
+                .load::<Self>(&connect_to_db())?
+        } else {
+            identifications
+                .filter(found.eq(false))
+                .load::<Self>(&connect_to_db())?
+        };
+
+        Ok(idts)
     }
 
     /// Marks the identification matching the given key as found

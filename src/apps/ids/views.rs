@@ -55,20 +55,54 @@ pub async fn get_idt(pk: web::Path<i32>) -> Result<HttpResponse, Error> {
     respond(msg, Some(idt), None).unwrap().await
 }
 
-/// Retrieves all existing Identifications
+/// Retrieves all existing Identifications, found and missing
+///
+/// ## WARNING
+/// Stick to /ids/missing if unsure.
+///
 /// # Url
-/// `/ids`
+/// `/ids/all`
 ///
 /// # Method
 /// `GET`
 pub async fn get_all_idts() -> Result<HttpResponse, Error> {
-    let data = Identification::retrieve_all()?;
+    let data = Identification::retrieve_all("all")?;
     let msg = hashmap!["status" => "200",
-            "message" => "Success. Identifications retrieved"];
+            "message" => "Success. All identifications retrieved"];
 
     respond(msg, Some(data), None).unwrap().await
 }
 
+/// Retrieves missing Identifications. These are identifications
+/// which have not been marked `is_found` as True yet.
+///
+/// # Url
+/// `/ids/missing`
+///
+/// # Method
+/// `GET`
+pub async fn get_missing_idts() -> Result<HttpResponse, Error> {
+    let data = Identification::retrieve_all("missing")?;
+    let msg = hashmap!["status" => "200",
+            "message" => "Success. Missing identifications retrieved"];
+
+    respond(msg, Some(data), None).unwrap().await
+}
+/// Retrieves found Identifications. These are identifications
+/// which have an `is_found` marked True by the owner.
+///
+/// # Url
+/// `/ids/found`
+///
+/// # Method
+/// `GET`
+pub async fn get_found_idts() -> Result<HttpResponse, Error> {
+    let data = Identification::retrieve_all("found")?;
+    let msg = hashmap!["status" => "200",
+            "message" => "Success. Found identifications retrieved"];
+
+    respond(msg, Some(data), None).unwrap().await
+}
 /// Marks an Identification as `found`
 ///
 /// A found IDt is assumed to have been acquired by
@@ -90,10 +124,30 @@ pub async fn is_now_found(pk: web::Path<i32>) -> Result<HttpResponse, Error> {
     respond(msg, Some(idt), None).unwrap().await
 }
 
-/// Marks an Identification as `not found`
+/// Marks an Identifications `is_found` status as
+/// False.
 ///
-/// A found IDt is assumed to be marked as lost by
-/// its owner
+/// ## INFO
+/// This request was initially meant to be made by the
+/// owner of the Idt. However, it's not reasonable, as
+/// just changing the found status does tell the owner
+/// where to find a re-lost Identification.
+///
+/// The alternative assumption was that posting a new
+/// identification should allow the user to search for
+/// closely matching fields on existing `found` Idts.
+/// In case this happens to be a relost Idt, an update
+/// (to (maybe) its new location, and `is_found` status)
+/// would simply be done, instead of creating a new Idt
+/// item all together.
+///
+/// This all seems an unnecessay fetch though.
+/// Reason? Seems like a fancy way to complicate the
+/// work of a user posting a found Idt.
+///
+/// An Identification whose `is_found` is marked `True`
+/// will be considered as good as deleted then, and should
+/// in no direct way happen to be visible to the user
 ///
 /// # Url
 /// `/ids/lose/{key}`
