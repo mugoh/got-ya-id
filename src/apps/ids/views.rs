@@ -81,8 +81,9 @@ pub async fn get_all_idts() -> Result<HttpResponse, Error> {
 /// `POST`
 ///
 pub async fn is_now_found(pk: web::Path<i32>) -> Result<HttpResponse, Error> {
-    let idt = Identification::mark_found(pk.into_inner())?;
+    let idt = Identification::mark_found(*pk)?;
 
+    Identification::remove_found_claims(*pk).await?;
     let msg = hashmap!["status" => "200",
             "message" => "Success. Identification status marked FOUND"];
 
@@ -183,15 +184,31 @@ pub async fn get_user_posted_idts(req: HttpRequest) -> Result<HttpResponse, Erro
 /// idt_data: The Identification information to be used in matching
 /// the Identification of `idt_key` to the user sending the request
 ///
-///This data should be an existing Identification Claim
+/// This data should be an existing Identification Claim
+///
+/// #### Authentication required
+///
+/// ## Example
+/// ```rust
+/// use actix_web::test;
+///
+/// let data = MatchedIdtJson {idt: 1, claim: 1};
+/// let req = test::TestRequest::post()
+///     .set_json(&body)
+///     .uri(&url)
+///     .to_request();
+///
+/// claim_idt(req);
+///
+/// ```
 pub async fn claim_idt(
     req: HttpRequest,
     data: web::Json<MatchedIdtJson>,
 ) -> Result<HttpResponse, Error> {
-    Identification::search_matching_claims(&data, &User::from_token(&req)?)?;
-    HttpResponse::build(actix_web::http::StatusCode::OK)
-        .body("Hee")
-        .await
+    let owned_idt = Identification::search_matching_claim(&data, &User::from_token(&req)?)?;
+    let msg = hashmap!["status" => "200",
+            "message" => "Success. Identification claimed"];
+    respond(msg, Some(owned_idt), None).unwrap().await
 }
 
 /// Created a claim to an identification

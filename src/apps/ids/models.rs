@@ -239,7 +239,7 @@ pub struct UpdatableClaimableIdt<'a> {
 }
 
 /// Json Model for an Identification claim request
-#[derive(Serialize)]
+#[derive(Deserialize)]
 pub struct MatchedIdtJson {
     /// The identification ID a User wants to claim
     idt: i32,
@@ -402,6 +402,19 @@ impl Identification {
         }
     }
 
+    /// Removes Identification claim matches of the Identification id given. `key`.
+    ///
+    /// This is meant to be called once an Identification has been found, and a claim
+    /// is no longer needed.
+    pub async fn remove_found_claims(key: i32) -> Result<(), ResError> {
+        use crate::diesel_cfg::schema::matched_identifications::dsl::{
+            identification_id, matched_identifications,
+        };
+        diesel::delete(matched_identifications.filter(identification_id.eq(key)))
+            .execute(&connect_to_db())?;
+        Ok(())
+    }
+
     /// Marks the identification matching the given key as NOT found
     pub fn is_lost(pk: i32) -> Result<Identification, ResError> {
         let mut idt = Self::find_by_id(pk)?;
@@ -461,14 +474,14 @@ impl Identification {
     /// Mark an Idt's `owner` as the given user
     ///
     /// The User's details should match those of the Identification, to some (probably to be agreed) extent.
-    pub fn is_now_mine(&self, usr: &User) -> Result<(), ResError> {
-        let is_truly_yours = false;
+    pub fn is_now_mine(&self, _usr: &User) -> Result<(), ResError> {
+        let _is_truly_yours = false;
         Ok(())
     }
 
     /// Checks if the Identification and Claim IDs given in
     /// the MatchedIdtJson request match each other.
-    pub fn search_matching_claims(
+    pub fn search_matching_claim(
         data: &MatchedIdtJson,
         usr: &User,
     ) -> Result<Identification, ResError> {
@@ -481,7 +494,7 @@ impl Identification {
             .first::<MatchedIDt>(&connect_to_db())?;
 
         let this_claim = claimed_identifications
-            .find(data.idt)
+            .find(idt_match.claim_id)
             .first::<ClaimableIdentification>(&connect_to_db())?;
 
         if this_claim.user_id != usr.id {
@@ -489,8 +502,9 @@ impl Identification {
         }
 
         let mut this_idt = identifications
-            .find(data.claim)
+            .find(idt_match.identification_id)
             .first::<Identification>(&connect_to_db())?;
+
         this_idt.owner = Some(usr.id);
         let saved_idt = this_idt.save_changes::<Identification>(&connect_to_db())?;
         Ok(saved_idt)
@@ -575,6 +589,9 @@ impl ClaimableIdentification {
     }
 
     /// Updates the Identification with the passed data
+    ///
+    /// This could also be done if a re-match of the claim
+    /// to existing, or newly posted Identifications is neccessary.
     pub async fn update(
         &self,
         auth_tk: &HttpRequest,
