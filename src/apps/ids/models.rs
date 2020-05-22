@@ -334,7 +334,7 @@ impl PartialEq<NewIdentification<'_>> for Identification {
 }
 impl<'a> NewIdentification<'a> {
     /// Saves a new ID record to the Identifications table
-    pub fn save(&mut self, auth_tk: &HttpRequest) -> Result<Identification, ResError> {
+    pub async fn save(&mut self, auth_tk: &HttpRequest) -> Result<Identification, ResError> {
         use crate::diesel_cfg::schema::identifications::dsl::{
             campus, course, identifications as _identifications, institution, name,
         };
@@ -364,8 +364,40 @@ impl<'a> NewIdentification<'a> {
 
         Ok(idt)
     }
-}
 
+    /// Finds Identification claims that would be possible matches
+    /// to a new Identification.
+    ///
+    /// This method should be analogous to `NewClaim.match_idt`
+    pub async fn match_claims(&self) -> Result<(), ResError> {
+        use crate::diesel_cfg::schema::claimed_identifications::dsl::{
+            campus_location, claimed_identifications, institution,
+        };
+
+        let idt_claims = claimed_identifications
+            .filter(
+                institution
+                    .eq(&self.institution)
+                    .and(campus_location.eq(&self.campus)),
+            )
+            .load::<ClaimableIdentification>(&connect_to_db())?;
+
+        for claim in idt_claims.iter() {
+            if self.is_possible_match(claim).await {
+                MatchedIDt::save(claim, &self.into()).await?;
+            }
+        }
+        Ok(())
+    }
+
+    /// Finds the similarity between a Claim and this Identification,
+    /// returning true if the Claim is a  possible match.
+    ///
+    /// Matching metric is cosine similarity.
+    pub async fn is_possible_match(&self, claim: &ClaimableIdentification) -> bool {
+        ClaimableIdentification::is_matching_idt(claim, &self.into()).await
+    }
+}
 impl Identification {
     /// Finds an Identification by its primary key
     pub fn find_by_id(key: i32) -> Result<Identification, ResError> {
@@ -687,19 +719,9 @@ impl ClaimableIdentification {
         &self,
         idents: Vec<Identification>,
     ) -> Result<(), diesel::result::Error> {
-        use crate::diesel_cfg::schema::matched_identifications::dsl::*;
-        use diesel::pg::upsert::on_constraint;
-
         for idt in idents.iter() {
-            if self.is_matching_idt(idt).await {
-                //
-                // unique (claim_id, identification_id)
-                // Ignore this, it's bound to happen
-                diesel::insert_into(matched_identifications)
-                    .values(&(claim_id.eq(self.id), identification_id.eq(idt.id)))
-                    .on_conflict(on_constraint("matched_claim_id_unique"))
-                    .do_nothing()
-                    .execute(&connect_to_db())?;
+            if Self::is_matching_idt(self, idt).await {
+                MatchedIDt::save(self, idt).await?;
             }
         }
         Ok(())
@@ -709,7 +731,7 @@ impl ClaimableIdentification {
     /// returning true if they match.
     ///
     /// Cosine threshold: .90
-    async fn is_matching_idt(&self, idt: &Identification) -> bool {
+    async fn is_matching_idt(claim: &ClaimableIdentification, idt: &Identification) -> bool {
         // Use cosine similarity here
         // name, course,
         // valid-from, valid-till
@@ -725,21 +747,71 @@ impl ClaimableIdentification {
         let crse_sig: f64 = 0.25; // Cosine of 1 contributes .25
         let tm_sig: f64 = 0.15; // Valid from, Valid till each contribute tm_sig/2
 
-        let name_s = cosine_similarity(self.name.as_ref(), &idt.name).await;
+        let name_s = cosine_similarity(claim.name.as_ref(), &idt.name).await;
         overall_significance += name_s * nm_sig;
 
-        let course_s = cosine_similarity(self.course.as_ref(), &idt.course).await;
+        let course_s = cosine_similarity(claim.course.as_ref(), &idt.course).await;
         overall_significance += course_s * crse_sig;
 
-        if idt.valid_from.is_some() && self.entry_year.is_some() {
-            if self.entry_year.unwrap().eq(&idt.valid_from.unwrap()) {
+        if idt.valid_from.is_some() && claim.entry_year.is_some() {
+            if claim.entry_year.unwrap().eq(&idt.valid_from.unwrap()) {
                 overall_significance += tm_sig / 2.;
             }
-        } else if idt.valid_till.is_some() && self.graduation_year.is_some() {
-            if self.graduation_year.unwrap().eq(&idt.valid_till.unwrap()) {
+        } else if idt.valid_till.is_some() && claim.graduation_year.is_some() {
+            if claim.graduation_year.unwrap().eq(&idt.valid_till.unwrap()) {
                 overall_significance += tm_sig / 2.;
             }
         }
         overall_significance >= min_threshold
+    }
+}
+
+impl MatchedIDt {
+    /// Inserts a new Identification/Claim match into the Matches
+    /// table.
+    pub async fn save(
+        claim: &ClaimableIdentification,
+        idt: &Identification,
+    ) -> Result<usize, diesel::result::Error> {
+        use crate::diesel_cfg::schema::matched_identifications::dsl::*;
+        use diesel::pg::upsert::on_constraint;
+
+        // unique (claim_id, identification_id)
+        // Ignore this, it's bound to happen
+        Ok(diesel::insert_into(matched_identifications)
+            .values(&(claim_id.eq(claim.id), identification_id.eq(idt.id)))
+            .on_conflict(on_constraint("matched_claim_id_unique"))
+            .do_nothing()
+            .execute(&connect_to_db())?)
+    }
+}
+
+impl std::convert::From<&NewIdentification<'_>> for Identification {
+    /// Desired fields are those used in comparison between Identifications
+    /// ans ClaimableIdentifications.
+    ///
+    /// Usable fields are only:
+    /// name, course, campus, valid_from, valid_till, institution
+    fn from(new_idt: &NewIdentification<'_>) -> Self {
+        Identification {
+            name: new_idt.name.as_ref().into(),
+            course: new_idt.course.as_ref().into(),
+            campus: new_idt.campus.as_ref().into(),
+            valid_from: new_idt.valid_from,
+            valid_till: new_idt.valid_till,
+            institution: new_idt.institution.as_ref().into(),
+
+            // Below fields should NOT be used on an Idt converted from a NewIdt
+            id: 0,
+            created_at: NaiveDate::from_ymd(2010, 01, 01).and_hms(0, 00, 00),
+            updated_at: NaiveDate::from_ymd(2010, 01, 01).and_hms(0, 00, 00),
+            location_name: "".into(),
+            location_point: None,
+            picture: None,
+            posted_by: new_idt.posted_by,
+            is_found: false,
+            about: None,
+            owner: None,
+        }
     }
 }

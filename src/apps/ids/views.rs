@@ -29,15 +29,15 @@ pub async fn create_new_identification(
         //return Ok(respond::<serde_json::Value>(hashmap!["status" => "400"], None, Some(&e.to_string())).unwrap());
         return Ok(err("400", e.to_string()));
     }
-    new_idt
-        .save(&req)
-        .map_err(|e| e.into())
-        .map(move |idt| {
-            let res = hashmap!["status" => "201",
+    let idt = new_idt.save(&req).await?;
+
+    // Identify possible existing claim on the ID
+    new_idt.match_claims().await?;
+
+    let res = hashmap!["status" => "201",
             "message" => "Success. Identification created"];
-            respond(res, Some(idt), None).unwrap()
-        })
-        .and_then(|ok| Ok(ok))
+
+    respond(res, Some(idt), None).unwrap().await
 }
 
 ///Retrives a single Identification using its PK
