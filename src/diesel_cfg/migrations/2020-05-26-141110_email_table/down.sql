@@ -1,0 +1,6 @@
+DROP TABLE IF EXISTS emails;
+
+ALTER TABLE users
+ADD COLUMN email VARCHAR UNIQUE;
+
+CREATE UNIQUE INDEX IF NOT EXISTS user_creds on USERS (username, email);
