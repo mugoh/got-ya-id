@@ -226,7 +226,7 @@ pub async fn login(user: web::Json<SignInUser<'_>>) -> Result<HttpResponse, Erro
                 format!("{}Login success", reactication_msg),
                 json!(
                     { "username": &usr.username,
-                      "email": &usr.email,
+                      "email": &usr.email(),
                       "auth_token": &auth_token,
                       "refresh_token": &refresh_tkn,
                     }

@@ -15,7 +15,7 @@ use crate::{
     core::py_interface::remove_py_mod,
     diesel_cfg::{
         config::connect_to_db,
-        schema::{oath_users, refresh_tokens, users},
+        schema::{emails as emails_table, oath_users, refresh_tokens, users},
     },
     errors::error::ResError,
 };
@@ -26,7 +26,7 @@ use serde::{Deserialize, Serialize};
 use validator::Validate;
 use validator_derive::Validate;
 
-use actix_web::error::{ErrorForbidden, ErrorInternalServerError};
+use actix_web::error::{Error, ErrorForbidden, ErrorInternalServerError};
 
 use actix_web::http::header::Header as acHeader;
 use actix_web_httpauth::headers::authorization::Authorization;
@@ -176,8 +176,10 @@ impl<'a> NewUser<'a> {
     ///
     /// # Returns
     /// User
-    pub fn save(&mut self, email: &str) -> Result<User, Box<dyn stdError>> {
-        match self.is_unique(email) {
+    pub fn save(&mut self, new_email: &str) -> Result<User, Box<dyn stdError>> {
+        use crate::diesel_cfg::schema::emails::*;
+
+        match self.is_unique(new_email) {
             Ok(_) => (),
             Err(e) => {
                 return Err(format!(
@@ -198,6 +200,12 @@ impl<'a> NewUser<'a> {
         let usr = diesel::insert_into(users::table)
             .values(&*self) // diesel::Insertable unimplemented for &mut
             .get_result::<User>(&connect_to_db())?;
+
+        let email_data = (email.eq(new_email), user_id.eq(usr.id), active.eq(true));
+
+        diesel::insert_into(emails_table::table)
+            .values(&email_data)
+            .load::<Email>(&connect_to_db())?;
         NewProfile::new(usr.id, None)?;
         Ok(usr)
     }
@@ -256,6 +264,16 @@ impl User {
             debug!("{:?}", e);
             e.to_string()
         })
+    }
+
+    pub fn email<'a>(&self) -> &'a str {
+        use crate::diesel_cfg::schema::emails::email;
+
+        Email::belonging_to(self)
+            .select(email)
+            .get_result::<String>(&connect_to_db())
+            .unwrap()
+            .as_str()
     }
 
     /// Creates an authorization token encoded with the
