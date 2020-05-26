@@ -266,10 +266,12 @@ impl User {
         })
     }
 
+    /// Gives the Active email of a User
     pub fn email<'a>(&self) -> &'a str {
-        use crate::diesel_cfg::schema::emails::email;
+        use crate::diesel_cfg::schema::emails::{active, email};
 
         Email::belonging_to(self)
+            .filter(active.eq(true))
             .select(email)
             .get_result::<String>(&connect_to_db())
             .unwrap()
@@ -312,18 +314,23 @@ impl User {
     /// Decodes the auth token representing a user
     /// to return an user object with a verified account
     pub fn verify_user(user_key: &str) -> Result<User, Box<dyn stdError>> {
+        use crate::diesel_cfg::schema::emails::dsl::{email, emails, user_id};
         use crate::diesel_cfg::schema::users::dsl::*;
+
         let user = match validate::decode_auth_token(user_key, Some("verification".to_owned())) {
             Ok(user_detail) => user_detail.sub,
             Err(e) => {
-                // return (status code, e)
                 return Err(e.into());
             }
         };
-        let user = diesel::update(users.filter(email.eq(&user)))
+        let uid = emails
+            .filter(email.eq(&user))
+            .select(user_id)
+            .get_result::<i32>(&connect_to_db())?;
+
+        let user = diesel::update(users.find(uid))
             .set(is_verified.eq(true))
-            .get_result::<User>(&connect_to_db())
-            .unwrap();
+            .get_result::<User>(&connect_to_db())?;
 
         Ok(user)
     }
@@ -331,6 +338,7 @@ impl User {
     /// Alters the existing account password to match
     /// the string passed as a new password.
     pub fn reset_pass(token: &str, new_password: &str) -> Result<(), Box<dyn stdError>> {
+        use crate::diesel_cfg::schema::emails::dsl::{email, emails, user_id};
         use crate::diesel_cfg::schema::users::dsl::*;
 
         let user = match validate::decode_auth_token(token, Some("password_reset".to_string())) {
@@ -342,7 +350,12 @@ impl User {
             Err(e) => return Err(e.into()),
         };
 
-        diesel::update(users.filter(email.eq(&user)))
+        let uid = emails
+            .filter(email.eq(&user))
+            .select(user_id)
+            .get_result::<i32>(&connect_to_db())?;
+
+        diesel::update(users.find(uid))
             .set(password.eq(pass_hash))
             .get_result::<User>(&connect_to_db())?;
         Ok(())
@@ -356,19 +369,11 @@ impl User {
     /// OK -> User object that matches the given email
     /// ERR -> String
     pub fn find_by_email(given_email: &str) -> Result<Vec<User>, String> {
-        use crate::diesel_cfg::schema::users::dsl::{email, users};
-
-        let user = users
-            .filter(email.eq(given_email))
-            .load::<User>(&connect_to_db())
-            .unwrap();
-        if user.is_empty() {
-            Err(format!("User of email {} non-existent", given_email))
-        } else {
-            Ok(user)
+        match Email::as_user(given_email) {
+            Err(_) => Err(format!("User of email {} non-existent", given_email)),
+            Ok(user) => user,
         }
     }
-
     /// Finds a User by Primary key
     ///
     /// # Returns

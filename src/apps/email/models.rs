@@ -7,7 +7,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     apps::user::{models::User, utils::from_timestamp},
-    diesel_cfg::schema::emails,
+    diesel_cfg::{config::connect_to_db, schema::emails},
 };
 
 use chrono::NaiveDateTime;
@@ -48,4 +48,24 @@ pub struct NewEmail<'a> {
 
     #[serde(skip_deserializing)]
     pub removed: bool,
+}
+
+impl Email {
+    /// Retrieves a User owning a given email
+    ///
+    /// This is the active email.
+    pub fn as_user(curious_email: &str) -> Result<User, diesel::result::Error> {
+        //
+
+        use crate::diesel_cfg::schema::emails::dsl::*;
+        use crate::diesel_cfg::schema::users::dsl::users;
+
+        let u_id = emails
+            .filter(email.eq(&curious_email))
+            .select(user_id)
+            .get_result::<i32>(&connect_to_db())?;
+
+        let user = users.find(u_id).get_result::<User>(&connect_to_db())?;
+        Ok(user)
+    }
 }
