@@ -5,14 +5,20 @@ use super::utils::{from_timestamp, validate_email, validate_name};
 
 use std::borrow::Cow;
 
-use crate::apps::auth::validate::{self, Claims};
-use crate::apps::profiles::models::{Avatar, NewProfile, Profile};
-use crate::config::configs as config;
-use crate::core::py_interface::remove_py_mod;
-use crate::diesel_cfg::{
-    config::connect_to_db, schema::oath_users, schema::refresh_tokens, schema::users,
+use crate::{
+    apps::{
+        auth::validate::{self, Claims},
+        email::models::Email,
+        profiles::models::{Avatar, NewProfile, Profile},
+    },
+    config::configs as config,
+    core::py_interface::remove_py_mod,
+    diesel_cfg::{
+        config::connect_to_db,
+        schema::{oath_users, refresh_tokens, users},
+    },
+    errors::error::ResError,
 };
-use crate::errors::error::ResError;
 
 use std::{env, error::Error as stdError};
 
@@ -20,10 +26,7 @@ use serde::{Deserialize, Serialize};
 use validator::Validate;
 use validator_derive::Validate;
 
-use actix_web::{
-    error::{ErrorForbidden, ErrorInternalServerError},
-    Error, HttpRequest,
-};
+use actix_web::error::{ErrorForbidden, ErrorInternalServerError};
 
 use actix_web::http::header::Header as acHeader;
 use actix_web_httpauth::headers::authorization::Authorization;
@@ -41,12 +44,11 @@ use url::Url;
 
 /// User Object
 /// Holds user data
-#[derive(Debug, Queryable, Serialize, AsChangeset, Deserialize, Identifiable, Validate)]
+#[derive(Queryable, Serialize, AsChangeset, Deserialize, Identifiable, Validate)]
 #[table_name = "users"]
 pub struct User {
     pub id: i32,
     pub username: String,
-    pub email: String,
     #[serde(skip_deserializing)]
     password: Option<String>,
     #[serde(deserialize_with = "from_timestamp")]
@@ -62,10 +64,22 @@ pub struct User {
 
 /// Temporary holds new User data
 /// User Record for new User entries
-#[derive(Clone, Validate, Serialize, Deserialize, Insertable)]
+#[derive(Clone, Serialize, Deserialize, Insertable)]
 #[table_name = "users"]
-#[serde(deny_unknown_fields)]
 pub struct NewUser<'b> {
+    pub username: Cow<'b, str>,
+    pub password: Cow<'b, str>,
+    pub access_level: Option<i32>,
+}
+
+/// The model representing the user
+/// data used in registering new users.
+///
+/// This structure only adds `email` onto
+/// the `NewUser` struct.
+#[derive(Clone, Validate, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct NewJsonUser<'b> {
     #[validate(
         length(min = 5, message = "Make username at least 5 letters long"),
         custom = "validate_name"
@@ -162,8 +176,8 @@ impl<'a> NewUser<'a> {
     ///
     /// # Returns
     /// User
-    pub fn save(&mut self) -> Result<User, Box<dyn stdError>> {
-        match self.is_unique() {
+    pub fn save(&mut self, email: &str) -> Result<User, Box<dyn stdError>> {
+        match self.is_unique(email) {
             Ok(_) => (),
             Err(e) => {
                 return Err(format!(
@@ -190,25 +204,41 @@ impl<'a> NewUser<'a> {
 
     /// Checks if the Email and Username given
     /// are present
-    fn is_unique(&self) -> Result<(), (String, String)> {
+    fn is_unique(&self, new_email: &str) -> Result<(), (String, String)> {
+        use crate::diesel_cfg::schema::emails::dsl::{email, emails};
         use crate::diesel_cfg::schema::users::dsl::*;
 
-        let present_user = users
-            .filter(email.eq(&self.email))
-            .or_filter(username.eq(&self.username))
-            .select((email, username))
-            .get_results::<(String, String)>(&connect_to_db())
+        let present_usernames = users
+            .filter(username.eq(&self.username))
+            .load::<User>(&connect_to_db())
             .unwrap();
 
-        for rec in &present_user {
-            let (email_, username_) = rec;
-            if email_.eq(&self.email) {
-                return Err(("Email: ".to_string(), email_.to_string()));
-            } else if username_.eq(&self.username) {
-                return Err(("Username: ".to_string(), username_.to_string()));
+        for user_ in &present_usernames {
+            if user_.username.eq(&self.username) {
+                return Err(("Username: ".to_string(), user_.username));
             }
         }
+
+        let email_ = emails
+            .filter(email.eq(new_email))
+            .load::<Email>(&connect_to_db())
+            .unwrap();
+
+        if !email_.is_empty() {
+            return Err(("Email: ".to_string(), email_[0].email));
+        }
         Ok(())
+    }
+}
+
+impl<'b> NewJsonUser<'b> {
+    ///   Created a NewUser, which is insertable, from JsonUser.
+    pub fn into_savable(&self) -> NewUser {
+        NewUser {
+            username: self.username,
+            password: self.password,
+            access_level: self.access_level,
+        }
     }
 }
 

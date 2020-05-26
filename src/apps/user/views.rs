@@ -2,8 +2,8 @@
 
 use super::{
     models::{
-        GoogleUser, NewRfToken, NewUser, NewUserLevel, OClient, OauthGgUser, OauthInfo, Reftoken,
-        ResetPassData, SignInUser, User, UserEmail,
+        GoogleUser, NewJsonUser, NewRfToken, NewUser, NewUserLevel, OClient, OauthGgUser,
+        OauthInfo, Reftoken, ResetPassData, SignInUser, User, UserEmail,
     },
     utils::{err_response, get_context, get_reset_context, get_url, TEMPLATE},
 };
@@ -48,11 +48,12 @@ use actix_web_httpauth::headers::authorization::Bearer;
 /// - On ERROR: JSONErrResponse
 ///
 pub async fn register_user(
-    mut data: web::Json<NewUser<'_>>,
+    data: web::Json<NewJsonUser<'_>>,
     req: HttpRequest,
 ) -> Result<HttpResponse, Error> {
     let user_ = &data.0;
-    let token = validate::encode_jwt_token(user_, "verification".into()).unwrap();
+    let token =
+        validate::encode_jwt_token(user_.email.as_ref().into(), "verification".into()).unwrap();
 
     // -> Extract host info from req Headers
     // let host = format!("{:?}", req.headers().get("host").unwrap());
@@ -73,7 +74,9 @@ pub async fn register_user(
         // Filter json where message is not null
     };
 
-    match data.save() {
+    let mut user = user_.into_savable();
+
+    match user.save(&data.0.email) {
         Ok(saved_user) => saved_user,
         Err(e) => {
             let res: response::JsonErrResponse<_> =

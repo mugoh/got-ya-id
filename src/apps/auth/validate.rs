@@ -2,7 +2,6 @@
 
 use std::{env, error, process};
 
-use crate::apps::user::models::NewUser;
 use crate::config::configs as config;
 
 use chrono::{Duration, Utc};
@@ -19,10 +18,10 @@ pub struct Claims {
     pub iss: String,
 }
 
-/// Encodes a JWT token with user details {email, username}
-pub fn encode_jwt_token(user: &NewUser, issuer: String) -> Result<String, Box<dyn error::Error>> {
+/// Encodes a JWT token with user details {email}
+pub fn encode_jwt_token(email: String, issuer: String) -> Result<String, Box<dyn error::Error>> {
     let payload = Claims {
-        sub: user.email.to_string(),
+        sub: email,
         iat: (Utc::now()).timestamp() as usize,
         exp: (Utc::now() + Duration::hours(36)).timestamp() as usize,
         iss: issuer,
