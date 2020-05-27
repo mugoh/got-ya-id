@@ -55,8 +55,6 @@ impl Email {
     ///
     /// This is the active email.
     pub fn as_user(curious_email: &str) -> Result<User, diesel::result::Error> {
-        //
-
         use crate::diesel_cfg::schema::emails::dsl::*;
         use crate::diesel_cfg::schema::users::dsl::users;
 
@@ -67,5 +65,44 @@ impl Email {
 
         let user = users.find(u_id).get_result::<User>(&connect_to_db())?;
         Ok(user)
+    }
+
+    /// Retrieves a User owning the given email
+    /// returning an empty Vec if the user
+    /// doesn't exist.
+    ///
+    /// This is an alternative to the `as_user` function
+    /// which instead returns an Error if the user isn't
+    /// found
+    pub fn load_user(given_email: &str) -> Result<Vec<User>, diesel::result::Error> {
+        use crate::diesel_cfg::schema::emails::dsl::*;
+        use crate::diesel_cfg::schema::users::dsl::users;
+
+        let u_id = emails
+            .filter(email.eq(&given_email))
+            .select(user_id)
+            .get_result::<i32>(&connect_to_db())?;
+
+        let user = users.find(u_id).load::<User>(&connect_to_db())?;
+        Ok(user)
+    }
+
+    /// Returns the User ID identifying the given email.
+    pub fn u_id(given_email: &str) -> Result<i32, diesel::result::Error> {
+        use crate::diesel_cfg::schema::emails::dsl::*;
+
+        emails
+            .filter(email.eq(&given_email))
+            .select(user_id)
+            .get_result::<i32>(&connect_to_db())
+    }
+
+    /// Saves a new email of the given user ID to the database
+    pub fn save_email(user: i32, new_email: &str) -> Result<Email, diesel::result::Error> {
+        use crate::diesel_cfg::schema::emails::dsl::*;
+
+        diesel::insert_into(emails)
+            .values(&(email.eq(new_email), user_id.eq(user)))
+            .get_result::<Email>(&connect_to_db())
     }
 }

@@ -27,6 +27,7 @@ use validator::Validate;
 use validator_derive::Validate;
 
 use actix_web::error::{Error, ErrorForbidden, ErrorInternalServerError};
+use actix_web::HttpRequest;
 
 use actix_web::http::header::Header as acHeader;
 use actix_web_httpauth::headers::authorization::Authorization;
@@ -369,9 +370,9 @@ impl User {
     /// OK -> User object that matches the given email
     /// ERR -> String
     pub fn find_by_email(given_email: &str) -> Result<Vec<User>, String> {
-        match Email::as_user(given_email) {
+        match Email::load_user(given_email) {
             Err(_) => Err(format!("User of email {} non-existent", given_email)),
-            Ok(user) => user,
+            Ok(user) => Ok(user),
         }
     }
     /// Finds a User by Primary key
@@ -505,16 +506,19 @@ impl User {
     /// The account being used to change the user level must be of
     /// a higher level or equal to the one requested
     pub fn alter_access_level(level: &NewUserLevel, auth_tk: &str) -> Result<User, String> {
+        use crate::diesel_cfg::schema::emails::dsl::{email, emails, user_id};
         use crate::diesel_cfg::schema::users::dsl::*;
 
         let grant_email = match validate::decode_auth_token(auth_tk, Some("auth".into())) {
             Ok(claims) => claims.sub,
             Err(e) => return Err(e.to_string()),
         };
-        let granter = users
-            .filter(email.eq(grant_email))
-            .load::<User>(&connect_to_db())
-            .unwrap();
+        let granter_result = Email::load_user(&grant_email);
+        let granter = if let Err(e) = granter_result {
+            return Err(e.to_string());
+        } else {
+            granter_result.unwrap()
+        };
 
         let granter = if !granter.is_empty() {
             &granter[0]
@@ -528,7 +532,15 @@ impl User {
             return Err("Oopsy! You are not allowed to do that".into());
         }
 
-        let user_result = diesel::update(users.filter(email.eq(&level.email)))
+        let uid = match emails
+            .filter(email.eq(&level.email))
+            .select(user_id)
+            .get_result::<i32>(&connect_to_db())
+        {
+            Ok(uid) => uid,
+            Err(e) => return Err(e.to_string()),
+        };
+        let user_result = diesel::update(users.find(uid))
             .set(access_level.eq(level.new_level))
             .get_result::<User>(&connect_to_db());
         match user_result {
@@ -555,16 +567,12 @@ impl User {
     /// Gives the User whose email matches the subject of the decoded
     /// authorization token
     pub fn from_token(auth_header: &HttpRequest) -> Result<Self, ResError> {
-        use crate::diesel_cfg::schema::users::dsl::{email, users};
-
         let auth = User::extract_auth_header(auth_header)?;
         let auth_tk = &auth.split(' ').collect::<Vec<&str>>()[1];
 
         let grant_email = validate::decode_auth_token(auth_tk, Some("auth".into()))?.sub;
 
-        let mut granter = users
-            .filter(email.eq(grant_email))
-            .load::<User>(&connect_to_db())?;
+        let mut granter = Email::load_user(&grant_email)?;
 
         if !granter.is_empty() {
             Ok(granter.pop().unwrap())
@@ -596,11 +604,9 @@ impl<'a> SignInUser<'a> {
         };
 
         match key {
-            "email" => users
-                .filter(email.eq(identity.clone().unwrap()))
-                .load::<User>(&connect_to_db()),
+            "email" => Email::load_user(&identity.unwrap()),
             _ => users
-                .filter(username.eq(identity.clone().unwrap()))
+                .filter(username.eq(identity.unwrap()))
                 .load::<User>(&connect_to_db()),
         }
     }
@@ -693,15 +699,16 @@ impl OauthGgUser {
         use rand::{distributions::Alphanumeric, thread_rng, Rng};
 
         use crate::diesel_cfg::schema::avatars::dsl::url as av_url;
+        use crate::diesel_cfg::schema::emails::{active, email as e_email, user_id};
         use crate::diesel_cfg::schema::oath_users::dsl::*;
         use crate::diesel_cfg::schema::users::dsl::{
-            email as uemail, social_id as usocial_id, username as u_username, users,
+            social_id as usocial_id, username as u_username, users,
         };
 
         let present_user = users
-            .filter(uemail.eq(&usr_data.email))
-            .select((uemail, usocial_id))
-            .get_results::<(String, Option<String>)>(&connect_to_db())?;
+            .find(Email::u_id(&usr_data.email)?)
+            .select(usocial_id)
+            .get_results::<Option<String>>(&connect_to_db())?;
 
         if present_user.is_empty() {
             // New User
@@ -731,12 +738,20 @@ impl OauthGgUser {
             let user_name = format!("{}-{}-{}", &usr_data.name, _rnd_ext, acc_provider);
 
             let ord_user = diesel::insert_into(users)
-                .values(&(
-                    uemail.eq(&usr_data.email),
-                    u_username.eq(user_name),
-                    usocial_id.eq(&usr_data.id),
-                ))
+                .values(&(u_username.eq(user_name), usocial_id.eq(&usr_data.id)))
                 .get_result::<User>(&connect_to_db())?;
+
+            // Save active email
+
+            let email_data = (
+                e_email.eq(usr_data.email),
+                user_id.eq(ord_user.id),
+                active.eq(true),
+            );
+            diesel::insert_into(emails_table::table)
+                .values(&email_data)
+                .load::<Email>(&connect_to_db())?;
+
             NewProfile::new(ord_user.id, None)?;
 
             let avatar = Avatar::belonging_to(&ord_user).get_result::<Avatar>(&connect_to_db())?;
@@ -747,7 +762,7 @@ impl OauthGgUser {
             return Ok(Some((user, ord_user)));
         }
 
-        let (_, s_id) = &present_user[0];
+        let s_id = &present_user[0];
         match s_id {
             // Previously used Oauth account
             Some(s) => {
