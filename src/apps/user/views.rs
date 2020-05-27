@@ -437,9 +437,8 @@ pub async fn get_user(id: web::Path<i32>, req: HttpRequest) -> Result<HttpRespon
         Ok((usr, profile)) => {
             let data =
                 hashmap!["status" => "200", "message" => "sucess. User and User profile retrieved"];
-            respond(data, Some((usr, profile.unwrap())), None)
-                .unwrap()
-                .await
+            let response = json!({"user": usr, "email": usr.email(), "profile":profile});
+            respond(data, Some(response), None).unwrap().await
         }
         Err(e) => Err(e.into()),
     }
@@ -647,7 +646,7 @@ async fn generate_tokens<'a>(
     usr: &User,
 ) -> Result<(String, String), Error> {
     let usr_email = if let Some(email) = usr_email {
-        email
+        email.to_string()
     } else {
         usr.email()
     };
@@ -659,7 +658,7 @@ async fn generate_tokens<'a>(
         })
         .parse::<i64>()
         .map_err(|e| ErrorInternalServerError(e.to_string()))?;
-    let auth_token = User::create_token(usr_email, Some(auth_tk_duration), "auth".into())
+    let auth_token = User::create_token(&usr_email, Some(auth_tk_duration), "auth".into())
         .map_err(|e| ErrorInternalServerError(e.to_string()))?;
 
     let rf_duration = env::var("REFRESH_TOKEN_DURATION")

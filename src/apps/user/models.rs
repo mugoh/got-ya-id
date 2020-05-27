@@ -268,7 +268,7 @@ impl User {
     }
 
     /// Gives the Active email of a User
-    pub fn email<'a>(&self) -> &'a str {
+    pub fn email(&self) -> String {
         use crate::diesel_cfg::schema::emails::{active, email};
 
         Email::belonging_to(self)
@@ -276,7 +276,6 @@ impl User {
             .select(email)
             .get_result::<String>(&connect_to_db())
             .unwrap()
-            .as_str()
     }
 
     /// Creates an authorization token encoded with the
@@ -604,9 +603,9 @@ impl<'a> SignInUser<'a> {
         };
 
         match key {
-            "email" => Email::load_user(&identity.unwrap()),
+            "email" => Email::load_user(&identity.as_ref().unwrap()),
             _ => users
-                .filter(username.eq(identity.unwrap()))
+                .filter(username.eq(identity.as_ref().unwrap()))
                 .load::<User>(&connect_to_db()),
         }
     }
@@ -744,8 +743,8 @@ impl OauthGgUser {
             // Save active email
 
             let email_data = (
-                e_email.eq(usr_data.email),
-                user_id.eq(ord_user.id),
+                e_email.eq(&usr_data.email),
+                user_id.eq(&ord_user.id),
                 active.eq(true),
             );
             diesel::insert_into(emails_table::table)
