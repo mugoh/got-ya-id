@@ -222,19 +222,19 @@ impl<'a> NewUser<'a> {
             .load::<User>(&connect_to_db())
             .unwrap();
 
-        for user_ in &present_usernames {
+        for user_ in present_usernames {
             if user_.username.eq(&self.username) {
                 return Err(("Username: ".to_string(), user_.username));
             }
         }
 
-        let email_ = emails
+        let mut email_ = emails
             .filter(email.eq(new_email))
             .load::<Email>(&connect_to_db())
             .unwrap();
 
         if !email_.is_empty() {
-            return Err(("Email: ".to_string(), email_[0].email));
+            return Err(("Email: ".to_string(), email_.pop().unwrap().email));
         }
         Ok(())
     }
@@ -244,8 +244,8 @@ impl<'b> NewJsonUser<'b> {
     ///   Created a NewUser, which is insertable, from JsonUser.
     pub fn into_savable(&self) -> NewUser {
         NewUser {
-            username: self.username,
-            password: self.password,
+            username: Cow::Borrowed(&self.username),
+            password: Cow::Borrowed(&self.password),
             access_level: self.access_level,
         }
     }

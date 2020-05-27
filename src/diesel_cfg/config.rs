@@ -53,11 +53,10 @@ pub async fn seed_admin_user() {
 
     let mut admin = NewUser {
         username: Cow::Borrowed(&uname),
-        email: Cow::Borrowed(&email),
         password: Cow::Borrowed(&pass),
         access_level: Some(0),
     };
-    match admin.save() {
+    match admin.save(&email) {
         Ok(_) => debug!("Saved admin user\n"),
         Err(e) => {
             if e.to_string().contains("already") {
