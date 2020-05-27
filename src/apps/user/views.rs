@@ -2,8 +2,8 @@
 
 use super::{
     models::{
-        GoogleUser, NewJsonUser, NewRfToken, NewUser, NewUserLevel, OClient, OauthGgUser,
-        OauthInfo, Reftoken, ResetPassData, SignInUser, User, UserEmail,
+        GoogleUser, NewJsonUser, NewRfToken, NewUserLevel, OClient, OauthGgUser, OauthInfo,
+        Reftoken, ResetPassData, SignInUser, User, UserEmail,
     },
     utils::{err_response, get_context, get_reset_context, get_url, TEMPLATE},
 };
@@ -215,7 +215,7 @@ pub async fn login(user: web::Json<SignInUser<'_>>) -> Result<HttpResponse, Erro
                     ))
                     .await?);
             }
-            let (auth_token, refresh_tkn) = generate_tokens(usr).await?;
+            let (auth_token, refresh_tkn) = generate_tokens(&user.email, &usr).await?;
             let mut rf_struct = NewRfToken {
                 body: Cow::Borrowed(&refresh_tkn),
             };
@@ -335,14 +335,14 @@ pub async fn send_reset_email(
         }
     };
     let user = &user[0];
-    let token = User::create_token(&user.email, Some(59), "password_reset".into()).unwrap();
+    let token = User::create_token(&data.email, Some(59), "password_reset".into()).unwrap();
     let host = format!("{:?}", req.headers().get("host").unwrap());
     let path = get_url(&host, "api/auth", &token);
     let context: Context = get_reset_context(&user, &path);
     match TEMPLATE.render("password_reset.html", &context) {
         Ok(s) => {
             let mut mail = mail::Mail::new(
-                &user.email,
+                &data.email,
                 &user.username,
                 "Account password reset",
                 s.as_str(),
@@ -357,8 +357,8 @@ pub async fn send_reset_email(
     };
     let res = response::JsonResponse::new(
         http::StatusCode::OK.to_string(),
-        format!("sucess. A password reset link sent to {}", &user.email),
-        json!({"email": &user.email, "username": &user.username, "link": &path, "token": token}),
+        format!("sucess. A password reset link sent to {}", &data.email),
+        json!({"email": &data.email, "username": &user.username, "link": &path, "token": token}),
     );
 
     HttpResponse::Created().json(&res).await
@@ -463,7 +463,7 @@ pub async fn change_activation_status(req: HttpRequest) -> Result<HttpResponse, 
         .map(|usr| {
             let data = hashmap!["status" => "200", "message" => "User activation status changed"];
             let body = json!({
-                "email": usr.email,
+                "email": usr.email(),
                 "username": usr.username,
                 "is_active": usr.is_active
             });
@@ -642,7 +642,16 @@ async fn send_activation_link(
     Ok(())
 }
 
-async fn generate_tokens(usr: &User) -> Result<(String, String), Error> {
+async fn generate_tokens<'a>(
+    usr_email: &Option<Cow<'a, str>>,
+    usr: &User,
+) -> Result<(String, String), Error> {
+    let usr_email = if let Some(email) = usr_email {
+        email
+    } else {
+        usr.email()
+    };
+
     let auth_tk_duration = env::var("AUTH_TOKEN_DURATION")
         .unwrap_or_else(|e| {
             debug!("{}", e);
@@ -650,7 +659,7 @@ async fn generate_tokens(usr: &User) -> Result<(String, String), Error> {
         })
         .parse::<i64>()
         .map_err(|e| ErrorInternalServerError(e.to_string()))?;
-    let auth_token = User::create_token(&usr.email, Some(auth_tk_duration), "auth".into())
+    let auth_token = User::create_token(usr_email, Some(auth_tk_duration), "auth".into())
         .map_err(|e| ErrorInternalServerError(e.to_string()))?;
 
     let rf_duration = env::var("REFRESH_TOKEN_DURATION")
@@ -661,7 +670,7 @@ async fn generate_tokens(usr: &User) -> Result<(String, String), Error> {
         .parse::<i64>()
         .map_err(|e| ErrorInternalServerError(e.to_string()))?;
 
-    let refresh_tkn = User::create_token(&usr.email, Some(rf_duration), "refresh".into())
+    let refresh_tkn = User::create_token(&usr_email, Some(rf_duration), "refresh".into())
         .map_err(|e| ErrorInternalServerError(e.to_string()))?;
     Ok((auth_token, refresh_tkn))
 }
@@ -689,7 +698,7 @@ pub async fn change_user_access_level(
     };
     let token = &auth.split(' ').collect::<Vec<&str>>()[1];
 
-    let user = match User::alter_access_level(&data.into_inner(), token) {
+    let user = match User::alter_access_level(&data, token) {
         Ok(u) => u,
         Err(e) => {
             if e.eq("NotFound") {
@@ -699,7 +708,7 @@ pub async fn change_user_access_level(
         }
     };
     let data = json!({
-        "email": user.email,
+        "email": data.email,
         "access_level": user.access_level
     });
     let msg = hashmap!["status" => "200",

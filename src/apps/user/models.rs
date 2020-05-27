@@ -101,7 +101,7 @@ pub struct SignInUser<'a> {
     // Email validation Panicks with :: ->
     /* the trait bound `std::borrow::Cow<'_, str>: std::convert::From<&std::borrow::Cow<'_, str>>` is not satisfied */
     #[validate(custom = "validate_email")]
-    email: Option<Cow<'a, str>>,
+    pub email: Option<Cow<'a, str>>,
     username: Option<Cow<'a, str>>,
     password: Cow<'a, str>,
 }
