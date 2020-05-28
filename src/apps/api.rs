@@ -1,7 +1,7 @@
 //! This module holds the API routes configuration
 use actix_web::{guard, web, HttpResponse};
 
-use crate::apps::{ids, profiles, user};
+use crate::apps::{email, ids, profiles, user};
 
 /// Configures the app service
 pub fn api(cfg: &mut web::ServiceConfig) {
@@ -70,6 +70,10 @@ pub fn api(cfg: &mut web::ServiceConfig) {
             .service(web::scope("/users").service(
                 web::resource("/profiles").route(web::get().to(profiles::views::get_all_profiles)),
             ))
+            .service(
+                web::scope("/email")
+                    .service(web::resource("/new").route(web::post().to(email::views::add_email))),
+            )
             .service(
                 web::scope("/ids")
                     .service(

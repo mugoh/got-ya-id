@@ -8,8 +8,8 @@ use serde::{Deserialize, Serialize};
 use crate::{
     apps::user::{models::User, utils::from_timestamp},
     diesel_cfg::{config::connect_to_db, schema::emails},
+    errors::error::ResError,
 };
-
 use chrono::NaiveDateTime;
 
 use std::borrow::Cow;
@@ -104,5 +104,33 @@ impl Email {
         diesel::insert_into(emails)
             .values(&(email.eq(new_email), user_id.eq(user)))
             .get_result::<Email>(&connect_to_db())
+    }
+}
+
+impl<'a> NewEmail<'a> {
+    /// Saves a new email to the Database
+    pub fn save(&self) -> Result<Email, ResError> {
+        use crate::diesel_cfg::schema::emails::dsl::{email, emails, removed};
+
+        // For previously `removed` emails,
+        // undo the remove
+        let mut existing_email = emails
+            .filter(email.eq(&self.email))
+            .load::<Email>(&connect_to_db())?;
+
+        if !existing_email.is_empty() {
+            if !existing_email[0].removed {
+                Err(ResError {
+                    msg: "Email seems to exist".into(),
+                    status: 409,
+                })
+            } else {
+                Ok(existing_email.pop().unwrap())
+            }
+        } else {
+            Ok(diesel::insert_into(emails)
+                .values(&*self)
+                .get_result::<Email>(&connect_to_db())?)
+        }
     }
 }
