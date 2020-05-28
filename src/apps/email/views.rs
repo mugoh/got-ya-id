@@ -1,10 +1,10 @@
 use crate::{
-    apps::user::models::User,
+    apps::user::models::{User, UserEmail},
     core::response::{err, respond},
     hashmap,
 };
 
-use super::models::NewEmail;
+use super::models::{Email, NewEmail};
 
 use actix_web::{web, Error, HttpRequest, HttpResponse, Result};
 use validator::Validate;
@@ -35,4 +35,32 @@ pub async fn add_email(
 
     let data = hashmap!["status"=> "201", "message"=> "Success. Email added"];
     respond(data, Some(saved_email), None).unwrap().await
+}
+
+/// Dissacciates an email with a user account.
+///
+/// # url `/emails/remove`
+///
+/// # Method: `PUT`
+///
+/// #### Authentication required
+///
+/// ## Request data format
+/// ```none
+/// let email = UserEmail {email: "donuty@email.nuts"}
+/// ```
+pub async fn remove_email(
+    req: HttpRequest,
+    email: web::Json<UserEmail<'_>>,
+) -> Result<HttpResponse, Error> {
+    if let Err(e) = email.validate() {
+        return err("400", e.to_string()).await;
+    }
+
+    let user = User::from_token(&req)?;
+
+    let removed_e = Email::remove(&email.into_inner().email, user.id)?;
+
+    let data = hashmap!["status"=> "200", "message"=> "Success. Email removed"];
+    respond(data, Some(removed_e), None).unwrap().await
 }

@@ -98,19 +98,46 @@ impl Email {
     }
 
     /// Saves a new email of the given user ID to the database
-    pub fn save_email(user: i32, new_email: &str) -> Result<Email, diesel::result::Error> {
+    pub fn save_email(user: i32, new_email: &str) -> Result<Self, diesel::result::Error> {
         use crate::diesel_cfg::schema::emails::dsl::*;
 
         diesel::insert_into(emails)
             .values(&(email.eq(new_email), user_id.eq(user)))
             .get_result::<Email>(&connect_to_db())
     }
+
+    /// Marks an Email as removed.
+    ///
+    /// This is almost equivalent to disassociating
+    /// the email with the user's account
+    pub fn remove(given_email: &str, usr_id: i32) -> Result<Self, ResError> {
+        //
+        use crate::diesel_cfg::schema::emails::dsl::{email, emails};
+
+        let mut this_email = emails
+            .filter(email.eq(given_email))
+            .first::<Self>(&connect_to_db())?;
+
+        if this_email.user_id != usr_id {
+            return Err(ResError::unauthorized());
+        }
+
+        if this_email.active {
+            Err(ResError {
+                msg: "Oops, can't remove an active email".into(),
+                status: 403,
+            })
+        } else {
+            this_email.removed = true;
+            Ok(this_email.save_changes::<Self>(&connect_to_db())?)
+        }
+    }
 }
 
 impl<'a> NewEmail<'a> {
     /// Saves a new email to the Database
     pub fn save(&self) -> Result<Email, ResError> {
-        use crate::diesel_cfg::schema::emails::dsl::{email, emails, removed};
+        use crate::diesel_cfg::schema::emails::dsl::{email, emails};
 
         // For previously `removed` emails,
         // undo the remove
@@ -120,17 +147,18 @@ impl<'a> NewEmail<'a> {
 
         if !existing_email.is_empty() {
             if !existing_email[0].removed {
-                Err(ResError {
+                return Err(ResError {
                     msg: "Email seems to exist".into(),
                     status: 409,
-                })
-            } else {
-                Ok(existing_email.pop().unwrap())
+                });
+            } else if existing_email[0].removed && existing_email[0].user_id == self.user_id {
+                existing_email[0].removed = false;
+                return Ok(existing_email[0].save_changes::<Email>(&connect_to_db())?);
             }
-        } else {
-            Ok(diesel::insert_into(emails)
-                .values(&*self)
-                .get_result::<Email>(&connect_to_db())?)
         }
+
+        Ok(diesel::insert_into(emails)
+            .values(&*self)
+            .get_result::<Email>(&connect_to_db())?)
     }
 }
