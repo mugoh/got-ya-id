@@ -4,6 +4,7 @@ CREATE TABLE emails (
     email VARCHAR NOT NULL UNIQUE,
     active BOOLEAN NOT NULL DEFAULT FALSE,
     removed BOOLEAN NOT NULL DEFAULT FALSE,
+    verified BOOLEAN NOT NULL DEFAULT FALSE,
     
     created_at timestamp without time zone not null default (now() at time zone 'utc'),
     updated_at timestamp without time zone not null default (now() at time zone 'utc')

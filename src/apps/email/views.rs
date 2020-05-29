@@ -1,17 +1,24 @@
 use crate::{
-    apps::user::models::{Reftoken, User, UserEmail},
+    apps::user::{
+        models::{Reftoken, User, UserEmail},
+        utils::get_url,
+        views::send_activation_link,
+    },
     core::response::{err, respond},
     hashmap,
 };
 
 use super::models::{Email, NewEmail};
 
-use actix_web::{web, Error, HttpRequest, HttpResponse, Result};
+use actix_web::{http::StatusCode, web, Error, HttpRequest, HttpResponse, Result};
 use validator::Validate;
 
 use serde_json::json;
 
 /// Adds a new email for a user account.
+///
+/// A verification link is sent to a newly added
+/// email for the user to verify the added email.
 ///
 /// # url `/emails/new`
 ///
@@ -35,7 +42,25 @@ pub async fn add_email(
     new_email.user_id = user.id;
     let saved_email = new_email.save()?;
 
-    let data = hashmap!["status"=> "201", "message"=> "Success. Email added"];
+    // send link
+    let token = User::create_token(&new_email.email, Some(24 * 60), "verification".into())?;
+
+    let host = format!("{:?}", req.headers().get("host").unwrap());
+    let path = get_url(&host, "api/emails/verify", &token);
+
+    send_activation_link(
+        &new_email.email,
+        Some(&user.username),
+        &path,
+        "email_activation.html",
+    )
+    .await?;
+
+    let msg_ = format!(
+        "Success. A verification link has been sent to {}",
+        &new_email.email
+    );
+    let data = hashmap!["status"=> "201", "message"=> &msg_];
     respond(data, Some(saved_email), None).unwrap().await
 }
 
@@ -103,4 +128,20 @@ pub async fn change_active_email(
     "refresh_token": tokens.1}
     );
     respond(data, Some(res), None).unwrap().await
+}
+
+/// Verifies an email account.
+///
+/// # url: `/emails/verify/{ver_token}`
+///
+/// # Method: `GET`
+pub async fn verify_email(ver_token: web::Path<String>) -> Result<HttpResponse, Error> {
+    match Email::verify(&ver_token) {
+        Ok(_) => {
+            HttpResponse::build(StatusCode::OK).body("Celebrate! Your email is now verified").await
+        }
+        Err(_) => HttpResponse::build(StatusCode::FORBIDDEN).body(
+            "Oopsy! The link you used seems expired. Just request a resend of your email verification link",
+        ).await
+    }
 }

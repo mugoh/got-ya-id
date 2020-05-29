@@ -6,7 +6,10 @@ use validator_derive::Validate;
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    apps::user::{models::User, utils::from_timestamp},
+    apps::{
+        auth::validate,
+        user::{models::User, utils::from_timestamp},
+    },
     diesel_cfg::{config::connect_to_db, schema::emails},
     errors::error::ResError,
 };
@@ -20,12 +23,15 @@ use std::borrow::Cow;
 /// Represents the Queryable Email data
 pub struct Email {
     id: i32,
-    user_id: i32,
+    pub user_id: i32,
     pub email: String,
     /// Selected for default use in identifying the user
     active: bool,
     /// No longer associated. Deleted.
     removed: bool,
+
+    /// Email verified as belonging to User
+    pub verified: bool,
 
     #[serde(deserialize_with = "from_timestamp")]
     pub created_at: NaiveDateTime,
@@ -48,6 +54,9 @@ pub struct NewEmail<'a> {
 
     #[serde(skip_deserializing)]
     pub removed: bool,
+
+    #[serde(skip_deserializing)]
+    pub verified: bool,
 }
 
 impl Email {
@@ -141,6 +150,11 @@ impl Email {
 
         if this_email.user_id != user.id {
             return Err(ResError::unauthorized());
+        } else if !this_email.verified {
+            return Err(ResError {
+                msg: "Email needs to be verified".into(),
+                status: 403,
+            });
         }
 
         this_email.active = true;
@@ -152,6 +166,23 @@ impl Email {
 
         active_email.save_changes::<Self>(&connect_to_db())?;
         Ok(this_email.save_changes::<Self>(&connect_to_db())?)
+    }
+
+    /// Marks an email object `verified` as true.
+    ///
+    /// ## Arguments
+    /// verf_key: Verification token
+    pub fn verify(verf_key: &str) -> Result<(), ResError> {
+        use crate::diesel_cfg::schema::emails::dsl::{email, emails, verified};
+
+        let user_email =
+            validate::decode_auth_token(verf_key, Some("verification".to_owned()))?.sub;
+
+        diesel::update(emails.filter(email.eq(user_email)))
+            .set(verified.eq(true))
+            .execute(&connect_to_db())?;
+
+        Ok(())
     }
 }
 

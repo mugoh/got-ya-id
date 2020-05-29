@@ -286,7 +286,7 @@ impl User {
         user_cred: &str,
         duration_min: Option<i64>,
         issuer: String,
-    ) -> Result<String, jsonwebtoken::errors::Error> {
+    ) -> Result<String, ResError> {
         let dur = if let Some(time) = duration_min {
             time
         } else {
@@ -314,7 +314,7 @@ impl User {
     /// Decodes the auth token representing a user
     /// to return an user object with a verified account
     pub fn verify_user(user_key: &str) -> Result<User, Box<dyn stdError>> {
-        use crate::diesel_cfg::schema::emails::dsl::{email, emails, user_id};
+        use crate::diesel_cfg::schema::emails::dsl::{email, emails, verified};
         use crate::diesel_cfg::schema::users::dsl::*;
 
         let user = match validate::decode_auth_token(user_key, Some("verification".to_owned())) {
@@ -323,12 +323,13 @@ impl User {
                 return Err(e.into());
             }
         };
-        let uid = emails
-            .filter(email.eq(&user))
-            .select(user_id)
-            .get_result::<i32>(&connect_to_db())?;
 
-        let user = diesel::update(users.find(uid))
+        // While at it, set email as verified too.
+        let em = diesel::update(emails.filter(email.eq(user)))
+            .set(verified.eq(true))
+            .get_result::<Email>(&connect_to_db())?;
+
+        let user = diesel::update(users.find(em.user_id))
             .set(is_verified.eq(true))
             .get_result::<User>(&connect_to_db())?;
 

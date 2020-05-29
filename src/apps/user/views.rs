@@ -618,7 +618,7 @@ pub async fn register_g_oauth(req: HttpRequest) -> HttpResponse {
 }
 
 /// Sends an account activation link to a user email
-async fn send_activation_link(
+pub async fn send_activation_link(
     user_email: &str,
     user_name: Option<&str>,
     reset_link: &str,

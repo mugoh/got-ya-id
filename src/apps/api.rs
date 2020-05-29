@@ -66,8 +66,15 @@ pub fn api(cfg: &mut web::ServiceConfig) {
                 web::resource("/profiles").route(web::get().to(profiles::get_all_profiles)),
             ))
             .service(
-                web::scope("/email")
-                    .service(web::resource("/new").route(web::post().to(email::add_email))),
+                web::scope("/emails")
+                    .service(web::resource("/new").route(web::post().to(email::add_email)))
+                    .service(
+                        web::resource("/verify/{token}").route(web::get().to(email::verify_email)),
+                    )
+                    .service(web::resource("/remove").route(web::put().to(email::remove_email)))
+                    .service(
+                        web::resource("/activate").route(web::put().to(email::change_active_email)),
+                    ),
             )
             .service(
                 web::scope("/ids")
