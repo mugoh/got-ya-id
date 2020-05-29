@@ -51,9 +51,7 @@ pub struct NewEmail<'a> {
 }
 
 impl Email {
-    /// Retrieves a User owning a given email
-    ///
-    /// This is the active email.
+    /// Retrieves a User object owning a given email
     pub fn as_user(curious_email: &str) -> Result<User, diesel::result::Error> {
         use crate::diesel_cfg::schema::emails::dsl::*;
         use crate::diesel_cfg::schema::users::dsl::users;
@@ -111,7 +109,6 @@ impl Email {
     /// This is almost equivalent to disassociating
     /// the email with the user's account
     pub fn remove(given_email: &str, usr_id: i32) -> Result<Self, ResError> {
-        //
         use crate::diesel_cfg::schema::emails::dsl::{email, emails};
 
         let mut this_email = emails
@@ -131,6 +128,30 @@ impl Email {
             this_email.removed = true;
             Ok(this_email.save_changes::<Self>(&connect_to_db())?)
         }
+    }
+    /// Changes the active email of a User
+    ///
+    /// A user has one active email.
+    pub fn new_active_email(new_email: &str, user: &User) -> Result<Self, ResError> {
+        use crate::diesel_cfg::schema::emails::dsl::{active, email, emails, user_id};
+
+        let mut this_email = emails
+            .filter(email.eq(new_email))
+            .get_result::<Self>(&connect_to_db())?;
+
+        if this_email.user_id != user.id {
+            return Err(ResError::unauthorized());
+        }
+
+        this_email.active = true;
+
+        let mut active_email = emails
+            .filter(user_id.eq(user.id).and(active.eq(true)))
+            .get_result::<Self>(&connect_to_db())?;
+        active_email.active = false;
+
+        active_email.save_changes::<Self>(&connect_to_db())?;
+        Ok(this_email.save_changes::<Self>(&connect_to_db())?)
     }
 }
 

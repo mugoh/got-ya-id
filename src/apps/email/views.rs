@@ -1,5 +1,5 @@
 use crate::{
-    apps::user::models::{User, UserEmail},
+    apps::user::models::{Reftoken, User, UserEmail},
     core::response::{err, respond},
     hashmap,
 };
@@ -8,6 +8,8 @@ use super::models::{Email, NewEmail};
 
 use actix_web::{web, Error, HttpRequest, HttpResponse, Result};
 use validator::Validate;
+
+use serde_json::json;
 
 /// Adds a new email for a user account.
 ///
@@ -63,4 +65,42 @@ pub async fn remove_email(
 
     let data = hashmap!["status"=> "200", "message"=> "Success. Email removed"];
     respond(data, Some(removed_e), None).unwrap().await
+}
+
+/// Changes the active email identifying by a User.
+/// The current active email shall be set to inactive.
+///
+/// Returns new auth and refresh tokens encoded with
+/// the saved active email.
+/// The old ones will no longer work.
+///
+/// # url `/emails/activate`
+///
+/// # Method: `PUT`
+///
+/// #### Authentication required
+///
+/// ## Request data format
+/// ```none
+/// let email = UserEmail {email: "donuty@email.nuts"}
+/// ```
+pub async fn change_active_email(
+    req: HttpRequest,
+    email: web::Json<UserEmail<'_>>,
+) -> Result<HttpResponse, Error> {
+    if let Err(e) = email.validate() {
+        return err("400", e.to_string()).await;
+    }
+    let user = User::from_token(&req)?;
+
+    let saved_email = Email::new_active_email(&*email.email, &user)?;
+    let tokens = Reftoken::generate_tokens(&saved_email.email)?;
+
+    let data = hashmap!["status"=> "200", "message"=> "Success. Active email changed"];
+    let res = json!({
+    "email": saved_email,
+    "auth_token": tokens.0,
+    "refresh_token": tokens.1}
+    );
+    respond(data, Some(res), None).unwrap().await
 }

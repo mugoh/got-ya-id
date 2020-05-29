@@ -831,7 +831,7 @@ impl Reftoken {
     /// Generated auth and refresh tokens
     ///  # Arguments
     ///  sub_field: sub encoding field
-    fn generate_tokens(sub: &str) -> Result<(String, String), Error> {
+    pub fn generate_tokens(sub: &str) -> Result<(String, String), Error> {
         let auth_tk_duration = env::var("AUTH_TOKEN_DURATION")
             .unwrap_or_else(|e| {
                 debug!("{}", e);
