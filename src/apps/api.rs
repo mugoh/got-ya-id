@@ -2,7 +2,8 @@
 use actix_web::{guard, web, HttpResponse};
 
 use crate::apps::{
-    email::views as email, ids::views as ids, profiles::views as profiles, user::views as user,
+    email::views as email, ids::views as ids, institution::views as institution,
+    profiles::views as profiles, user::views as user,
 };
 
 /// Configures the app service
@@ -64,6 +65,9 @@ pub fn api(cfg: &mut web::ServiceConfig) {
             )
             .service(web::scope("/users").service(
                 web::resource("/profiles").route(web::get().to(profiles::get_all_profiles)),
+            ))
+            .service(web::scope("/institution").service(
+                web::resource("/change").route(web::post().to(institution::change_institution)),
             ))
             .service(
                 web::scope("/emails")

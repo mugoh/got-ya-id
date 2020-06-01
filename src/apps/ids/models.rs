@@ -215,7 +215,7 @@ pub struct NewClaimableIdt<'a> {
 
 /// The Insertable model to be used in updating
 /// changes to a user-claimed Identifications
-#[derive(AsChangeset, Deserialize, Validate)]
+#[derive(AsChangeset, Default, Deserialize, Validate)]
 #[table_name = "claimed_identifications"]
 #[serde(deny_unknown_fields)]
 pub struct UpdatableClaimableIdt<'a> {
@@ -225,17 +225,17 @@ pub struct UpdatableClaimableIdt<'a> {
     #[validate(regex(path = "regexes::ALPHA_REGEX", message = "should just have letters"))]
     pub course: Option<Cow<'a, str>>,
 
-    entry_year: Option<NaiveDate>,
-    graduation_year: Option<NaiveDate>,
+    pub entry_year: Option<NaiveDate>,
+    pub graduation_year: Option<NaiveDate>,
 
     #[validate(regex(path = "regexes::ALPHA_REGEX", message = "should just have letters"))]
-    institution: Option<Cow<'a, str>>,
+    pub institution: Option<Cow<'a, str>>,
 
     #[validate(regex(
         path = "regexes::LOCATION_REGEX",
         message = "should have letters, digits or -_`"
     ))]
-    campus_location: Option<Cow<'a, str>>,
+    pub campus_location: Option<Cow<'a, str>>,
 }
 
 /// Json Model for an Identification claim request
@@ -648,11 +648,9 @@ impl ClaimableIdentification {
     /// to existing, or newly posted Identifications is neccessary.
     pub async fn update(
         &self,
-        auth_tk: &HttpRequest,
+        this_user: &User,
         data: UpdatableClaimableIdt<'_>,
     ) -> Result<Self, ResError> {
-        let this_user = User::from_token(auth_tk)?;
-
         if this_user.id != self.user_id {
             return Err(ResError::unauthorized());
         }

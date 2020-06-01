@@ -19,7 +19,7 @@ pub struct Profile<'a> {
     phone: Option<String>,
     /// Full name
     name: Option<String>,
-    institution: Option<String>,
+    pub institution: Option<String>,
     about: Option<String>,
     found_ids: Option<Cow<'a, i32>>,
 }

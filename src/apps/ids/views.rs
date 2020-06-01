@@ -311,10 +311,11 @@ pub async fn update_idt_claim(
     if let Err(e) = idt_data.validate() {
         return err("400", e.to_string()).await;
     }
+    let user = User::from_token(&req)?;
     let claimed_idt = ClaimableIdentification::find_by_id(*pk)?;
 
     claimed_idt
-        .update(&req, idt_data.into_inner())
+        .update(&user, idt_data.into_inner())
         .await
         .map(|updated| {
             let msg = hashmap!["status" => "200",
