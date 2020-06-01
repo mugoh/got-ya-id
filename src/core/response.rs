@@ -69,11 +69,11 @@ where
         }
     }
 
-    pub fn success<'b>(status: &'b str, message: &'b str, data: T) -> Response<'b, T> {
+    pub fn success<'b>(status: &'b str, message: &'b str, data: Option<T>) -> Response<'b, T> {
         Response {
             status,
             errors: None,
-            data: Some(data),
+            data: data,
             message: Some(message),
         }
     }
@@ -121,11 +121,50 @@ where
         Ok(HttpResponse::build(status).json(Response::success(
             data["status"],
             &data.get("message").unwrap(),
-            body.unwrap(),
+            body,
         )))
     }
 }
 
+/// Constructs a HttpResponse
+///
+/// Like `respond` but not returning a Result
+/// and has no `err` argument.
+/// This is meant to be a replacement for `respond`
+///
+/// Calling `respond` with an error requires a type declaration,
+/// but the aim of this was to provide SIMPLICITY in making
+/// http responses.
+///
+///
+/// # Arguments
+///
+/// ## data: Hashmap<&'static str, &'static str>
+/// message: Response message during 2** status (Success) response
+///             Ignored for Error responses
+/// status: Status code. e.g "200"
+///
+/// ## body: T
+/// The data to be contained in the success reponse
+/// It ought to be JSON Serializable
+///
+/// # Returns
+///  HttpResponse
+#[allow(clippy::implicit_hasher)]
+pub fn respond2<'c, T>(data: HashMap<&'c str, &'c str>, body: Option<T>) -> HttpResponse
+//
+where
+    T: serde::de::DeserializeOwned,
+    T: Serialize,
+{
+    let status = StatusCode::from_u16(data["status"].parse::<u16>().unwrap()).unwrap();
+
+    HttpResponse::build(status).json(Response::success(
+        data["status"],
+        &data.get("message").unwrap(),
+        body,
+    ))
+}
 /// Gives a HttpResponse holding an error status
 /// and the cause of request error
 pub fn err<T: serde::de::DeserializeOwned + Serialize>(status: &'_ str, err: T) -> HttpResponse //serde_json::value::Value
