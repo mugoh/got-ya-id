@@ -16,6 +16,9 @@ use std::collections::HashSet;
 /// The default metric used is similarity in the string's alphaneumerics ("\w").
 /// To base the similarity on words("\w+") instead, specify regex=words
 pub async fn cosine_similarity(text1: &str, text2: &str) -> f64 {
+    let text1 = text1.to_lowercase();
+    let text2 = text2.to_lowercase();
+
     let regex = "alpha";
     let pattern = if regex == "words" { r"\w+" } else { r"\w" };
     let re = Regex::new(pattern).unwrap();
