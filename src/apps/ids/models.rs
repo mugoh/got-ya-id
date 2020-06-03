@@ -365,37 +365,12 @@ impl<'a> NewIdentification<'a> {
         Ok(idt)
     }
 
-    /// Finds Identification claims that would be possible matches
-    /// to a new Identification.
-    ///
-    /// This method should be analogous to `NewClaim.match_idt`
-    pub async fn match_claims(&self) -> Result<(), ResError> {
-        use crate::diesel_cfg::schema::claimed_identifications::dsl::{
-            campus_location, claimed_identifications, institution,
-        };
-
-        let idt_claims = claimed_identifications
-            .filter(
-                institution
-                    .eq(&self.institution)
-                    .and(campus_location.eq(&self.campus)),
-            )
-            .load::<ClaimableIdentification>(&connect_to_db())?;
-
-        for claim in idt_claims.iter() {
-            if self.is_possible_match(claim).await {
-                MatchedIDt::save(claim, &self.into()).await?;
-            }
-        }
-        Ok(())
-    }
-
     /// Finds the similarity between a Claim and this Identification,
     /// returning true if the Claim is a  possible match.
     ///
     /// Matching metric is cosine similarity.
-    pub async fn is_possible_match(&self, claim: &ClaimableIdentification) -> bool {
-        ClaimableIdentification::is_matching_idt(claim, &self.into()).await
+    pub async fn is_possible_match(idt: &Identification, claim: &ClaimableIdentification) -> bool {
+        ClaimableIdentification::is_matching_idt(claim, idt).await
     }
 }
 impl Identification {
@@ -563,6 +538,36 @@ impl Identification {
         let saved_idt = this_idt.save_changes::<Identification>(&connect_to_db())?;
         Ok(saved_idt)
     }
+
+    /// Finds Claims that match an Identification.
+    ///
+    /// This method should be analogous to `NewClaim.match_idt`
+    ///
+    /// # Returns
+    /// true: If a claim match is found for the Identification.
+    pub async fn match_claims(&self) -> Result<bool, ResError> {
+        use crate::diesel_cfg::schema::claimed_identifications::dsl::{
+            campus_location, claimed_identifications, institution,
+        };
+
+        let mut has_match = false;
+
+        let idt_claims = claimed_identifications
+            .filter(
+                institution
+                    .eq(&self.institution)
+                    .and(campus_location.eq(&self.campus)),
+            )
+            .load::<ClaimableIdentification>(&connect_to_db())?;
+
+        for claim in idt_claims.iter() {
+            if NewIdentification::is_possible_match(self, claim).await {
+                has_match = true;
+                MatchedIDt::save(claim, self).await?;
+            }
+        }
+        Ok(has_match)
+    }
 }
 
 impl<'a> NewClaimableIdt<'a> {
@@ -591,8 +596,6 @@ impl<'a> NewClaimableIdt<'a> {
         let idt_claim = diesel::insert_into(claimed_identifications::table)
             .values(&*self)
             .get_result::<ClaimableIdentification>(&connect_to_db())?;
-
-        //idt_claim.match_idt().await?;
 
         Ok(idt_claim)
     }
@@ -658,7 +661,6 @@ impl ClaimableIdentification {
         let updated_idt = diesel::update(&*self)
             .set(data)
             .get_result::<Self>(&connect_to_db())?;
-        self.match_idt().await?;
 
         Ok(updated_idt)
     }
@@ -683,7 +685,10 @@ impl ClaimableIdentification {
     ///
     /// The Identifications selected for match are selected from the name of the
     /// institution given in the Claim.
-    pub async fn match_idt(&self) -> Result<(), ResError> {
+    ///
+    /// # Returns
+    /// bool: If a match of the claim is found, otherwise false.
+    pub async fn match_idt(&self) -> Result<bool, ResError> {
         use crate::diesel_cfg::schema::identifications::dsl::{
             campus, identifications, institution, is_found,
         };
@@ -704,8 +709,7 @@ impl ClaimableIdentification {
                 .load::<Identification>(&connect_to_db())?
         };
 
-        self.find_similarity(idts).await?;
-        Ok(())
+        Ok(self.find_similarity(idts).await?)
     }
 
     /// Compares the fields of a claim to given Identifications to ascertain
@@ -716,13 +720,16 @@ impl ClaimableIdentification {
     async fn find_similarity(
         &self,
         idents: Vec<Identification>,
-    ) -> Result<(), diesel::result::Error> {
+    ) -> Result<bool, diesel::result::Error> {
+        let mut matched = false;
+
         for idt in idents.iter() {
             if Self::is_matching_idt(self, idt).await {
+                matched = true;
                 MatchedIDt::save(self, idt).await?;
             }
         }
-        Ok(())
+        Ok(matched)
     }
 
     /// Finds the similarity between a Claim and an Identification,

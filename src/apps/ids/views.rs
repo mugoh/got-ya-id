@@ -38,9 +38,12 @@ pub async fn create_new_identification(
     let idt_f = new_idt.save();
 
     // Identify possible existing claim on the ID
-    let match_f = new_idt.match_claims();
+    let idt_: Identification = Identification::from(&new_idt.0);
+    let match_f = idt_.match_claims();
 
-    let (idt, _) = try_join(idt_f, match_f).await?;
+    let (idt, matched) = try_join(idt_f, match_f).await?;
+
+    // Send notification
 
     let res = hashmap!["status" => "201",
             "message" => "Success. Identification created"];
@@ -193,6 +196,10 @@ pub async fn update_idt(
     let msg = hashmap!["status" => "200",
             "message" => "Success. Identification updated"];
 
+    let newly_matched = idt.match_claims().await?;
+
+    // Send Notification
+
     respond(msg, Some(saved), None).unwrap().await
 }
 
@@ -300,7 +307,8 @@ pub async fn create_idt_claim(
             "message" => "Success. Claim saved"];
     let resp_f = respond(msg, Some(new_claim.clone()), None).unwrap();
 
-    let (_, res) = try_join(match_f, resp_f).await?;
+    let (is_matched, res) = try_join(match_f, resp_f).await?;
+    // send Notification
     Ok(res)
 }
 
@@ -322,17 +330,15 @@ pub async fn update_idt_claim(
     let user = User::from_token(&req)?;
     let claimed_idt = ClaimableIdentification::find_by_id(*pk)?;
 
-    claimed_idt
-        .update(&user, idt_data.into_inner())
-        .await
-        .map(|updated| {
-            let msg = hashmap!["status" => "200",
-            "message" => "Success. Claim updated"];
+    let updated = claimed_idt.update(&user, idt_data.into_inner()).await?;
+    let msg = hashmap!["status" => "200",
+            "message" => "Success. Claimupdated"];
 
-            respond(msg, Some(updated), None).unwrap()
-        })
-        .map_err(|e| e.into())
-        .and_then(|res| Ok(res))
+    let newly_matched = claimed_idt.match_idt().await?;
+
+    // Send notification
+
+    respond(msg, Some(updated), None).unwrap().await
 }
 
 /// Retrieves Claimable Identifications by PK
