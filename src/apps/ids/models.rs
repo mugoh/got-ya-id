@@ -24,6 +24,8 @@ use std::borrow::Cow;
 
 use actix_web::HttpRequest;
 
+use futures::future::join;
+
 /// Represents a matched Identification-Claim
 #[derive(Queryable, Serialize, Deserialize, Identifiable)]
 #[table_name = "matched_identifications"]
@@ -120,7 +122,7 @@ pub struct NewIdentification<'a> {
 
     #[serde(flatten, with = "serde_pg_point")]
     location_point: Option<PgPoint>,
-    posted_by: Option<i32>,
+    pub posted_by: Option<i32>,
     about: Option<Cow<'a, str>>,
 }
 
@@ -167,7 +169,7 @@ pub struct UpdatableIdentification<'a> {
 /// claim ownership of an existing Identification, or
 /// to be notified once an Identification matching their
 /// particular claim is found.
-#[derive(Queryable, Associations, Serialize, Deserialize, AsChangeset, Identifiable)]
+#[derive(Queryable, Clone, Associations, Serialize, Deserialize, AsChangeset, Identifiable)]
 #[belongs_to(User, foreign_key = "user_id")]
 #[table_name = "claimed_identifications"]
 pub struct ClaimableIdentification {
@@ -334,12 +336,10 @@ impl PartialEq<NewIdentification<'_>> for Identification {
 }
 impl<'a> NewIdentification<'a> {
     /// Saves a new ID record to the Identifications table
-    pub async fn save(&mut self, auth_tk: &HttpRequest) -> Result<Identification, ResError> {
+    pub async fn save(&self) -> Result<Identification, ResError> {
         use crate::diesel_cfg::schema::identifications::dsl::{
             campus, course, identifications as _identifications, institution, name,
         };
-        let usr_id = User::from_token(auth_tk)?.id;
-        self.posted_by = Some(usr_id);
 
         let presents = _identifications
             .filter(
@@ -592,7 +592,7 @@ impl<'a> NewClaimableIdt<'a> {
             .values(&*self)
             .get_result::<ClaimableIdentification>(&connect_to_db())?;
 
-        idt_claim.match_idt().await?;
+        //idt_claim.match_idt().await?;
 
         Ok(idt_claim)
     }
@@ -745,10 +745,13 @@ impl ClaimableIdentification {
         let crse_sig: f64 = 0.25; // Cosine of 1 contributes .25
         let tm_sig: f64 = 0.15; // Valid from, Valid till each contribute tm_sig/2
 
-        let name_s = cosine_similarity(claim.name.as_ref(), &idt.name).await;
-        overall_significance += name_s * nm_sig;
+        let name_s = cosine_similarity(claim.name.as_ref(), &idt.name);
 
-        let course_s = cosine_similarity(claim.course.as_ref(), &idt.course).await;
+        let course_s = cosine_similarity(claim.course.as_ref(), &idt.course);
+
+        let (name_s, course_s) = join(name_s, course_s).await;
+
+        overall_significance += name_s * nm_sig;
         overall_significance += course_s * crse_sig;
 
         if idt.valid_from.is_some() && claim.entry_year.is_some() {

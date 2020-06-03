@@ -10,7 +10,7 @@ use serde_json::Value;
 use std::collections::HashMap;
 /// Response to User on Success
 /// Deserialized to JSON
-#[derive(Deserialize, Serialize, Debug)]
+#[derive(Deserialize, Serialize)]
 pub struct JsonResponse<T> {
     status: String,
     message: String,
@@ -30,7 +30,7 @@ impl<T> JsonResponse<T> {
 
 /// Response to User on Failed request
 /// Deserialized to JSON
-#[derive(Deserialize, Serialize, Debug)]
+#[derive(Deserialize, Serialize)]
 pub struct JsonErrResponse<T> {
     status: String,
     errors: T,
@@ -45,7 +45,7 @@ impl<T> JsonErrResponse<T> {
 
 /// Response to User on Failed request
 /// Deserialized to JSON
-#[derive(Deserialize, Serialize, Debug)]
+#[derive(Deserialize, Serialize)]
 pub struct Response<'a, T> {
     status: &'a str,
     #[serde(skip_serializing_if = "Option::is_none")]

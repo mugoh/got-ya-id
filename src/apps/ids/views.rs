@@ -14,6 +14,9 @@ use crate::{
 
 use validator::Validate;
 
+use futures::future::try_join;
+use futures::future::TryFutureExt;
+
 /// Receives a json NewIdentification data struct which is
 /// used to POST a new Identification
 ///
@@ -29,10 +32,15 @@ pub async fn create_new_identification(
         //return Ok(respond::<serde_json::Value>(hashmap!["status" => "400"], None, Some(&e.to_string())).unwrap());
         return Ok(err("400", e.to_string()));
     }
-    let idt = new_idt.save(&req).await?;
+    let this_user = User::from_token(&req)?;
+    new_idt.0.posted_by = Some(this_user.id);
+
+    let idt_f = new_idt.save();
 
     // Identify possible existing claim on the ID
-    new_idt.match_claims().await?;
+    let match_f = new_idt.match_claims();
+
+    let (idt, _) = try_join(idt_f, match_f).await?;
 
     let res = hashmap!["status" => "201",
             "message" => "Success. Identification created"];
@@ -285,15 +293,15 @@ pub async fn create_idt_claim(
         return err("400", e.to_string()).await;
     }
 
-    new_idt
-        .save(&req)
-        .await
-        .map_err(|e| e.into())
-        .map(|res_data| {
-            let msg = hashmap!["status" => "201",
+    let new_claim = new_idt.save(&req).await?;
+    let match_f = new_claim.match_idt().map_err(|e| e.into());
+
+    let msg = hashmap!["status" => "201",
             "message" => "Success. Claim saved"];
-            respond(msg, Some(res_data), None).unwrap()
-        })
+    let resp_f = respond(msg, Some(new_claim.clone()), None).unwrap();
+
+    let (_, res) = try_join(match_f, resp_f).await?;
+    Ok(res)
 }
 
 /// Updates existing Claims
