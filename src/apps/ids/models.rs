@@ -575,17 +575,13 @@ impl Identification {
 
 impl<'a> NewClaimableIdt<'a> {
     /// Saves a new user Identification Claim to db
-    pub async fn save(
-        &mut self,
-        auth_tk: &HttpRequest,
-    ) -> Result<ClaimableIdentification, ResError> {
+    pub async fn save(&mut self, this_user: &User) -> Result<ClaimableIdentification, ResError> {
         use crate::diesel_cfg::schema::claimed_identifications::dsl::{
             claimed_identifications as cl_idt_table, institution as c_institution, name as c_name,
         };
 
-        let this_user = User::from_token(auth_tk)?;
-        self.user_id = this_user.id;
         self.has_claim(&this_user).await?;
+        self.user_id = this_user.id;
 
         let existing_claims = cl_idt_table
             .filter(
@@ -691,7 +687,7 @@ impl ClaimableIdentification {
     ///
     /// # Returns
     /// bool: If a match of the claim is found, otherwise false.
-    pub async fn match_idt(&self) -> Result<bool, ResError> {
+    pub async fn match_idt(&self) -> Result<(bool, Vec<Identification>), ResError> {
         use crate::diesel_cfg::schema::identifications::dsl::{
             campus, identifications, institution, is_found,
         };
@@ -723,16 +719,18 @@ impl ClaimableIdentification {
     async fn find_similarity(
         &self,
         idents: Vec<Identification>,
-    ) -> Result<bool, diesel::result::Error> {
-        let mut matched = false;
+    ) -> Result<(bool, Vec<Identification>), diesel::result::Error> {
+        let mut is_matched = false;
+        let mut matched_idts = vec![];
 
-        for idt in idents.iter() {
-            if Self::is_matching_idt(self, idt).await {
-                matched = true;
-                MatchedIDt::save(self, idt).await?;
+        for idt in idents.into_iter() {
+            if Self::is_matching_idt(self, &idt).await {
+                is_matched = true;
+                MatchedIDt::save(self, &idt).await?;
+                matched_idts.push(idt);
             }
         }
-        Ok(matched)
+        Ok((is_matched, matched_idts))
     }
 
     /// Finds the similarity between a Claim and an Identification,

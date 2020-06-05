@@ -210,11 +210,10 @@ pub async fn update_idt(
 
     let (newly_matched, matched_claims) = idt.match_claims().await?;
 
+    // Send Notification
     if newly_matched {
         send_claim_notification(&saved, matched_claims).await?;
     }
-
-    // Send Notification
 
     respond(msg, Some(saved), None).unwrap().await
 }
@@ -316,15 +315,20 @@ pub async fn create_idt_claim(
         return err("400", e.to_string()).await;
     }
 
-    let new_claim = new_idt.save(&req).await?;
+    let user = User::from_token(&req)?;
+    let new_claim = new_idt.save(&user).await?;
     let match_f = new_claim.match_idt().map_err(|e| e.into());
 
     let msg = hashmap!["status" => "201",
             "message" => "Success. Claim saved"];
     let resp_f = respond(msg, Some(new_claim.clone()), None).unwrap();
 
-    let (is_matched, res) = try_join(match_f, resp_f).await?;
+    let ((is_matched, matched_idts), res) = try_join(match_f, resp_f).await?;
+
     // send Notification
+    if is_matched {
+        send_claimed_notification(&user, matched_idts).await?;
+    }
     Ok(res)
 }
 
@@ -350,9 +354,11 @@ pub async fn update_idt_claim(
     let msg = hashmap!["status" => "200",
             "message" => "Success. Claimupdated"];
 
-    let newly_matched = claimed_idt.match_idt().await?;
+    let (newly_matched, matched_idts) = claimed_idt.match_idt().await?;
 
-    // Send notification
+    if newly_matched {
+        send_claimed_notification(&user, matched_idts).await?;
+    }
 
     respond(msg, Some(updated), None).unwrap().await
 }
@@ -402,14 +408,10 @@ async fn send_claim_notification(
     let claim_rdct_link: String = env::var("CLAIM_REDIRECT_LINK").unwrap_or("".into());
 
     for claim in claims {
-        let user_emails = User::all_emails(claim.user_id)?;
+        let user_emails = User::all_emails(claim.user_id).await?;
         let user_name = User::find_by_pk(claim.user_id, None)?.0.username;
 
-        let mut context = get_notif_context(&user_name, &claim_rdct_link).await;
-        context.insert("id_name", &idt.name);
-        context.insert("id_institution", &idt.institution);
-        context.insert("id_inst_location", &idt.campus);
-        context.insert("id_course", &idt.course);
+        let context = get_notif_context(&user_name, &claim_rdct_link, idt).await?;
 
         let s = TEMPLATE.render("claim_notification.html", &context)?;
 
@@ -420,6 +422,34 @@ async fn send_claim_notification(
 
             mail.send().await?;
         }
+    }
+    Ok(())
+}
+
+/// Sends a notification email to a single claim owner whose Identification
+/// claim matches a set of Identifications.
+///
+/// The send email has the details of only one of the Identifications
+/// in the matched set. The notification content should redirect the user
+/// to the rest of the matches
+async fn send_claimed_notification(
+    clm_owner: &User,
+    idts: Vec<Identification>,
+) -> Result<(), ResError> {
+    let claim_rdct_link: String = env::var("CLAIM_REDIRECT_LINK").unwrap_or("".into());
+
+    let emails_f = clm_owner.emails().map_err(|e| e.into());
+    let context_f = get_notif_context(&clm_owner.username, &claim_rdct_link, &idts[0]);
+
+    let (emails, context) = try_join(emails_f, context_f).await?;
+    let s = TEMPLATE.render("claim_notification.html", &context)?;
+
+    for user_email in emails {
+        let mut mail = mail::Mail::new(&user_email, &clm_owner.username, "Pick up your ID", &s)
+            .await
+            .map_err(|e| ResError::new(e, 500))?;
+
+        mail.send().await?;
     }
     Ok(())
 }

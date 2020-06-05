@@ -280,7 +280,7 @@ impl User {
 
     /// Returns all verified email addresses belonging to
     /// the given user id.
-    pub fn all_emails(usr_id: i32) -> Result<Vec<String>, ResError> {
+    pub async fn all_emails(usr_id: i32) -> Result<Vec<String>, ResError> {
         use crate::diesel_cfg::schema::emails::dsl::{email, emails, user_id, verified};
 
         let all_em = emails
@@ -288,6 +288,17 @@ impl User {
             .select(email)
             .load::<String>(&connect_to_db())?;
         Ok(all_em)
+    }
+
+    /// Returns all verified email addresses belonging to
+    /// a User instance.
+    pub async fn emails(&self) -> Result<Vec<String>, diesel::result::Error> {
+        use crate::diesel_cfg::schema::emails::dsl::{email, verified};
+
+        Email::belonging_to(self)
+            .filter(verified.eq(true))
+            .select(email)
+            .load::<String>(&connect_to_db())
     }
 
     /// Creates an authorization token encoded with the

@@ -4,7 +4,10 @@ use validator::ValidationError;
 
 use super::models::User;
 
-use crate::apps::core::response;
+use crate::{
+    apps::{core::response, ids::models::Identification},
+    errors::error::ResError,
+};
 
 use chrono::NaiveDateTime;
 use serde::de;
@@ -97,7 +100,11 @@ pub fn get_context(username: Option<&str>, path: &str) -> Context {
 }
 
 /// Email matched-claim notification context
-pub async fn get_notif_context(username: &str, path: &str) -> Context {
+pub async fn get_notif_context(
+    username: &str,
+    path: &str,
+    idt: &Identification,
+) -> Result<Context, ResError> {
     let mut context = Context::new();
 
     // Handle Oauth Google Users
@@ -111,7 +118,12 @@ pub async fn get_notif_context(username: &str, path: &str) -> Context {
     context.insert("username", username);
     context.insert("link", path);
 
-    context
+    context.insert("id_name", &idt.name);
+    context.insert("id_institution", &idt.institution);
+    context.insert("id_inst_location", &idt.campus);
+    context.insert("id_course", &idt.course);
+
+    Ok(context)
 }
 
 /// Template holding context for password reset
