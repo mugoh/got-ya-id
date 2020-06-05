@@ -83,3 +83,21 @@ impl From<actix_web::error::ParseError> for ResError {
         Self { msg, status }
     }
 }
+
+impl From<lettre::smtp::error::Error> for ResError {
+    fn from(er: lettre::smtp::error::Error) -> Self {
+        let msg = er.to_string();
+        let status = 500;
+
+        Self { msg, status }
+    }
+}
+
+impl From<tera::Error> for ResError {
+    fn from(er: tera::Error) -> Self {
+        let msg = er.to_string();
+        let status = 500;
+
+        Self { msg, status }
+    }
+}

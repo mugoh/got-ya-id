@@ -7,8 +7,15 @@ use super::models::{
     UpdatableClaimableIdt, UpdatableIdentification,
 };
 use crate::{
-    apps::user::models::User,
-    core::response::{err, respond},
+    apps::user::{
+        models::User,
+        utils::{get_notif_context, TEMPLATE},
+    },
+    core::{
+        mail,
+        response::{err, respond},
+    },
+    errors::error::ResError,
     hashmap,
 };
 
@@ -16,6 +23,8 @@ use validator::Validate;
 
 use futures::future::try_join;
 use futures::future::TryFutureExt;
+
+use std::env;
 
 /// Receives a json NewIdentification data struct which is
 /// used to POST a new Identification
@@ -41,9 +50,12 @@ pub async fn create_new_identification(
     let idt_: Identification = Identification::from(&new_idt.0);
     let match_f = idt_.match_claims();
 
-    let (idt, matched) = try_join(idt_f, match_f).await?;
+    let (idt, (is_matched, matched_claims)) = try_join(idt_f, match_f).await?;
 
     // Send notification
+    if is_matched {
+        send_claim_notification(&idt, matched_claims).await?;
+    }
 
     let res = hashmap!["status" => "201",
             "message" => "Success. Identification created"];
@@ -196,7 +208,11 @@ pub async fn update_idt(
     let msg = hashmap!["status" => "200",
             "message" => "Success. Identification updated"];
 
-    let newly_matched = idt.match_claims().await?;
+    let (newly_matched, matched_claims) = idt.match_claims().await?;
+
+    if newly_matched {
+        send_claim_notification(&saved, matched_claims).await?;
+    }
 
     // Send Notification
 
@@ -373,4 +389,37 @@ pub async fn retrieve_user_claim(req: HttpRequest) -> Result<HttpResponse, Error
             "message" => "Success. Claim  retrieved"];
 
     respond(msg, Some(idt_claim), None).unwrap().await
+}
+
+/// Sends a notification email to Users of the passed Identification
+/// claims.
+///
+/// A notification is sent to every email attached to the User
+async fn send_claim_notification(
+    idt: &Identification,
+    claims: Vec<ClaimableIdentification>,
+) -> Result<(), ResError> {
+    let claim_rdct_link: String = env::var("CLAIM_REDIRECT_LINK").unwrap_or("".into());
+
+    for claim in claims {
+        let user_emails = User::all_emails(claim.user_id)?;
+        let user_name = User::find_by_pk(claim.user_id, None)?.0.username;
+
+        let mut context = get_notif_context(&user_name, &claim_rdct_link).await;
+        context.insert("id_name", &idt.name);
+        context.insert("id_institution", &idt.institution);
+        context.insert("id_inst_location", &idt.campus);
+        context.insert("id_course", &idt.course);
+
+        let s = TEMPLATE.render("claim_notification.html", &context)?;
+
+        for user_email in user_emails {
+            let mut mail = mail::Mail::new(&user_email, &user_name, "Pick up your ID", &s)
+                .await
+                .map_err(|e| ResError::new(e, 500))?;
+
+            mail.send().await?;
+        }
+    }
+    Ok(())
 }

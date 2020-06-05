@@ -96,6 +96,24 @@ pub fn get_context(username: Option<&str>, path: &str) -> Context {
     context
 }
 
+/// Email matched-claim notification context
+pub async fn get_notif_context(username: &str, path: &str) -> Context {
+    let mut context = Context::new();
+
+    // Handle Oauth Google Users
+    // The username is derived from the `name` +  a random substring
+
+    let username = if username.contains("-google") {
+        username.split("-").collect::<Vec<&str>>()[0]
+    } else {
+        username
+    };
+    context.insert("username", username);
+    context.insert("link", path);
+
+    context
+}
+
 /// Template holding context for password reset
 /// Receives a User ref
 pub fn get_reset_context<'a>(data: &User, path: &'a str) -> Context {

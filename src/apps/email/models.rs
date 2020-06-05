@@ -96,7 +96,7 @@ impl Email {
 
     /// Returns the User ID identifying the given email.
     pub fn u_id(given_email: &str) -> Result<i32, diesel::result::Error> {
-        use crate::diesel_cfg::schema::emails::dsl::*;
+        use crate::diesel_cfg::schema::emails::dsl::{email, emails, user_id};
 
         emails
             .filter(email.eq(&given_email))

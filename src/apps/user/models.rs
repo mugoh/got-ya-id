@@ -269,13 +269,25 @@ impl User {
 
     /// Gives the Active email of a User
     pub fn email(&self) -> String {
-        use crate::diesel_cfg::schema::emails::{active, email};
+        use crate::diesel_cfg::schema::emails::dsl::{active, email};
 
         Email::belonging_to(self)
             .filter(active.eq(true))
             .select(email)
             .get_result::<String>(&connect_to_db())
             .unwrap()
+    }
+
+    /// Returns all verified email addresses belonging to
+    /// the given user id.
+    pub fn all_emails(usr_id: i32) -> Result<Vec<String>, ResError> {
+        use crate::diesel_cfg::schema::emails::dsl::{email, emails, user_id, verified};
+
+        let all_em = emails
+            .filter(user_id.eq(usr_id).and(verified.eq(true)))
+            .select(email)
+            .load::<String>(&connect_to_db())?;
+        Ok(all_em)
     }
 
     /// Creates an authorization token encoded with the
@@ -388,7 +400,7 @@ impl User {
     pub fn find_by_pk<'a>(
         pk: i32,
         include_profile: Option<i32>,
-    ) -> Result<(User, Option<Profile<'a>>), Box<dyn stdError>> {
+    ) -> Result<(User, Option<Profile<'a>>), ResError> {
         use crate::diesel_cfg::schema::users::dsl::*;
         let user = users.find(pk).get_result::<User>(&connect_to_db())?;
 
@@ -398,7 +410,10 @@ impl User {
 
         let mut usr_profile = Profile::belonging_to(&user).load::<Profile>(&connect_to_db())?;
         if usr_profile.is_empty() {
-            return Err(format!("User of ID {id} non existent", id = pk).into());
+            return Err(ResError::new(
+                format!("User of ID {id} non existent", id = pk),
+                404,
+            ));
         }
         Ok((user, usr_profile.pop()))
     }
@@ -699,7 +714,7 @@ impl OauthGgUser {
         use rand::{distributions::Alphanumeric, thread_rng, Rng};
 
         use crate::diesel_cfg::schema::avatars::dsl::url as av_url;
-        use crate::diesel_cfg::schema::emails::{active, email as e_email, user_id};
+        use crate::diesel_cfg::schema::emails::dsl::{active, email as e_email, user_id};
         use crate::diesel_cfg::schema::oath_users::dsl::*;
         use crate::diesel_cfg::schema::users::dsl::{
             social_id as usocial_id, username as u_username, users,
