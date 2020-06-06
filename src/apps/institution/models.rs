@@ -109,20 +109,26 @@ impl<'a> ChangeableInst<'a> {
     ///
     /// ### Example
     /// ```rust
-    /// let name = "Planty Planty";
-    /// let email = "poofy@planty.du";
-    /// assert!(email_institution_sim(name, email, false))
+    /// use got_ya_id::apps::institution::models::ChangeableInst;
     ///
+    /// async {
+    ///     let name = "Planty Planty";
+    ///     let email = "poofy@planty.du";
+    ///     assert!(ChangeableInst::email_institution_sim(name, email, false).await);
+    /// };
     ///
-    /// let name = "Great Uncookers Dozen";
-    /// let email = "poofy@uncookers.doom";
-    /// assert!(email_institution_sim(name, email, false))
-    ///
-    /// let name = "Great Uncookers Dozen";
-    /// let email = "poofy@unrs.doom";
-    /// assert_ne!(true, email_institution_sim(name, email, false))
+    /// async {
+    ///     let name = "Great Uncookers Dozen";
+    ///     let email = "poofy@uncookers.doom";
+    ///     assert!(ChangeableInst::email_institution_sim(name, email, false).await);
+    ///};
+    /// async {
+    ///     let name = "Great Uncookers Dozen";
+    ///     let email = "poofy@unrs.doom";
+    ///     assert_ne!(true, ChangeableInst::email_institution_sim(name, email, false).await);
+    /// };
     /// ```
-    async fn email_institution_sim(name: &str, email: &str, remove_of: bool) -> bool {
+    pub async fn email_institution_sim(name: &str, email: &str, remove_of: bool) -> bool {
         const THRESHOLD: f64 = 0.75;
 
         let name = name.to_lowercase();

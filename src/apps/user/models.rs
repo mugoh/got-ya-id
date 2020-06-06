@@ -65,7 +65,7 @@ pub struct User {
 
 /// Temporary holds new User data
 /// User Record for new User entries
-#[derive(Clone, Serialize, Deserialize, Insertable)]
+#[derive(Serialize, Deserialize, Insertable)]
 #[table_name = "users"]
 pub struct NewUser<'b> {
     pub username: Cow<'b, str>,
@@ -78,7 +78,7 @@ pub struct NewUser<'b> {
 ///
 /// This structure only adds `email` onto
 /// the `NewUser` struct.
-#[derive(Clone, Validate, Deserialize)]
+#[derive(Serialize, Validate, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct NewJsonUser<'b> {
     #[validate(
@@ -503,8 +503,8 @@ impl User {
         // This should differentiate them from oauth2 profile avatars
         let old_url = &avatar[0].url;
 
-        if old_url.is_some() && old_url.clone().unwrap().contains("got_ya_id") {
-            let compl = Url::parse(&old_url.clone().unwrap())?;
+        if old_url.is_some() && old_url.as_ref().unwrap().contains("got_ya_id") {
+            let compl = Url::parse(&old_url.as_ref().unwrap())?;
             let s: Vec<&str> = compl
                 .path_segments()
                 .unwrap()

@@ -273,16 +273,11 @@ pub async fn get_user_posted_idts(req: HttpRequest) -> Result<HttpResponse, Erro
 /// #### Authentication required
 ///
 /// ## Example
-/// ```rust
-/// use actix_web::test;
-///
-/// let data = MatchedIdtJson {idt: 1, claim: 1};
-/// let req = test::TestRequest::post()
-///     .set_json(&body)
-///     .uri(&url)
-///     .to_request();
-///
-/// claim_idt(req);
+/// ```json
+/// {
+///     idt: 1,
+///     claim: 1
+/// }
 ///
 /// ```
 pub async fn claim_idt(

@@ -47,6 +47,15 @@ use actix_web_httpauth::headers::authorization::Bearer;
 /// - On Sucess: JSONResponse
 /// - On ERROR: JSONErrResponse
 ///
+/// ## Request Example
+/// ```json
+/// {
+///     username: "jewemy",
+///     email: "jewemy@jewe.ju",
+///     password: "passypassy"
+/// }
+///
+/// ```
 pub async fn register_user(
     data: web::Json<NewJsonUser<'_>>,
     req: HttpRequest,
@@ -153,6 +162,16 @@ pub async fn send_account_activation_link(
 ///
 /// # url
 /// ## `auth/login`
+///
+/// ## Request Example
+/// -Either `username` or `email`
+/// ```json
+/// {
+///     email: "email@ds.co",
+///     username: "fancy",
+///     password: pasypasy
+/// }
+/// ```
 pub async fn login(user: web::Json<SignInUser<'_>>) -> Result<HttpResponse, Error> {
     if let Err(err) = user.validate() {
         let res = response::JsonErrResponse::new("400".to_string(), err);

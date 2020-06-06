@@ -1,5 +1,7 @@
-use super::models::NewUser;
-use super::views::*;
+use super::{
+    models::{NewJsonUser, User},
+    views::register_user,
+};
 
 use actix_web::{http, test, web, App};
 use std::{borrow::Cow, env};
@@ -22,7 +24,7 @@ async fn _register_valid_user() {
     let url = BASE.to_owned() + "/auth";
 
     let mut app = test::init_service(App::new().route(&url, web::post().to(register_user))).await;
-    let body = NewUser {
+    let body = NewJsonUser {
         email: Cow::Borrowed("user@f.co"),
         password: Cow::Borrowed("password"),
         username: Cow::Borrowed("user1"),
@@ -32,9 +34,13 @@ async fn _register_valid_user() {
         .set_json(&body)
         .uri(&url)
         .to_request();
-    let resp = test::call_service(&mut app, req).await;
+    let _resp = test::call_service(&mut app, req).await;
 
-    assert_eq!(resp.status(), http::StatusCode::CONFLICT);
+    // Email is sent on registration.
+    // The req will err unless a mock of the email sending
+    // is done.
+    let user = User::find_by_email(&body.email).unwrap();
+    assert_eq!(user[0].username, body.username.to_string());
 }
 
 #[actix_rt::test]
@@ -43,13 +49,13 @@ async fn register_invalid_user() {
     let url = BASE.to_owned() + "/auth";
 
     let mut app = test::init_service(App::new().route(&url, web::post().to(register_user))).await;
-    let invalid_named = NewUser {
+    let invalid_named = NewJsonUser {
         email: Cow::Borrowed("user@f.co"),
         password: Cow::Borrowed("password"),
         username: Cow::Borrowed("sh"),
         access_level: Some(2),
     };
-    let invalid_emailed = NewUser {
+    let invalid_emailed = NewJsonUser {
         email: Cow::Borrowed("invalid_email"),
         password: Cow::Borrowed("password"),
         username: Cow::Borrowed("saddh"),
@@ -78,7 +84,7 @@ async fn register_user_twice() {
     let url = BASE.to_owned() + "/auth";
 
     let mut app = test::init_service(App::new().route(&url, web::post().to(register_user))).await;
-    let body = NewUser {
+    let body = NewJsonUser {
         email: Cow::Borrowed("user@f.co"),
         password: Cow::Borrowed("password"),
         username: Cow::Borrowed("user1"),
