@@ -8,8 +8,13 @@ use std::{
 
 use tera::Tera;
 
-use got_ya_id::apps::api;
-use got_ya_id::apps::user::{models::OClient, utils::create_oauth_client};
+use got_ya_id::{
+    apps::{
+        api,
+        user::{models::OClient, utils::create_oauth_client},
+    },
+    diesel_cfg::config::seed_admin_user,
+};
 
 #[actix_rt::main]
 async fn main() -> io::Result<()> {
@@ -18,6 +23,8 @@ async fn main() -> io::Result<()> {
     // env::set_var("RUST_LOG", "debug");
     env_logger::init();
     let tera = Tera::new("src/templates/**/*").unwrap();
+    seed_admin_user().await;
+
     let data = OClient {
         client: create_oauth_client(),
     };

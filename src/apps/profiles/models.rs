@@ -11,18 +11,15 @@ use serde_json::{json, value};
 use std::{borrow::Cow, error};
 
 /// Holds the User Profile Record
-#[derive(
-    Queryable, Identifiable, AsChangeset, Associations, Deserialize, Default, Serialize, Debug,
-)]
+#[derive(Queryable, Identifiable, AsChangeset, Associations, Deserialize, Default, Serialize)]
 #[belongs_to(User)]
 pub struct Profile<'a> {
     id: i32,
-    user_id: i32,
+    pub user_id: i32,
     phone: Option<String>,
-    first_name: Option<String>,
-    middle_name: Option<String>,
-    last_name: Option<String>,
-    institution: Option<String>,
+    /// Full name
+    name: Option<String>,
+    pub institution: Option<String>,
     about: Option<String>,
     found_ids: Option<Cow<'a, i32>>,
 }
@@ -37,8 +34,9 @@ impl<'a> Profile<'a> {
     ///   {avatar: url_to_profile avatar}
     ///  )
     pub fn find_by_key(pk: i32) -> Result<(Vec<Profile<'a>>, value::Value), Box<dyn error::Error>> {
-        use schema::avatars::dsl::*;
-        use schema::profiles::dsl::*;
+        use schema::avatars::dsl::avatars;
+        use schema::profiles::dsl::profiles;;
+
         let profile = profiles.find(pk).load(&connect_to_db())?;
         if profile.is_empty() {
             return Err(format!("User of ID {} non-existent", pk).into());
@@ -52,9 +50,8 @@ impl<'a> Profile<'a> {
     }
 
     /// Retrieves all existing User profiles
-    ///
     pub fn retrieve_all<'b>() -> Result<Vec<Profile<'b>>, Box<dyn error::Error>> {
-        use crate::diesel_cfg::schema::profiles::dsl::*;
+        use crate::diesel_cfg::schema::profiles::dsl::profiles;
         let prof_vec = profiles.load::<Profile<'b>>(&connect_to_db())?;
 
         Ok(prof_vec)
@@ -73,15 +70,13 @@ impl<'a> Profile<'a> {
 }
 
 /// Holds a new User Profile Record
-#[derive(Insertable, Deserialize, Default, Serialize, Debug)]
+#[derive(Insertable, Deserialize, Default, Serialize)]
 #[table_name = "profiles"]
 #[serde(deny_unknown_fields)]
 pub struct NewProfile<'a> {
     user_id: i32,
     phone: Option<Cow<'a, str>>,
-    first_name: Option<Cow<'a, str>>,
-    middle_name: Option<Cow<'a, str>>,
-    last_name: Option<Cow<'a, str>>,
+    name: Option<Cow<'a, str>>,
     institution: Option<Cow<'a, str>>,
     about: Option<Cow<'a, str>>,
 }
@@ -122,19 +117,17 @@ impl<'a> NewProfile<'a> {
 }
 
 /// Updatable profile object
-#[derive(AsChangeset, Serialize, Deserialize)]
+#[derive(AsChangeset, Deserialize)]
 #[table_name = "profiles"]
 pub struct UpdtProfile<'a> {
     phone: Option<Cow<'a, str>>,
-    first_name: Option<Cow<'a, str>>,
-    middle_name: Option<Cow<'a, str>>,
-    last_name: Option<Cow<'a, str>>,
+    name: Option<Cow<'a, str>>,
     institution: Option<Cow<'a, str>>,
     about: Option<Cow<'a, str>>,
 }
 
 /// User Profile Avatar struct
-#[derive(Queryable, Identifiable, AsChangeset, Associations, Deserialize, Serialize, Debug)]
+#[derive(Queryable, Identifiable, AsChangeset, Associations, Deserialize, Serialize)]
 #[belongs_to(User)]
 pub struct Avatar<'a> {
     id: i32,
@@ -144,7 +137,7 @@ pub struct Avatar<'a> {
 }
 
 /// Insertible profile avatar data
-#[derive(Insertable, Deserialize, Serialize, Debug)]
+#[derive(Insertable, Deserialize)]
 #[table_name = "avatars"]
 pub struct NewAvatar<'a> {
     url: Option<Cow<'a, str>>,

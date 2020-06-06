@@ -1,0 +1,5 @@
+CREATE TABLE  refresh_tokens (
+    id BIGSERIAL PRIMARY KEY,
+    body VARCHAR UNIQUE NOT NULL,
+    valid BOOLEAN NOT NULL DEFAULT TRUE
+);

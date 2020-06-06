@@ -3,9 +3,11 @@ db_port=
 db_host=''
 db_pass=''
 db_name=''
+export test_db_name=''
 
 
 export DATABASE_URL=postgres://$(db_username):$(db_pass)@$(db_host):$(db_port)/$(db_name)
+export TEST_DATABASE_URL=postgres://$db_username:$db_pass@$db_host:$db_port/$test_db_name
 # DATABASE_URL=
 
 export CLOUDINARY_URL=
@@ -14,11 +16,23 @@ export secret_key='some_secrety_secrety'
 
 export GOOGLE_PROFILE_URL="https://www.googleapis.com/oauth2/v1/userinfo"
 
+# Link to a User's matched Identification claims page
+export CLAIM_REDIRECT_LINK='https://homy/goes/here'
+
 # Email Client
-export SMTP_CLIENT=
-export MAIL_ADDR=
-export MAIL_USERNAME=
-export MAIL_PASS=
+export smtp_client=
+export mail_addr=
+export mail_username=
+export mail_pass=
+
+# In minutes
+export REFRESH_TOKEN_DURATION=43200
+export AUTH_TOKEN_DURATION=120
+
+export ADMIN_USERNAME=
+export ADMIN_PASSWORD=
+export ADMIN_EMAIL=
+
 
 # export RUST_LOG=debug
 # export actix_web=debug

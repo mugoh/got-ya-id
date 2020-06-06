@@ -1,36 +1,38 @@
 //! Handles views for User items
-//!
-//!
 
-use super::models::{
-    GoogleUser, NewUser, OClient, OauthGgUser, OauthInfo, ResetPassData, SignInUser, User,
-    UserEmail,
+use super::{
+    models::{
+        GoogleUser, NewJsonUser, NewRfToken, NewUserLevel, OClient, OauthGgUser, OauthInfo,
+        Reftoken, ResetPassData, SignInUser, User, UserEmail,
+    },
+    utils::{err_response, get_context, get_reset_context, get_url, TEMPLATE},
+};
+use crate::{
+    apps::auth::validate,
+    core::{
+        mail,
+        response::{self, err, respond},
+    },
+    hashmap,
 };
 
-use super::utils::{err_response, get_context, get_reset_context, get_url, TEMPLATE};
-
-use crate::apps::auth::validate;
-use crate::core::mail;
-use crate::core::response::{self, err, respond};
-use crate::hashmap;
-
-use log::debug;
 use tera::{self, Context};
 
-use actix_web::{http, web, HttpRequest, HttpResponse};
+use actix_web::{
+    error::ErrorInternalServerError, http, web, Error, HttpRequest, HttpResponse, Result,
+};
 use serde_json::json;
 use validator::Validate;
 
 use std::{
+    borrow::Cow,
     env,
-    error::Error as stdError,
     sync::{Arc, Mutex},
 };
 
 use actix_web::http::header::Header;
 use actix_web_httpauth::headers::authorization::Authorization;
 use actix_web_httpauth::headers::authorization::Bearer;
-// use actix_web_httpauth::headers::www_authenticate::bearer::Bearer;
 
 /// Registers a new user
 ///
@@ -45,53 +47,79 @@ use actix_web_httpauth::headers::authorization::Bearer;
 /// - On Sucess: JSONResponse
 /// - On ERROR: JSONErrResponse
 ///
-pub fn register_user(mut data: web::Json<NewUser>, req: HttpRequest) -> HttpResponse {
+/// ## Request Example
+/// ```json
+/// {
+///     username: "jewemy",
+///     email: "jewemy@jewe.ju",
+///     password: "passypassy"
+/// }
+///
+/// ```
+pub async fn register_user(
+    data: web::Json<NewJsonUser<'_>>,
+    req: HttpRequest,
+) -> Result<HttpResponse, Error> {
     let user_ = &data.0;
-    let token = validate::encode_jwt_token(user_).unwrap();
-    let _claims = validate::decode_auth_token(&token);
+    let token =
+        validate::encode_jwt_token(user_.email.as_ref().into(), "verification".into()).unwrap();
 
     // -> Extract host info from req Headers
-    let host = format!("{:?}", req.headers().get("host").unwrap());
+    // let host = format!("{:?}", req.headers().get("host").unwrap());
+    let req_header = req.headers().get("host");
+    let host = if let Some(rq) = req_header {
+        format!("{:?}", rq)
+    } else {
+        "http::/127.0.0.1:8888".into()
+    };
     let path = get_url(&host, "api/auth/verify", &token);
 
     if let Err(err) = data.validate() {
         let res: response::JsonErrResponse<_> =
             response::JsonErrResponse::new(http::StatusCode::BAD_REQUEST.to_string(), err);
-        return HttpResponse::build(http::StatusCode::BAD_REQUEST).json(&res);
+        return HttpResponse::build(http::StatusCode::BAD_REQUEST)
+            .json(&res)
+            .await;
         // Filter json where message is not null
     };
 
-    match data.save() {
+    let mut user = user_.into_savable();
+
+    match user.save(&data.0.email) {
         Ok(saved_user) => saved_user,
         Err(e) => {
             let res: response::JsonErrResponse<_> =
-                response::JsonErrResponse::new("409".to_string(), e);
-            return HttpResponse::build(http::StatusCode::CONFLICT).json(&res);
+                response::JsonErrResponse::new("409".to_string(), e.to_string());
+            return HttpResponse::build(http::StatusCode::CONFLICT)
+                .json(&res)
+                .await;
         }
     };
 
     // Mail
-    if let Err(e) = send_activation_link(
+    send_activation_link(
         &data.email,
         Some(&data.username),
         &path,
         "email_activation.html",
-    ) {
-        return err("500", e.to_string());
-    }
+    )
+    .await?;
     let res: response::JsonResponse<_> = response::JsonResponse::new(
         http::StatusCode::CREATED.to_string(),
-        format!("Success. An activation link sent to {}", &data.0.email),
+        format!("sucess. An activation link sent to {}", &data.0.email),
         json!({"email": &data.0.email, "username": &data.0.username, "token": &token}),
     );
 
-    HttpResponse::build(http::StatusCode::CREATED).json(&res)
+    HttpResponse::build(http::StatusCode::CREATED)
+        .json(&res)
+        .await
 }
 
-/// Sends an activation link to a user email
+/// Sends an account activation link to a user email
 ///
 /// This endpoint should specifically be useful in re-sending
-/// of account activation links to users
+/// of account activation links to users. (Logic assumes, in cases
+/// where the initial link token expired before use)
 ///
 /// # url
 /// `/auth/activation/send`
@@ -99,25 +127,33 @@ pub fn register_user(mut data: web::Json<NewUser>, req: HttpRequest) -> HttpResp
 /// # method
 ///
 /// `POST`
-pub fn send_account_activation_link(email: web::Json<UserEmail>, req: HttpRequest) -> HttpResponse {
-    //
+///
+/// ### Authentication Required
+pub async fn send_account_activation_link(
+    email: web::Json<UserEmail<'_>>,
+    req: HttpRequest,
+) -> Result<HttpResponse, Error> {
+    User::decode_auth_header(&req)?;
+
     if let Err(e) = email.0.validate() {
-        return HttpResponse::build(http::StatusCode::BAD_REQUEST).json(e);
+        return HttpResponse::build(http::StatusCode::BAD_REQUEST)
+            .json(e)
+            .await;
     }
     if let Err(e) = User::find_by_email(&email.email) {
-        return HttpResponse::build(http::StatusCode::NOT_FOUND).json(e);
+        return HttpResponse::build(http::StatusCode::NOT_FOUND)
+            .json(e)
+            .await;
     }
 
-    let token = User::create_token(&email.email).unwrap();
+    let token = User::create_token(&email.email, Some(24 * 60), "verification".into()).unwrap();
     let host = format!("{:?}", req.headers().get("host").unwrap());
     let path = get_url(&host, "api/auth/verify", &token);
 
-    if let Err(e) = send_activation_link(&email.email, None, &path, "email_activation.html") {
-        return err("500", e.to_string());
-    }
+    send_activation_link(&email.email, None, &path, "email_activation.html").await?;
 
-    let data = hashmap!["status" => "200", "message" => "Success. Activation link sent"];
-    respond(data, Some("".to_string()), None).unwrap()
+    let data = hashmap!["status" => "200", "message" => "sucess. Activation link sent"];
+    Ok(respond(data, Some("".to_string()), None).unwrap())
 }
 
 /// Logs in registered user
@@ -127,76 +163,109 @@ pub fn send_account_activation_link(email: web::Json<UserEmail>, req: HttpReques
 /// # url
 /// ## `auth/login`
 ///
-pub fn login(user: web::Json<SignInUser>) -> HttpResponse {
+/// ## Request Example
+/// -Either `username` or `email`
+/// ```json
+/// {
+///     email: "email@ds.co",
+///     username: "fancy",
+///     password: pasypasy
+/// }
+/// ```
+pub async fn login(user: web::Json<SignInUser<'_>>) -> Result<HttpResponse, Error> {
     if let Err(err) = user.validate() {
         let res = response::JsonErrResponse::new("400".to_string(), err);
-        return HttpResponse::build(http::StatusCode::BAD_REQUEST).json(&res);
+        return Ok(HttpResponse::build(http::StatusCode::BAD_REQUEST)
+            .json(&res)
+            .await?);
     };
     if user.has_credentials() {
         let res =
             response::JsonErrResponse::new("400".to_string(), "Oh-uh, provide a username or email");
-        return HttpResponse::build(http::StatusCode::BAD_REQUEST).json(&res);
+        return Ok(HttpResponse::build(http::StatusCode::BAD_REQUEST)
+            .json(&res)
+            .await?);
     }
+
+    let mut reactication_msg = "";
+
     let res = match user.sign_in() {
         Ok(usr_vec) => {
             if usr_vec.is_empty() {
-                return HttpResponse::build(http::StatusCode::UNAUTHORIZED).json(
+                let resp = HttpResponse::build(http::StatusCode::UNAUTHORIZED).json(
                     response::JsonErrResponse::new(
                         http::StatusCode::UNAUTHORIZED.to_string(),
                         "Could not find details that match you. Just try again.",
                     ),
                 );
+                return Ok(resp);
             }
             let usr = &usr_vec[0];
 
             if !usr.is_active {
-                return HttpResponse::Forbidden().json(response::JsonErrResponse::new(
-                    http::StatusCode::FORBIDDEN.to_string(),
-                    &format!("Account associated with email {} is deactivated", usr.email),
-                ));
-            }
-            if !usr.verify_pass(user.get_password()).unwrap() {
-                let status = http::StatusCode::UNAUTHORIZED;
-                return HttpResponse::build(status).json(response::JsonErrResponse::new(
-                    status.to_string(),
-                    "Could not find details that match you. Just try again.",
-                ));
-            }
-            match User::create_token(&usr.email) {
-                Ok(s) => response::JsonResponse::new(
-                    http::StatusCode::OK.to_string(),
-                    "Login Success".to_string(),
-                    json!(
-                        { "username": &usr.username,
-                          "token": &s
-                        }
-                    ),
-                ),
-                Err(e) => {
+                if let Err(e) = usr.alter_activation_status() {
                     debug!("{:?}", e);
-                    let status = http::StatusCode::INTERNAL_SERVER_ERROR;
-                    let e = response::JsonErrResponse::new(
-                        status.to_string(),
-                        "Encountered a problem attempting to sign in. Try again later".to_string(),
-                    );
-                    return HttpResponse::build(status).json(e);
+                    return Ok(HttpResponse::InternalServerError()
+                        .json(response::JsonErrResponse::new(
+                            http::StatusCode::INTERNAL_SERVER_ERROR.to_string(),
+                            "Encountered a problem reacticating the account",
+                        ))
+                        .await?);
+                } else {
+                    reactication_msg = "Account activated. ";
                 }
+                /*
+                    return HttpResponse::Forbidden().json(response::JsonErrResponse::new(
+                        http::StatusCode::FORBIDDEN.to_string(),
+                        &format!("Account associated with email {} is deactivated", usr.email),
+                    ));
+                */
             }
+            if !usr
+                .verify_pass(user.get_password())
+                .await
+                .map_err(ErrorInternalServerError)?
+            {
+                let status = http::StatusCode::UNAUTHORIZED;
+                return Ok(HttpResponse::build(status)
+                    .json(response::JsonErrResponse::new(
+                        status.to_string(),
+                        "Could not find details that match you. Just try again.",
+                    ))
+                    .await?);
+            }
+            let (auth_token, refresh_tkn) = generate_tokens(&user.email, &usr).await?;
+            let mut rf_struct = NewRfToken {
+                body: Cow::Borrowed(&refresh_tkn),
+            };
+            rf_struct.save().await.map_err(ErrorInternalServerError)?;
+
+            response::JsonResponse::new(
+                http::StatusCode::OK.to_string(),
+                format!("{}Login success", reactication_msg),
+                json!(
+                    { "username": &usr.username,
+                      "email": &usr.email(),
+                      "auth_token": &auth_token,
+                      "refresh_token": &refresh_tkn,
+                    }
+                ),
+            )
         }
         Err(e) => {
-            return HttpResponse::build(http::StatusCode::UNAUTHORIZED).json(
-                response::JsonErrResponse::new(
+            return Ok(HttpResponse::build(http::StatusCode::UNAUTHORIZED)
+                .json(response::JsonErrResponse::new(
                     http::StatusCode::UNAUTHORIZED.to_string(),
                     format!(
                         "Could not find details that match you. Just try again. : {}",
                         e
                     ),
-                ),
-            );
+                ))
+                .await?);
         }
     };
 
-    HttpResponse::build(http::StatusCode::OK).json(res)
+    Ok(HttpResponse::build(http::StatusCode::OK).json(res).await?)
 }
 
 /// Verifies a user's account.
@@ -207,12 +276,53 @@ pub fn login(user: web::Json<SignInUser>) -> HttpResponse {
 ///
 /// # Method
 /// ## GET
-///
 pub fn verify(path: web::Path<String>) -> HttpResponse {
     match User::verify_user(&path) {
-        Ok(_) => HttpResponse::build(http::StatusCode::OK).body("Your account is now verified"),
+        Ok(_) => HttpResponse::build(http::StatusCode::OK).body("Yay! Your account is now verified"),
         Err(_) => HttpResponse::build(http::StatusCode::FORBIDDEN)
-            .json("Oopsy! That didn't work. Just request a resend of the account activation link"),
+            .body("Oopsy! The link you used seems expired. Just request a resend of the account activation link"),
+    }
+}
+
+/// Exchanges a refresh token for a new user authorization token
+///
+/// # url
+/// `auth/refresh/{refresh}`
+///
+/// # Method
+/// `GET`
+pub async fn refresh_access_token(ref_tkn: web::Path<String>) -> Result<HttpResponse, Error> {
+    let tokens = Reftoken::exchange_token(&ref_tkn.into_inner()).await?;
+
+    let msg = hashmap![
+            "status" => "200",
+            "message" => "success. tokens updated"];
+
+    let data = json!({
+        "auth_token": tokens.0,
+        "refresh_tokens": tokens.1
+    });
+
+    respond(msg, Some(data), None)?.await
+}
+
+/// Logs out authenticated users
+/// The refresh token is invalidated
+///
+/// # url
+/// `auth/logout`
+///
+/// # method
+/// `GET`
+pub async fn logout(ref_tkn: web::Path<String>) -> Result<HttpResponse, Error> {
+    let res = Reftoken::invalidate(&ref_tkn.into_inner())?;
+    if res == 0 {
+        err("401", "Invalid token".to_string()).await
+    } else {
+        let msg = hashmap![
+            "status" => "200",
+            "message" => "success. tokens revoked"];
+        respond(msg, Some("".to_string()), None)?.await
     }
 }
 
@@ -223,46 +333,54 @@ pub fn verify(path: web::Path<String>) -> HttpResponse {
 ///
 /// # Method
 /// ## POST
-pub fn send_reset_email(mut data: web::Json<UserEmail>, req: HttpRequest) -> HttpResponse {
+pub async fn send_reset_email(
+    mut data: web::Json<UserEmail<'_>>,
+    req: HttpRequest,
+) -> Result<HttpResponse, Error> {
     if let Err(err) = data.validate() {
         let res = response::JsonErrResponse::new("400".to_string(), err);
-        return HttpResponse::build(http::StatusCode::BAD_REQUEST).json(&res);
+        return HttpResponse::build(http::StatusCode::BAD_REQUEST)
+            .json(&res)
+            .await;
     };
 
     let user = match User::find_by_email(&data.email.to_mut()) {
         Ok(usr) => usr,
         Err(e) => {
             let status = http::StatusCode::NOT_FOUND;
-            return HttpResponse::build(status).json(err_response(status.to_string(), e));
+            return HttpResponse::build(status)
+                .json(err_response(status.to_string(), e))
+                .await;
         }
     };
     let user = &user[0];
-    let token = User::create_token(&user.email).unwrap();
+    let token = User::create_token(&data.email, Some(59), "password_reset".into()).unwrap();
     let host = format!("{:?}", req.headers().get("host").unwrap());
     let path = get_url(&host, "api/auth", &token);
     let context: Context = get_reset_context(&user, &path);
     match TEMPLATE.render("password_reset.html", &context) {
         Ok(s) => {
             let mut mail = mail::Mail::new(
-                &user.email,
+                &data.email,
                 &user.username,
                 "Account password reset",
                 s.as_str(),
             )
-            .unwrap();
+            .await
+            .map_err(ErrorInternalServerError)?;
 
-            mail.send().unwrap();
+            mail.send().await.map_err(ErrorInternalServerError)?;
         }
 
-        Err(e) => return err("500", e.to_string()),
+        Err(e) => return err("500", e.to_string()).await,
     };
     let res = response::JsonResponse::new(
         http::StatusCode::OK.to_string(),
-        format!("Success. A password reset link sent to {}", &user.email),
-        json!({"email": &user.email, "username": &user.username, "link": &path, "token": token}),
+        format!("sucess. A password reset link sent to {}", &data.email),
+        json!({"email": &data.email, "username": &user.username, "link": &path, "token": token}),
     );
 
-    HttpResponse::Created().json(&res)
+    HttpResponse::Created().json(&res).await
 }
 
 /// Allows reset of user account passwords
@@ -333,13 +451,15 @@ pub fn reset_password(
 ///
 /// # url
 /// ## `/user/{ID}`
-pub fn get_user(id: web::Path<i32>) -> HttpResponse {
-    match User::find_by_pk(*id, Some(1)) {
+pub async fn get_user(id: web::Path<i32>, req: HttpRequest) -> Result<HttpResponse, Error> {
+    match User::find_by_pk_authenticated(*id, Some(1), &req) {
         Ok((usr, profile)) => {
-            let data = hashmap!["status" => "200", "message" => "Success. User and User profile retrieved"];
-            respond(data, Some((usr, profile.unwrap())), None).unwrap()
+            let data =
+                hashmap!["status" => "200", "message" => "sucess. User and User profile retrieved"];
+            let response = json!({"user": usr, "email": usr.email(), "profile":profile});
+            respond(data, Some(response), None).unwrap().await
         }
-        Err(e) => err("404", e.to_string()),
+        Err(e) => Err(e.into()),
     }
 }
 
@@ -353,31 +473,22 @@ pub fn get_user(id: web::Path<i32>) -> HttpResponse {
 ///
 /// # method
 ///  PATCH
-pub fn change_activation_status(mut data: web::Json<UserEmail>) -> HttpResponse {
-    if let Err(err) = data.validate() {
-        let res = response::JsonErrResponse::new("400".to_string(), err);
-        return HttpResponse::build(http::StatusCode::BAD_REQUEST).json(&res);
-    };
-    match User::find_by_email(data.email.to_mut()) {
-        Ok(vec) => {
-            let user = &vec[0];
-            match user.alter_activation_status() {
-                Ok(usr) => {
-                    let data =
-                        hashmap!["status" => "200", "message" => "User activation status changed"];
-                    let body = json!({
-                        "email": usr.email,
-                        "username": usr.username,
-                        "is_active": usr.is_active
-                    });
+///
+/// ### Authentication Required
+pub async fn change_activation_status(req: HttpRequest) -> Result<HttpResponse, Error> {
+    let user = User::from_token(&req)?;
+    user.alter_activation_status()
+        .map(|usr| {
+            let data = hashmap!["status" => "200", "message" => "User activation status changed"];
+            let body = json!({
+                "email": usr.email(),
+                "username": usr.username,
+                "is_active": usr.is_active
+            });
 
-                    respond(data, Some(body), None).unwrap()
-                }
-                Err(e) => err("500", e.to_string()),
-            }
-        }
-        Err(e) => err("404", e),
-    }
+            respond(data, Some(body), None).unwrap()
+        })
+        .map_err(|e| e.into())
 }
 
 /// Oauth authentication
@@ -435,7 +546,7 @@ pub fn google_auth_callback(
     match client.exchange_code(code) {
         Ok(token) => {
             let data = hashmap!["status" => "200",
-            "message" => "Success. Authorization token received"];
+            "message" => "sucess. Authorization token received"];
 
             respond(data, Some(token), None).unwrap()
         }
@@ -444,7 +555,7 @@ pub fn google_auth_callback(
 }
 
 /// Registers users authenticated with google Oauth
-/// This endpoint should be manulllay called with
+/// This endpoint should be manually called with
 /// the Oauth token received from the callback url (`/auth/callback`)
 /// in the Authorization header
 /// # url
@@ -455,7 +566,7 @@ pub fn google_auth_callback(
 ///
 /// # Arguments
 /// `Authorization: Bearer`
-pub async fn register_g_oauth(req: HttpRequest) ->HttpResponse {
+pub async fn register_g_oauth(req: HttpRequest) -> HttpResponse {
     use serde_json::Value;
 
     let token_hdr = match Authorization::<Bearer>::parse(&req) {
@@ -489,14 +600,14 @@ pub async fn register_g_oauth(req: HttpRequest) ->HttpResponse {
 
     match OauthGgUser::register_as_third_party(res) {
         Ok(data) => {
-            let token = User::create_token(&res.email).unwrap();
+            let token = User::create_token(&res.email, None, "auth".into()).unwrap();
 
             if let Some(dt) = &data {
                 // New oauth account
 
                 respond(
                     hashmap!["status" => "201",
-            "message" => "Success. Account created"],
+            "message" => "sucess. account created"],
                     Some(json!({
                         "email": & dt.0.email,
                         "token": &token,
@@ -509,7 +620,7 @@ pub async fn register_g_oauth(req: HttpRequest) ->HttpResponse {
                 // Existing
                 respond(
                     hashmap!["status" => "200",
-            "message" => "Success. Account updated"],
+            "message" => "sucess. account updated"],
                     Some(json!({
                         "email": & res.email,
                         "token": &token,
@@ -526,22 +637,106 @@ pub async fn register_g_oauth(req: HttpRequest) ->HttpResponse {
 }
 
 /// Sends an account activation link to a user email
-fn send_activation_link(
+pub async fn send_activation_link(
     user_email: &str,
     user_name: Option<&str>,
     reset_link: &str,
     template: &str,
-) -> Result<(), Box<dyn stdError>> {
-    //
+) -> Result<(), Error> {
     let context = get_context(user_name, reset_link);
     let mut username = "";
 
-    let s = TEMPLATE.render(template, &context)?;
+    let s = TEMPLATE
+        .render(template, &context)
+        .map_err(ErrorInternalServerError)?;
     if let Some(name) = user_name {
         username = name;
     }
 
-    let mut mail = mail::Mail::new(user_email, username, "Email activation", &s)?;
-    mail.send()?;
+    let mut mail = mail::Mail::new(user_email, username, "Email activation", &s)
+        .await
+        .map_err(ErrorInternalServerError)?;
+    mail.send().await.map_err(ErrorInternalServerError)?;
     Ok(())
+}
+
+async fn generate_tokens<'a>(
+    usr_email: &Option<Cow<'a, str>>,
+    usr: &User,
+) -> Result<(String, String), Error> {
+    let usr_email = if let Some(email) = usr_email {
+        email.to_string()
+    } else {
+        usr.email()
+    };
+
+    let auth_tk_duration = env::var("AUTH_TOKEN_DURATION")
+        .unwrap_or_else(|e| {
+            debug!("{}", e);
+            "120".into()
+        })
+        .parse::<i64>()
+        .map_err(|e| ErrorInternalServerError(e.to_string()))?;
+    let auth_token = User::create_token(&usr_email, Some(auth_tk_duration), "auth".into())
+        .map_err(|e| ErrorInternalServerError(e.to_string()))?;
+
+    let rf_duration = env::var("REFRESH_TOKEN_DURATION")
+        .unwrap_or_else(|e| {
+            debug!("{}", e);
+            "42600".into()
+        })
+        .parse::<i64>()
+        .map_err(|e| ErrorInternalServerError(e.to_string()))?;
+
+    let refresh_tkn = User::create_token(&usr_email, Some(rf_duration), "refresh".into())
+        .map_err(|e| ErrorInternalServerError(e.to_string()))?;
+    Ok((auth_token, refresh_tkn))
+}
+
+/// Changes an account's user level
+/// For a user to increase another's prilidge,
+/// they must have a higher/equal priviledge than/equal to the one requested.
+///
+/// Ordinary users can't change another's access.
+///
+/// # url
+/// `/auth/access`
+///
+/// ### Authentication Required
+pub async fn change_user_access_level(
+    req: HttpRequest,
+    data: web::Json<NewUserLevel<'_>>,
+) -> HttpResponse {
+    if let Err(e) = data.validate() {
+        return err("400", e.to_string());
+    }
+    let auth = match get_bearer(&req) {
+        Ok(a) => a,
+        Err(e) => return err("400", e),
+    };
+    let token = &auth.split(' ').collect::<Vec<&str>>()[1];
+
+    let user = match User::alter_access_level(&data, token) {
+        Ok(u) => u,
+        Err(e) => {
+            if e.eq("NotFound") {
+                return err("404", e);
+            }
+            return err("401", e);
+        }
+    };
+    let data = json!({
+        "email": data.email,
+        "access_level": user.access_level
+    });
+    let msg = hashmap!["status" => "200",
+                       "message" => "sucess. user access level changed"];
+    respond(msg, Some(data), None).unwrap().await.unwrap()
+}
+
+fn get_bearer(req: &HttpRequest) -> Result<String, String> {
+    match Authorization::<Bearer>::parse(req) {
+        Ok(auth_header) => Ok(auth_header.into_scheme().to_string()),
+        Err(e) => Err(e.to_string()),
+    }
 }

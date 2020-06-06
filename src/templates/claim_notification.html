@@ -1,0 +1,55 @@
+{% extends "base.html" %}
+
+{% block title %}Notification{% endblock title %}
+{% block head %}
+    {{ super() }}
+{% endblock head %}
+
+{% block content %}
+
+    <div class="main-info">
+        <p id="content-message"> 
+        A friend has found an ID that seems to match your details. Exciting, isn't?
+        Here is a preview. Get to know where to collect it from on <a style="text-decoration:none;" href="{{link}}">your account profile.</a>
+
+            <p>
+            If you think the one below doesn't belong to you, that's cool, just checkout <a style="text-decoration:none;" href="{{link}}">your GotyaID dashboard</a>
+            to see the rest of the cards that match you.
+            </p>
+        </p>
+    </div>
+
+    <div class="id-template">
+        <div class=fields>
+            <div class="field">
+                <p class="p-field" id="field-name"> <span class="f-field"> Name: </span> <span class="f-field-name">
+                    {{id_name}}
+                </span></p>
+            </div>
+
+            <div class="field">
+                <p class="p-field"><span class="f-field"> Institution: </span> <span class="f-field-name">
+                    {{id_institution}}
+
+                    {% if id_inst_location %}
+                        , {{id_inst_location}}
+                    {% endif %}
+                </span></p>
+            </div>
+            <div class="field">
+                <p class="p-field"><span class="f-field"> Specialty: </span> <span class="f-field-name">
+                    {{id_course}}
+                </span></p>
+            </div>
+
+
+        </div>
+    </div>
+
+
+    <div class="sign">
+        <p class="salutation">Cheers!</p>
+        <span class="sign-off">The got ya id team</span>
+    </div>
+
+{% endblock content %}

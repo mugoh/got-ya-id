@@ -3,6 +3,7 @@
 <head>
     {% block head %}
         <link rel="stylesheet" href="/static/styles.css" type="text/css">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
 <style>
 
 body {
@@ -138,7 +139,72 @@ background-color:  #4b34ff;
     overflow: hidden;
     margin-top: 50px;
     }
+
+/*===============
+  Found claim notification
+  ========================
+*/
+
+.fields {
+    width: fit-content;
+}
+
+.f-field , .f-field-name {
+    padding: .1em;
+}
+
+.p-field {
+    padding: .1em 3em;
+    width: fit-content;
+    color: #fff;
+}
+.f-field {
+    margin-right: .5em;
+    font-size: 1.03em;
+}
+
+.f-field-name {
+    font-size: 1em;
+}
+#field-name> .f-field-name {
+    font-size: 1.09em;
+    text-transform: uppercase;
+}
+
+#field-name {
+
+    padding-bottom: .5em;
+}
+
+.id-template {
+        border: 1px solid #888;
+        width: fit-content;
+        min-width: 35%;
+        margin-left: auto;
+        margin-right: auto;
+        margin-bottom: 3em;
+        padding: .8em 1em;
+        text-align: left;
+        border-radius: 7px;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.10), 0 1px 2px rgba(0,0,0,0.20);
+        background: #2C3E50;  /* fallback for old browsers */
+        background: -webkit-linear-gradient(to bottom, #4CA1AF, #2C3E50);  /* Chrome 10-25, Safari 5.1-6 */
+        background: linear-gradient(to bottom, #4CA1AF, #2C3E50); /* W3C, IE 10+/ Edge, Firefox 16+, Chrome 26+, Opera 12+, Safari 7+ */
+}
+
+
+
+
+
+
+
+
+/*
+==================== 
+*/
+
 </style>
+
         <title>{% block title %}{% endblock title %} - Got-ya-Id </title>
     {% endblock head %}
 </head>
@@ -163,7 +229,7 @@ background-color:  #4b34ff;
                 </span></p></div>
         <div class="content">
             {% block content %}
-            
+
             {% endblock content %}
         </div>
     </div>

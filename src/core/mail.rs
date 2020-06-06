@@ -21,12 +21,12 @@ pub struct Mail {
 
 /// Returns a Mail struct
 impl Mail {
-    pub fn new<'a>(
+    pub async fn new<'a>(
         to_addr: &'a str,
         to_name: &'a str,
         subject: &'a str,
         content: &'a str,
-    ) -> Result<Mail, &'static str> {
+    ) -> Result<Mail, String> {
         // ENV
         //let SMTP_CLIENT;
         //let MAIL_USERNAME;
@@ -36,41 +36,37 @@ impl Mail {
             vec!["SMTP_CLIENT", "MAIL_ADDR", "MAIL_USERNAME", "MAIL_PASS"],
             &mut mail_vars,
         );
-        let email = match Email::builder()
+        let email = Email::builder()
             .to((to_addr, to_name))
             .from(mail_vars[1].as_str())
             .subject(subject)
             .html(content)
-            .build()
-        {
-            Ok(e) => e,
-
-            Err(er) => {
-                debug!("{:?}", er);
-                return Err("Unable to create email");
-            }
+            .build();
+        let email = match email {
+            Ok(em) => em,
+            Err(e) => return Err(e.to_string()),
         };
 
         let creds = Credentials::new(
             mail_vars.get(2).unwrap().into(),
             mail_vars.get(3).unwrap().into(),
         );
-        let mailer = SmtpClient::new_simple(
+        let mail_client = SmtpClient::new_simple(
             mail_vars[0].as_ref(), //smtpclient//
-        )
-        .unwrap()
-        .credentials(creds)
-        .transport();
+        );
+
+        let mailer = if let Err(e) = mail_client {
+            return Err(e.to_string());
+        } else {
+            mail_client.unwrap().credentials(creds).transport()
+        };
 
         Ok(Mail { email, mailer })
     }
 
     /// Sends the email
-    pub fn send(&mut self) -> Result<smtp::response::Response, smtp::error::Error> {
-        match self.mailer.send(self.email.clone().into()) {
-            Ok(s) => Ok(s),
-            Err(e) => Result::Err(e),
-        }
+    pub async fn send(&mut self) -> Result<smtp::response::Response, smtp::error::Error> {
+        self.mailer.send(self.email.clone().into())
     }
 }
 

@@ -4,7 +4,10 @@ use validator::ValidationError;
 
 use super::models::User;
 
-use crate::apps::core::response;
+use crate::{
+    apps::{core::response, ids::models::Identification},
+    errors::error::ResError,
+};
 
 use chrono::NaiveDateTime;
 use serde::de;
@@ -96,6 +99,33 @@ pub fn get_context(username: Option<&str>, path: &str) -> Context {
     context
 }
 
+/// Email matched-claim notification context
+pub async fn get_notif_context(
+    username: &str,
+    path: &str,
+    idt: &Identification,
+) -> Result<Context, ResError> {
+    let mut context = Context::new();
+
+    // Handle Oauth Google Users
+    // The username is derived from the `name` +  a random substring
+
+    let username = if username.contains("-google") {
+        username.split("-").collect::<Vec<&str>>()[0]
+    } else {
+        username
+    };
+    context.insert("username", username);
+    context.insert("link", path);
+
+    context.insert("id_name", &idt.name);
+    context.insert("id_institution", &idt.institution);
+    context.insert("id_inst_location", &idt.campus);
+    context.insert("id_course", &idt.course);
+
+    Ok(context)
+}
+
 /// Template holding context for password reset
 /// Receives a User ref
 pub fn get_reset_context<'a>(data: &User, path: &'a str) -> Context {
@@ -155,15 +185,14 @@ pub fn err_response<T>(status: String, msg: T) -> response::JsonErrResponse<T> {
 ///
 /// # Arguments
 /// ## host: str
-///     - The host part of the URL
+/// The host part of the URL
 ///
 /// ## path: str
-///     - Path of the request
+/// Path of the request
 ///
 /// ## id: str
-///     - Parameter to append to complete the url path
+/// Parameter to append to complete the url path
 pub fn get_url<'a>(host: &'a str, path: &'a str, id: &'a str) -> String {
-    //
     format!(
         r#"http://{host}/{path}/{id}"#,
         host = host,
@@ -240,6 +269,33 @@ impl<'de> de::Visitor<'de> for NaiveDateTimeVisitor {
 }
 
 pub fn from_timestamp<'de, D>(d: D) -> Result<NaiveDateTime, D::Error>
+where
+    D: de::Deserializer<'de>,
+{
+    d.deserialize_str(NaiveDateTimeVisitor)
+}
+
+struct NaiveYear;
+
+impl<'de> de::Visitor<'de> for NaiveYear {
+    type Value = NaiveDateTime;
+
+    fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+        write!(formatter, "a string represents chrono::NaiveDateTime")
+    }
+
+    fn visit_str<E>(self, s: &str) -> Result<Self::Value, E>
+    where
+        E: de::Error,
+    {
+        match NaiveDateTime::parse_from_str(s, "%Y") {
+            Ok(t) => Ok(t),
+            Err(_) => Err(de::Error::invalid_value(de::Unexpected::Str(s), &self)),
+        }
+    }
+}
+
+pub fn to_year<'de, D>(d: D) -> Result<NaiveDateTime, D::Error>
 where
     D: de::Deserializer<'de>,
 {
