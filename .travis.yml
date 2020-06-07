@@ -26,8 +26,8 @@ services:
 
 install:
     - cargo install diesel_cli --vers 1.4.0 --no-default-features --features postgres
+    - sudo cp /etc/postgresql/10/main/pg_hba.conf /etc/postgresql/11/main/pg_hba.conf
     - sudo systemctl restart postgresql@11-main
-    - sudo systemctl start postgresql
     - sudo apt install python3-dev python-dev
 
 addons:
@@ -39,11 +39,8 @@ addons:
             - postgresql-11-postgis-3
 
 before_script:
-  - psql -U postgres -c "create extension postgis"
-  - psql -c 'create database gotdb;' -U postgres
-  - psql -c 'create database gotdb_test;' -U postgres
-  - psql -c "alter user postgres with password 'poshy'"; 
   - diesel database setup --locked-schema --migration-dir=src/diesel_cfg/migrations/
+  - rustup component add rustfmt
 
 scipt:
     - cargo test
