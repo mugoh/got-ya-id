@@ -36,8 +36,7 @@ before_install:
     - sudo mv postgresql.conf /etc/postgresql/11/main
     - sudo cp /etc/postgresql/{10,11}/main/pg_hba.conf
     - sudo service postgresql restart 11
-    
-    
+
 
 before_script:
   - export PATH="/usr/lib/postgresql/11/bin:$PATH"
