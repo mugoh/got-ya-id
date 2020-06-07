@@ -1,4 +1,6 @@
 #![recursion_limit = "256"]
+#![deny(clippy::all)]
+
 pub mod apps;
 pub mod config;
 pub mod core;

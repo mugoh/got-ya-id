@@ -41,5 +41,7 @@ pub async fn change_institution(
 
     let res = hashmap!["status" => "200", "message" => "Success. Institution changed"];
 
-    respond::<String>(res, None).await
+    type H = std::collections::hash_map::RandomState;
+
+    respond::<String, H>(res, None).await
 }

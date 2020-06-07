@@ -8,7 +8,10 @@ use diesel::{self, prelude::*};
 use serde::{Deserialize, Serialize};
 use serde_json::{json, value};
 
-use std::{borrow::Cow, error};
+use std::{
+    env,
+    {borrow::Cow, error},
+};
 
 /// Holds the User Profile Record
 #[derive(Queryable, Identifiable, AsChangeset, Associations, Deserialize, Default, Serialize)]
@@ -90,8 +93,7 @@ impl<'a> NewProfile<'a> {
     /// - profile: Option<u32>
     ///     If Some returns the created user Profile object.
     ///     None(default): Nothing is returned
-    #[allow(clippy::new_ret_no_self)]
-    pub fn new<'b>(
+    pub fn create<'b>(
         user_id: i32,
         profile: Option<u32>,
     ) -> Result<Option<(Profile<'b>, Avatar<'b>)>, String> {
@@ -103,7 +105,7 @@ impl<'a> NewProfile<'a> {
             .values(new_profile)
             .get_result::<Profile>(&connect_to_db())
             .expect("Error creating user profile");
-        let res_av = match NewAvatar::new(user_id) {
+        let res_av = match NewAvatar::create(user_id) {
             Ok(av) => av,
             Err(e) => return Err(e.to_string()),
         };
@@ -146,13 +148,11 @@ pub struct NewAvatar<'a> {
 
 impl<'a> NewAvatar<'a> {
     /// Creates a new user profile avatar
-    #[allow(clippy::new_ret_no_self)]
-    pub fn new<'b>(user_id: i32) -> Result<Avatar<'b>, diesel::result::Error> {
-        //
-        //TODO Set Default avatar url
-        let default_avatar = "some default avatar url";
+    pub fn create<'b>(user_id: i32) -> Result<Avatar<'b>, diesel::result::Error> {
+        let default_avatar =
+            env::var("DEFAULT_AVATAR_URL").unwrap_or_else(|_| "some default avatar url".into());
         let avatar = NewAvatar {
-            url: Some(Cow::Borrowed(default_avatar)),
+            url: Some(Cow::Borrowed(&default_avatar)),
             user_id,
         };
 

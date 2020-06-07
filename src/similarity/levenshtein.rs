@@ -42,12 +42,10 @@ pub fn levenshtn(a: &str, b: &str) -> usize {
                 } else {
                     dist_b
                 }
+            } else if dist_b > dist_a {
+                dist_a + 1
             } else {
-                if dist_b > dist_a {
-                    dist_a + 1
-                } else {
-                    dist_b
-                }
+                dist_b
             };
 
             cache[idx_a] = lev_dist;

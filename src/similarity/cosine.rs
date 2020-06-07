@@ -41,10 +41,10 @@ pub async fn cosine_similarity(text1: &str, text2: &str) -> f64 {
     let keys1 = hash1.keys().map(|c| **c).collect::<Vec<&str>>();
     let keys2 = hash2.keys().map(|c| **c).collect::<Vec<&str>>();
 
-    let set1 = keys1.iter().map(|c| *c).collect::<HashSet<&str>>();
-    let set2 = keys2.iter().map(|c| *c).collect::<HashSet<&str>>();
+    let set1 = keys1.iter().copied().collect::<HashSet<&str>>();
+    let set2 = keys2.iter().copied().collect::<HashSet<&str>>();
 
-    let intersection: Vec<&str> = set1.intersection(&set2).map(|c| *c).collect();
+    let intersection: Vec<&str> = set1.intersection(&set2).copied().collect();
 
     let numerator = intersection
         .iter()

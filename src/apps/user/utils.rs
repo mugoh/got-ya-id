@@ -111,7 +111,7 @@ pub async fn get_notif_context(
     // The username is derived from the `name` +  a random substring
 
     let username = if username.contains("-google") {
-        username.split("-").collect::<Vec<&str>>()[0]
+        username.split('-').collect::<Vec<&str>>()[0]
     } else {
         username
     };
