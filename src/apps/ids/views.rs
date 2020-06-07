@@ -400,7 +400,7 @@ async fn send_claim_notification(
     idt: &Identification,
     claims: Vec<ClaimableIdentification>,
 ) -> Result<(), ResError> {
-    let claim_rdct_link: String = env::var("CLAIM_REDIRECT_LINK").unwrap_or("".into());
+    let claim_rdct_link: String = env::var("CLAIM_REDIRECT_LINK").unwrap_or_else(|_| "".into());
 
     for claim in claims {
         let user_emails = User::all_emails(claim.user_id).await?;
@@ -431,7 +431,7 @@ async fn send_claimed_notification(
     clm_owner: &User,
     idts: Vec<Identification>,
 ) -> Result<(), ResError> {
-    let claim_rdct_link: String = env::var("CLAIM_REDIRECT_LINK").unwrap_or("".into());
+    let claim_rdct_link: String = env::var("CLAIM_REDIRECT_LINK").unwrap_or_else(|_| "".into());
 
     let emails_f = clm_owner.emails().map_err(|e| e.into());
     let context_f = get_notif_context(&clm_owner.username, &claim_rdct_link, &idts[0]);

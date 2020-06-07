@@ -242,7 +242,7 @@ impl<'a> NewUser<'a> {
 
 impl<'b> NewJsonUser<'b> {
     ///   Created a NewUser, which is insertable, from JsonUser.
-    pub fn into_savable(&self) -> NewUser {
+    pub fn to_savable(&self) -> NewUser {
         NewUser {
             username: Cow::Borrowed(&self.username),
             password: Cow::Borrowed(&self.password),

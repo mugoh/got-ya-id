@@ -83,7 +83,7 @@ pub async fn register_user(
         // Filter json where message is not null
     };
 
-    let mut user = user_.into_savable();
+    let mut user = user_.to_savable();
 
     match user.save(&data.0.email) {
         Ok(saved_user) => saved_user,
@@ -660,8 +660,8 @@ pub async fn send_activation_link(
     Ok(())
 }
 
-async fn generate_tokens<'a>(
-    usr_email: &Option<Cow<'a, str>>,
+async fn generate_tokens(
+    usr_email: &Option<Cow<'_, str>>,
     usr: &User,
 ) -> Result<(String, String), Error> {
     let usr_email = if let Some(email) = usr_email {

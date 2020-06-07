@@ -600,11 +600,8 @@ impl<'a> NewClaimableIdt<'a> {
     }
 
     /// Checks whether a new Claim has fields, which ought to be unique,  matching another
-    pub fn is_unique(
-        &self,
-        existing_claims: &Vec<ClaimableIdentification>,
-    ) -> Result<bool, ResError> {
-        let duplicate = existing_claims.into_iter().any(|claim| claim == self);
+    pub fn is_unique(&self, existing_claims: &[ClaimableIdentification]) -> Result<bool, ResError> {
+        let duplicate = existing_claims.iter().any(|claim| claim == self);
         if duplicate {
             Err(ResError {
                 msg: "A similar Identification claim seems to exist".into(),
@@ -623,12 +620,13 @@ impl<'a> NewClaimableIdt<'a> {
         //
         let user_claims = ClaimableIdentification::belonging_to(current_user)
             .load::<ClaimableIdentification>(&connect_to_db())?;
-        match user_claims.is_empty() {
-            false => Err(ResError {
+        if user_claims.is_empty() {
+            Ok(false)
+        } else {
+            Err(ResError {
                 msg: "Dude, you created a claim some while back".into(),
                 status: 409,
-            }),
-            true => Ok(false),
+            })
         }
     }
 }
@@ -762,14 +760,17 @@ impl ClaimableIdentification {
         overall_significance += name_s * nm_sig;
         overall_significance += course_s * crse_sig;
 
-        if idt.valid_from.is_some() && claim.entry_year.is_some() {
-            if claim.entry_year.unwrap().eq(&idt.valid_from.unwrap()) {
-                overall_significance += tm_sig / 2.;
-            }
-        } else if idt.valid_till.is_some() && claim.graduation_year.is_some() {
-            if claim.graduation_year.unwrap().eq(&idt.valid_till.unwrap()) {
-                overall_significance += tm_sig / 2.;
-            }
+        if idt.valid_from.is_some()
+            && claim.entry_year.is_some()
+            && claim.entry_year.unwrap().eq(&idt.valid_from.unwrap())
+        {
+            overall_significance += tm_sig / 2.;
+        }
+        if idt.valid_till.is_some()
+            && claim.graduation_year.is_some()
+            && claim.graduation_year.unwrap().eq(&idt.valid_till.unwrap())
+        {
+            overall_significance += tm_sig / 2.;
         }
         overall_significance >= min_threshold
     }
@@ -812,8 +813,8 @@ impl std::convert::From<&NewIdentification<'_>> for Identification {
 
             // Below fields should NOT be used on an Idt converted from a NewIdt
             id: 0,
-            created_at: NaiveDate::from_ymd(2010, 01, 01).and_hms(0, 00, 00),
-            updated_at: NaiveDate::from_ymd(2010, 01, 01).and_hms(0, 00, 00),
+            created_at: NaiveDate::from_ymd(2010, 1, 1).and_hms(0, 00, 00),
+            updated_at: NaiveDate::from_ymd(2010, 1, 1).and_hms(0, 00, 00),
             location_name: "".into(),
             location_point: None,
             picture: None,

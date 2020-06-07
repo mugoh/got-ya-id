@@ -142,10 +142,10 @@ impl<'a> ChangeableInst<'a> {
             .filter(|s| if remove_of { s != &"of" } else { true })
             .collect::<Vec<&str>>();
 
-        let email_dom_v = email.split("@").collect::<Vec<&str>>()[1];
+        let email_dom_v = email.split('@').collect::<Vec<&str>>()[1];
 
         // remove tail
-        let mut email_dom_v = email_dom_v.split(".").collect::<Vec<&str>>();
+        let mut email_dom_v = email_dom_v.split('.').collect::<Vec<&str>>();
         email_dom_v.pop();
         let email_dom = email_dom_v.join(".");
 
@@ -156,7 +156,7 @@ impl<'a> ChangeableInst<'a> {
 
             let initials: String = inst_name_v
                 .iter()
-                .flat_map(|name| name.chars().nth(0))
+                .flat_map(|name| name.chars().next())
                 .collect();
 
             if email_dom_v.len() > 1 {

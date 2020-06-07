@@ -61,7 +61,7 @@ pub struct NewEmail<'a> {
 
 impl Email {
     /// Retrieves a User object owning a given email
-    pub fn as_user(curious_email: &str) -> Result<User, diesel::result::Error> {
+    pub fn user(curious_email: &str) -> Result<User, diesel::result::Error> {
         use crate::diesel_cfg::schema::emails::dsl::*;
         use crate::diesel_cfg::schema::users::dsl::users;
 

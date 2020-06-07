@@ -73,7 +73,7 @@ where
         Response {
             status,
             errors: None,
-            data: data,
+            data,
             message: Some(message),
         }
     }
