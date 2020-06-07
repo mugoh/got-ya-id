@@ -7,7 +7,7 @@ use actix_web::{http::StatusCode, HttpResponse};
 use serde_json::json;
 use serde_json::Value;
 
-use std::collections::HashMap;
+use std::{collections::HashMap, hash::BuildHasher};
 /// Response to User on Success
 /// Deserialized to JSON
 #[derive(Deserialize, Serialize)]
@@ -100,9 +100,8 @@ where
 ///
 ///  Ok: HttpResponse
 ///  Err: dyn std::error::Error
-#[allow(clippy::implicit_hasher)]
-pub fn respond<'c, T>(
-    data: HashMap<&'c str, &'c str>,
+pub fn respond<'c, T, H: BuildHasher>(
+    data: HashMap<&'c str, &'c str, H>,
     body: Option<T>,
     err: Option<&'c str>,
 ) -> Result<HttpResponse, ()>
@@ -150,8 +149,10 @@ where
 ///
 /// # Returns
 ///  HttpResponse
-#[allow(clippy::implicit_hasher)]
-pub fn respond2<'c, T>(data: HashMap<&'c str, &'c str>, body: Option<T>) -> HttpResponse
+pub fn respond2<'c, T, H: BuildHasher>(
+    data: HashMap<&'c str, &'c str, H>,
+    body: Option<T>,
+) -> HttpResponse
 //
 where
     T: serde::de::DeserializeOwned,

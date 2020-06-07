@@ -506,7 +506,7 @@ pub async fn change_activation_status(req: HttpRequest) -> Result<HttpResponse, 
 pub fn google_auth(_req: HttpRequest, data: web::Data<Arc<Mutex<OClient>>>) -> HttpResponse {
     use oauth2::CsrfToken;
 
-    // TODO Retrieve base url for redirect url
+    // Retrieve base url for redirect url
     // let host = format!("http://{:?}", req.headers().get("host").unwrap());
     // let host = Url::parse(&host).unwrap();
 

@@ -148,7 +148,6 @@ pub struct NewAvatar<'a> {
 
 impl<'a> NewAvatar<'a> {
     /// Creates a new user profile avatar
-    #[allow(clippy::new_ret_no_self)]
     pub fn create<'b>(user_id: i32) -> Result<Avatar<'b>, diesel::result::Error> {
         let default_avatar =
             env::var("DEFAULT_AVATAR_URL").unwrap_or_else(|_| "some default avatar url".into());
