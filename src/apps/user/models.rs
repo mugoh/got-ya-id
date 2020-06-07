@@ -207,7 +207,7 @@ impl<'a> NewUser<'a> {
         diesel::insert_into(emails_table::table)
             .values(&email_data)
             .load::<Email>(&connect_to_db())?;
-        NewProfile::new(usr.id, None)?;
+        NewProfile::create(usr.id, None)?;
         Ok(usr)
     }
 
@@ -778,7 +778,7 @@ impl OauthGgUser {
                 .values(&email_data)
                 .load::<Email>(&connect_to_db())?;
 
-            NewProfile::new(ord_user.id, None)?;
+            NewProfile::create(ord_user.id, None)?;
 
             let avatar = Avatar::belonging_to(&ord_user).get_result::<Avatar>(&connect_to_db())?;
             diesel::update(&avatar)

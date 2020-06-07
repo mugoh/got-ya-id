@@ -12,6 +12,9 @@ export TEST_DATABASE_URL=postgres://$db_username:$db_pass@$db_host:$db_port/$tes
 
 export CLOUDINARY_URL=
 
+# Url for default avatar field
+export DEFAULT_AVATAR_URL="some default url"
+
 export secret_key='some_secrety_secrety'
 
 export GOOGLE_PROFILE_URL="https://www.googleapis.com/oauth2/v1/userinfo"
