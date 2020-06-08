@@ -1,7 +1,7 @@
 //! This module holds items related to data manipulation
 //! for the User Object
 
-use super::utils::{from_timestamp, validate_email, validate_name};
+use super::utils::{from_timestamp, serialize_username, validate_email, validate_name};
 
 use std::borrow::Cow;
 
@@ -49,6 +49,7 @@ use url::Url;
 #[table_name = "users"]
 pub struct User {
     pub id: i32,
+    #[serde(serialize_with = "serialize_username")]
     pub username: String,
     #[serde(skip_deserializing)]
     password: Option<String>,
