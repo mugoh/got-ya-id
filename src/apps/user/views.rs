@@ -488,7 +488,7 @@ pub async fn change_activation_status(req: HttpRequest) -> Result<HttpResponse, 
 
             Ok(respond(data, Some(body), None).unwrap())
         })?
-        .map_err(|e| e.into())
+        .map_err(|e| e)
 }
 
 /// Oauth authentication

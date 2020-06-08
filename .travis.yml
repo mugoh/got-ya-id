@@ -5,50 +5,50 @@ rust:
 
 cache:
     cargo: true
-    before_cache: rm -rf "$TRAVIS_HOME/.cargo/registry/src" 
+before_cache: rm -rf "$TRAVIS_HOME/.cargo/registry/src" 
 
-    env:
-        global:
-            - RUST_BACKTRACE=1
+env:
+    global:
+        - RUST_BACKTRACE=1
 
-            - db_username='postgres'
-            - db_port=5432
-            - db_host='localhost'
-            - db_pass='poshy'
-            - db_name='gotdb'
-            - test_db_name='gotdb_test'
+        - db_username='postgres'
+        - db_port=5432
+        - db_host='localhost'
+        - db_pass='poshy'
+        - db_name='gotdb'
+        - test_db_name='gotdb_test'
 
-            - DATABASE_URL=postgres://$db_username:$db_pass@$db_host:$db_port/$db_name
-            - TEST_DATABASE_URL=postgres://$db_username:$db_pass@$db_host:$db_port/$test_db_name
-
-
-        install:
-            - cargo install diesel_cli --vers 1.4.0 --no-default-features --features postgres
-
-        before_install:
-            - export PACKAGE=postgresql-11-postgis-2.5
-            - sudo service postgresql stop
-            - sudo apt-get --yes remove postgresql-10-postgis-2.4
-            - sudo apt-get install $(apt-cache depends $PACKAGE | grep Depends | sed "s/.*ends:\ //" | tr '\n' ' ')
-            - sudo apt install --yes postgresql-11-postgis-2.5-scripts postgresql-11 postgresql-client-11 postgresql-11-postgis-2.5
-            - sed -e 's/^port.*/port = 5432/' /etc/postgresql/11/main/postgresql.conf > postgresql.conf
-            - sudo chown postgres postgresql.conf
-            - sudo mv postgresql.conf /etc/postgresql/11/main
-            - sudo cp /etc/postgresql/{10,11}/main/pg_hba.conf
-            - sudo service postgresql restart 11
+        - DATABASE_URL=postgres://$db_username:$db_pass@$db_host:$db_port/$db_name
+        - TEST_DATABASE_URL=postgres://$db_username:$db_pass@$db_host:$db_port/$test_db_name
 
 
-        before_script:
-            - export PATH="/usr/lib/postgresql/11/bin:$PATH"
-            - diesel database setup --locked-schema --migration-dir=src/diesel_cfg/migrations/
-            - rustup component add rustfmt
-            - rustup component add clippy
+install:
+    - cargo install diesel_cli --vers 1.4.0 --no-default-features --features postgres
 
-        scipt:
-            - cargo test
-            - cargo fmt
-            - cargo clippy  --all-targets --all-features --all
+before_install:
+    - export PACKAGE=postgresql-11-postgis-2.5
+    - sudo service postgresql stop
+    - sudo apt-get --yes remove postgresql-10-postgis-2.4
+    - sudo apt-get install $(apt-cache depends $PACKAGE | grep Depends | sed "s/.*ends:\ //" | tr '\n' ' ')
+    - sudo apt install --yes postgresql-11-postgis-2.5-scripts postgresql-11 postgresql-client-11 postgresql-11-postgis-2.5
+    - sed -e 's/^port.*/port = 5432/' /etc/postgresql/11/main/postgresql.conf > postgresql.conf
+    - sudo chown postgres postgresql.conf
+    - sudo mv postgresql.conf /etc/postgresql/11/main
+    - sudo cp /etc/postgresql/{10,11}/main/pg_hba.conf
+    - sudo service postgresql restart 11
 
-        notifications:
-            email:
-                on_success: never
+
+before_script:
+  - export PATH="/usr/lib/postgresql/11/bin:$PATH"
+  - diesel database setup --locked-schema --migration-dir=src/diesel_cfg/migrations/
+  - rustup component add rustfmt
+  - rustup component add clippy
+
+scipt:
+    - cargo test
+    - cargo fmt
+    - cargo clippy  --all-targets --all-features --all
+
+notifications:
+  email:
+    on_success: never
