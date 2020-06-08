@@ -268,6 +268,23 @@ impl<'de> de::Visitor<'de> for NaiveDateTimeVisitor {
     }
 }
 
+/// Deserializer for username field
+///
+/// Oauth usernames have a random substring.
+/// The custom deserialization removes the appended
+/// characters when giving responses
+pub fn serialize_username<S>(username: &str, s: S) -> Result<S::Ok, S::Error>
+where
+    S: serde::Serializer,
+{
+    let username = if username.contains("-google") {
+        username.split('-').collect::<Vec<&str>>()[0]
+    } else {
+        username
+    };
+    s.serialize_str(username)
+}
+
 pub fn from_timestamp<'de, D>(d: D) -> Result<NaiveDateTime, D::Error>
 where
     D: de::Deserializer<'de>,

@@ -1,7 +1,7 @@
 //! This module holds items related to data manipulation
 //! for the User Object
 
-use super::utils::{from_timestamp, validate_email, validate_name};
+use super::utils::{from_timestamp, serialize_username, validate_email, validate_name};
 
 use std::borrow::Cow;
 
@@ -49,6 +49,7 @@ use url::Url;
 #[table_name = "users"]
 pub struct User {
     pub id: i32,
+    #[serde(serialize_with = "serialize_username")]
     pub username: String,
     #[serde(skip_deserializing)]
     password: Option<String>,
@@ -268,14 +269,13 @@ impl User {
     }
 
     /// Gives the Active email of a User
-    pub fn email(&self) -> String {
+    pub fn email(&self) -> Result<String, ResError> {
         use crate::diesel_cfg::schema::emails::dsl::{active, email};
 
-        Email::belonging_to(self)
+        Ok(Email::belonging_to(self)
             .filter(active.eq(true))
             .select(email)
-            .get_result::<String>(&connect_to_db())
-            .unwrap()
+            .get_result::<String>(&connect_to_db())?)
     }
 
     /// Returns all verified email addresses belonging to
