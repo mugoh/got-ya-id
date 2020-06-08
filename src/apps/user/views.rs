@@ -245,7 +245,7 @@ pub async fn login(user: web::Json<SignInUser<'_>>) -> Result<HttpResponse, Erro
                 format!("{}Login success", reactication_msg),
                 json!(
                     { "username": &usr.username,
-                      "email": &usr.email(),
+                      "email": &usr.email()?,
                       "auth_token": &auth_token,
                       "refresh_token": &refresh_tkn,
                     }
@@ -456,7 +456,7 @@ pub async fn get_user(id: web::Path<i32>, req: HttpRequest) -> Result<HttpRespon
         Ok((usr, profile)) => {
             let data =
                 hashmap!["status" => "200", "message" => "sucess. User and User profile retrieved"];
-            let response = json!({"user": usr, "email": usr.email(), "profile":profile});
+            let response = json!({"user": usr, "email": usr.email()?, "profile":profile});
             respond(data, Some(response), None).unwrap().await
         }
         Err(e) => Err(e.into()),
@@ -478,16 +478,16 @@ pub async fn get_user(id: web::Path<i32>, req: HttpRequest) -> Result<HttpRespon
 pub async fn change_activation_status(req: HttpRequest) -> Result<HttpResponse, Error> {
     let user = User::from_token(&req)?;
     user.alter_activation_status()
-        .map(|usr| {
+        .map(|usr| -> Result<HttpResponse, Error> {
             let data = hashmap!["status" => "200", "message" => "User activation status changed"];
             let body = json!({
-                "email": usr.email(),
+                "email": usr.email()?,
                 "username": usr.username,
                 "is_active": usr.is_active
             });
 
-            respond(data, Some(body), None).unwrap()
-        })
+            Ok(respond(data, Some(body), None).unwrap())
+        })?
         .map_err(|e| e.into())
 }
 
@@ -667,7 +667,7 @@ async fn generate_tokens(
     let usr_email = if let Some(email) = usr_email {
         email.to_string()
     } else {
-        usr.email()
+        usr.email()?
     };
 
     let auth_tk_duration = env::var("AUTH_TOKEN_DURATION")

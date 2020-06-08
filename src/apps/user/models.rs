@@ -268,14 +268,13 @@ impl User {
     }
 
     /// Gives the Active email of a User
-    pub fn email(&self) -> String {
+    pub fn email(&self) -> Result<String, ResError> {
         use crate::diesel_cfg::schema::emails::dsl::{active, email};
 
-        Email::belonging_to(self)
+        Ok(Email::belonging_to(self)
             .filter(active.eq(true))
             .select(email)
-            .get_result::<String>(&connect_to_db())
-            .unwrap()
+            .get_result::<String>(&connect_to_db())?)
     }
 
     /// Returns all verified email addresses belonging to
