@@ -1,9 +1,10 @@
 use super::{
-    models::{NewJsonUser, User},
-    views::register_user,
+    models::{NewJsonUser, SignInUser, User},
+    views::{get_user, login, register_user},
 };
+use crate::apps::user::models::NewUser;
 
-use actix_web::{http, test, web, App};
+use actix_web::{http::StatusCode, test, web, App};
 use std::{borrow::Cow, env};
 
 const BASE: &str = "/api";
@@ -18,7 +19,29 @@ lazy_static! {
     };
 }
 
-async fn _register_valid_user() {
+/// Creates new user
+fn create_user(username: &str, password: &str, email: &str) {
+    let username = Cow::Borrowed(username);
+    let password = Cow::Borrowed(password);
+    let email = Cow::Borrowed(email);
+
+    let mut user = NewUser {
+        username,
+        password,
+        access_level: Some(2),
+    };
+
+    if let Ok(_) = user.save(&email) {};
+}
+
+/// Returns an auth for the encoded with the passed email
+fn _auth_token(email: &str) -> String {
+    let t = User::create_token(email, None, "auth".into()).unwrap();
+    "Bearer".to_owned() + &t
+}
+
+#[actix_rt::test]
+async fn register_valid_user() {
     let _ = *DB_URL;
     // let url = "http://localhost:8888".to_owned() +
     let url = BASE.to_owned() + "/auth";
@@ -74,8 +97,8 @@ async fn register_invalid_user() {
         .to_request();
     let resp2 = test::call_service(&mut app, resp2).await;
 
-    assert_eq!(resp.status(), http::StatusCode::BAD_REQUEST);
-    assert_eq!(resp2.status(), http::StatusCode::BAD_REQUEST);
+    assert_eq!(resp.status(), StatusCode::BAD_REQUEST);
+    assert_eq!(resp2.status(), StatusCode::BAD_REQUEST);
 }
 
 #[actix_rt::test]
@@ -101,5 +124,132 @@ async fn register_user_twice() {
         .to_request();
     let resp = test::call_service(&mut app, req).await;
 
-    assert_eq!(resp.status(), http::StatusCode::CONFLICT);
+    assert_eq!(resp.status(), StatusCode::CONFLICT);
+}
+
+#[actix_rt::test]
+async fn login_valid_user() {
+    let url = BASE.to_owned() + "/auth/login";
+
+    let mut app = test::init_service(App::new().route(&url, web::post().to(login))).await;
+
+    let username = Cow::Borrowed("loggy");
+    let password = Cow::Borrowed("password");
+    let email = Cow::Borrowed("user@f.co");
+
+    create_user(&username, &password, &email);
+    let user = SignInUser {
+        email: Some(email),
+        username: Some(username),
+        password,
+    };
+    let req = test::TestRequest::post()
+        .set_json(&user)
+        .uri(&url)
+        .to_request();
+
+    let resp = test::call_service(&mut app, req).await;
+
+    assert_eq!(resp.status(), StatusCode::OK);
+}
+
+#[actix_rt::test]
+async fn login_nonexistent_username() {
+    let url = BASE.to_owned() + "/auth/login";
+
+    let mut app = test::init_service(App::new().route(&url, web::post().to(login))).await;
+
+    let username = Cow::Borrowed("missing");
+    let password = Cow::Borrowed("password");
+
+    let user = SignInUser {
+        email: None,
+        username: Some(username),
+        password,
+    };
+    let req = test::TestRequest::post()
+        .set_json(&user)
+        .uri(&url)
+        .to_request();
+
+    let resp = test::call_service(&mut app, req).await;
+
+    assert_eq!(resp.status(), StatusCode::UNAUTHORIZED);
+}
+
+#[actix_rt::test]
+async fn login_nonexistent_email() {
+    let url = BASE.to_owned() + "/auth/login";
+
+    let mut app = test::init_service(App::new().route(&url, web::post().to(login))).await;
+
+    let email = Cow::Borrowed("missing@co.cu");
+    let password = Cow::Borrowed("password");
+
+    let user = SignInUser {
+        email: Some(email),
+        username: None,
+        password,
+    };
+    let req = test::TestRequest::post()
+        .set_json(&user)
+        .uri(&url)
+        .to_request();
+
+    let resp = test::call_service(&mut app, req).await;
+
+    assert_eq!(resp.status(), StatusCode::UNAUTHORIZED);
+}
+
+#[actix_rt::test]
+async fn login_invalid_password() {
+    let url = BASE.to_owned() + "/auth/login";
+
+    let mut app = test::init_service(App::new().route(&url, web::post().to(login))).await;
+
+    let username = Cow::Borrowed("loggy");
+    let password = Cow::Borrowed("password");
+    let email = Cow::Borrowed("user@f.co");
+
+    let wrong_pass = "dookydooky!";
+
+    create_user(&username, &password, &email);
+    let user = SignInUser {
+        email: Some(email),
+        username: Some(username),
+        password: Cow::Borrowed(wrong_pass),
+    };
+    let req = test::TestRequest::post()
+        .set_json(&user)
+        .uri(&url)
+        .to_request();
+
+    let resp = test::call_service(&mut app, req).await;
+
+    assert_eq!(resp.status(), StatusCode::UNAUTHORIZED);
+}
+
+async fn _fetch_registered_user() {
+    let username = Cow::Borrowed("loggy");
+    let password = Cow::Borrowed("password");
+    let email = Cow::Borrowed("user@f.co");
+
+    create_user(&username, &password, &email);
+    let user_id = User::find_by_email(&email).unwrap()[0].id;
+
+    let token = _auth_token(&email);
+
+    let url = BASE.to_owned() + &format!("/user/{}", user_id);
+
+    let mut app = test::init_service(App::new().route(&url, web::get().to(get_user))).await;
+
+    let req = test::TestRequest::get()
+        .header("Authorization", token)
+        .uri(&url)
+        .to_request();
+
+    let resp = test::call_service(&mut app, req).await;
+    println!("res: {:?}", resp);
+
+    assert_eq!(resp.status(), StatusCode::OK);
 }
