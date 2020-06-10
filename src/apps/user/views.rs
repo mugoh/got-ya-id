@@ -451,6 +451,8 @@ pub fn reset_password(
 ///
 /// # url
 /// ## `/user/{ID}`
+///
+/// #### Authentication Required
 pub async fn get_user(id: web::Path<i32>, req: HttpRequest) -> Result<HttpResponse, Error> {
     match User::find_by_pk_authenticated(*id, Some(1), &req) {
         Ok((usr, profile)) => {
