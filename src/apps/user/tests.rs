@@ -31,10 +31,8 @@ fn create_user(username: &str, password: &str, email: &str) {
         access_level: Some(2),
     };
 
-    if let Ok(_) = user.save(&email) {
-    } else {
+    if user.save(&email).is_ok() {
     };
-}
 
 /// Returns an auth for the encoded with the passed email
 fn _auth_token(email: &str) -> String {

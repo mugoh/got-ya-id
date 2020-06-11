@@ -45,9 +45,9 @@ before_script:
   - rustup component add clippy
 
 scipt:
-    - cargo test
     - cargo fmt
     - cargo clippy  --all-targets --all-features --all
+    - cargo test
 
 notifications:
   email:
