@@ -103,8 +103,8 @@ pub struct SignInUser<'a> {
     /* the trait bound `std::borrow::Cow<'_, str>: std::convert::From<&std::borrow::Cow<'_, str>>` is not satisfied */
     #[validate(custom = "validate_email")]
     pub email: Option<Cow<'a, str>>,
-    username: Option<Cow<'a, str>>,
-    password: Cow<'a, str>,
+    pub username: Option<Cow<'a, str>>,
+    pub password: Cow<'a, str>,
 }
 
 /// Holds user email passed in email-only JSON requests
