@@ -52,7 +52,9 @@ pub async fn add_email(
         &new_email.email,
         Some(&user.username),
         &path,
-        "email_activation.html",
+        "email_verification.html",
+        false,
+        None,
     )
     .await?;
 
