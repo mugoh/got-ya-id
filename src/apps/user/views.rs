@@ -102,6 +102,8 @@ pub async fn register_user(
         Some(&data.username),
         &path,
         "email_activation.html",
+        false,
+        Some("Complete your registration"),
     )
     .await?;
     let res: response::JsonResponse<_> = response::JsonResponse::new(
@@ -150,7 +152,16 @@ pub async fn send_account_activation_link(
     let host = format!("{:?}", req.headers().get("host").unwrap());
     let path = get_url(&host, "api/auth/verify", &token);
 
-    send_activation_link(&email.email, None, &path, "email_activation.html").await?;
+    let sub = "Complete your registration";
+    send_activation_link(
+        &email.email,
+        None,
+        &path,
+        "email_activation.html",
+        true,
+        Some(sub),
+    )
+    .await?;
 
     let data = hashmap!["status" => "200", "message" => "sucess. Activation link sent"];
     Ok(respond(data, Some("".to_string()), None).unwrap())
@@ -637,13 +648,22 @@ pub async fn register_g_oauth(req: HttpRequest) -> HttpResponse {
 }
 
 /// Sends an account activation link to a user email
+///
+/// # Arguments
+/// resend: Whether a  response to an activation link
+/// re-send request.
 pub async fn send_activation_link(
     user_email: &str,
     user_name: Option<&str>,
     reset_link: &str,
     template: &str,
+    resend: bool,
+    subject: Option<&str>,
 ) -> Result<(), Error> {
-    let context = get_context(user_name, reset_link);
+    let mut context = get_context(user_name, reset_link);
+    if resend {
+        context.insert("resend", "1");
+    }
     let mut username = "";
 
     let s = TEMPLATE
@@ -653,7 +673,13 @@ pub async fn send_activation_link(
         username = name;
     }
 
-    let mut mail = mail::Mail::new(user_email, username, "Email activation", &s)
+    let subject = if let Some(sub) = subject {
+        sub
+    } else {
+        "Email activation"
+    };
+
+    let mut mail = mail::Mail::new(user_email, username, subject, &s)
         .await
         .map_err(ErrorInternalServerError)?;
     mail.send().await.map_err(ErrorInternalServerError)?;

@@ -8,8 +8,13 @@
 {% block content %}
 
     <div class="main-info">
-        <p id="content-message">Pleased to have you on Got Your Id buddy. 
-        We are thrilled that you could join us.
+        <p id="content-message">
+        {% if not resend %}
+            Pleased to have you on Got Your Id buddy. 
+            We are thrilled that you could join us.
+        {% else %}
+            You requested a resend of this link to complete your registration.
+        {% endif %}
         Just follow the link below to activate your account.</p>
         <a id="activate-link" href="{{ link  }}"><p id="act-button">activate</p></a>
     </div>
