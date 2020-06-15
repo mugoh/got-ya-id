@@ -19,7 +19,8 @@ use crate::{
 use tera::{self, Context};
 
 use actix_web::{
-    error::ErrorInternalServerError, http, web, Error, HttpRequest, HttpResponse, Result,
+    error::{ErrorForbidden, ErrorInternalServerError},
+    http, web, Error, HttpRequest, HttpResponse, Result,
 };
 use serde_json::json;
 use validator::Validate;
@@ -235,7 +236,7 @@ pub async fn login(user: web::Json<SignInUser<'_>>) -> Result<HttpResponse, Erro
             if !usr
                 .verify_pass(user.get_password())
                 .await
-                .map_err(ErrorInternalServerError)?
+                .map_err(ErrorForbidden)?
             {
                 let status = http::StatusCode::UNAUTHORIZED;
                 return Ok(HttpResponse::build(status)
