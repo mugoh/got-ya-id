@@ -1,0 +1,149 @@
+CCC
+pstm - Update get all ids endpoint /ids/all. ids/missing/ ids/found,
+	/emails/new. - add new.
+	/emails/activate - change active email
+	/emails/remove
+	/emails/verify
+
+
+Allow changing of usernames
+
+Return auth & refr tokens for oauth accounts 
+- remove the update step for oauth-users table every time an oauth request is made
+
+
+[X]
+Separate email activation, account activation $ resend link emailing templates
+- For account activation change subject to - complete your registration
+
+Add default avatar url. Clear TODOs
+
+Rust lettre mock sending mail
+
+
+[X]
+Custom serializer for username to remove oauth substring
+
+Send a notification to user when claim/idt match.
+Include: Id name, institution, campus/location, course
+
+// Cain wait
+Use an endpoint to match idt/claims
+Current implementation attempts to match idts/idt claims whenever there's a write (save or update) on either an idt or a claim and giving a response asynchronously.
+
+Instead, make the write, give the http response, then send a second response looking for matches
+
+[X]
+Change active email - give new auth & refresh tokens after this
+
+[X]
+Mark an email as removed
+
+Get all emails belonging to current user (not removed)
+
+
+.75 initials lev dist threshold
+Option to change a User's institution.
+[Solution 3] - Use sheerID for student status verification (Ignore, *Not free)
+[Solution 1] - preferred
+[EDIT] - Request to include inst name and inst issued email address
+	Will need a way to check if the email belongs to the institution. Manually is the only 		solution Identified for now,
+	but for the rest check --@[part] part has .edu, or .ac (is educational)
+	
+	Check - for unknown institution names, check the provided email domain isn't among
+	domains of known institutions. Also check, for a known institution, the domain matches
+	what we expect it to be.
+
+- After change, set account verification status to false.
+- Require the new institution's email account to send a verification link
+
+[Solution 2]
+- Have users request to have their institution changed.
+- Require they provide some form of verification.
+
+
+
+[X]
+On post of new Identification, find possible claims
+
+[//]
+Add a lost_on field in claims.
+ - To be used in matching Identifications only found on or after this day
+
+[X]
+If previously lost ID is found, delete all its entries in the matchedIDclaims table
+
+---
+
+[X]
+Add emails table
+- Should allow users to add more that one email
+  This will allow users who registered using non-insitutional accounts
+  to add an institutional account which can be used in verifying that
+  they are members of said intitution
+
+- Send verification link, upon addition of new email.
+
+- Add option to remove an email ("delete")
+Ignored_EDIT - When sending an account verification link, confirm if user's email is an
+ institutional account. If not, ask for one, and send the link to that email.
+ [Unsafe - One email can be used in verification of infinite accounts.
+
+---
+
+Postgres Indexing of columns
+- index claim name
+
+Authenticate
+- mark idt found - Owner Only (OO) or Moderator (M)
+- mark idt lost OO or M
+
+Trigger found_idts count on a user posting of Idt
+- Or just use an and_then future to update
+
+[X]
+Remove user_id field from newclaim data (Shouldn't have to be manually specified)
+
+[X]
+BUG - mark id as found
+[could not identify an equality operator for type point]
+
+[X]
+Ensure same claim isn't posted twice
+
+[X] 
+Both should meet the threshold
+leventshein - .25
+cosine - .33
+[EDIT] => Used cosine character similararity only(.9 threshold). Why? More accurate, better time complexity.
+
+
+[//]
+implement validator err for the reserr
+ - use self method to call validate
+ 
+[X]
+diesel updated_at column fix
+
+[X]
+Implement refresh of tokens
+ - Return exp time in token, return token & refresh token on login
+ - Hash refresh tokens before storage
+# CHECK: Refresh tokens stored unhashed
+
+[X]
+- ID with same exact details should be posted twice
+ [See how to implement this: struct == struct]
+
+
+[//]
+- use naivedate::from_ymd when inserting validity timelines
+
+- Add reference third_party users to users table
+
+- OPtion to update user access level
+
+
+
+[//] - Ignore
+[X] - Done
