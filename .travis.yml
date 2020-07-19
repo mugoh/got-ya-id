@@ -41,8 +41,9 @@ before_install:
 before_script:
   - export PATH="/usr/lib/postgresql/11/bin:$PATH"
   - diesel database setup --locked-schema --migration-dir=src/diesel_cfg/migrations/
-  - rustup component add rustfmt
-  - rustup component add clippy
+  - rustup component add rustfmt --toolchain stable
+  - rustup component add clippy --toolchain stable
+
 
 scipt:
     - cargo fmt
