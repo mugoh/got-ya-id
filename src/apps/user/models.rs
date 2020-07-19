@@ -262,7 +262,20 @@ impl User {
     ///
     /// bool: True -> Verified, False -> Fail
     pub async fn verify_pass(&self, pass: &str) -> Result<bool, String> {
-        verify(pass, &self.password.as_ref().unwrap()).map_err(|e| {
+        let password = if let Some(pasw) = self.password.as_ref() {
+            pasw
+        } else {
+            // Oauth user accounts are created with no password.
+            // However, for an account registered through oauth,
+            // the user can sign in normally
+            // ie., with username/email and a password
+            // by first sending a password reset reset request.
+            //
+            // This creates a password for the previously
+            // Oauth-authenication-only account.
+            return Err("Attempted sign in from oauth account".into());
+        };
+        verify(pass, password).map_err(|e| {
             debug!("{:?}", e);
             e.to_string()
         })
@@ -791,6 +804,19 @@ impl OauthGgUser {
         let s_id = &present_user[0];
         match s_id {
             // Previously used Oauth account
+            //
+            // Updating this account is really unnecessary
+            // as it's never used anywhere (never queried) - The user profile
+            // holds all necessary user data.
+            //
+            // A better alternative would be to save any info deemed important
+            // in the profile at the registration step and forget about
+            // this Oauth additional profile data. If an update is needed,
+            // the user can do so with their own profile.
+            //
+            // In short, the Oauth-users table seems to have unneeded fields,
+            // with the exception of the oauth user id. We can keep the table
+            // as is but updates at each login are unnecessary.
             Some(s) => {
                 diesel::update(oath_users.filter(acc_id.eq(s)))
                     .set((
