@@ -10,9 +10,9 @@ repository = "https://github.com/mugoh/got-ya-id"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [profile.dev]
-debug = false
-opt-level = 3 
-incremental = true
+debug = true
+# opt-level = 3 
+# incremental = true
 
 
 [profile.release]

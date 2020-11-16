@@ -1,0 +1,19 @@
+Install rust
+Install diesel
+Install python3.6-dev
+
+1. Enter the database fields in the .env file
+ - Remember to source/activaate the env file
+
+source/activate the .env file
+
+
+2. setup the database (Uses postgresql)
+
+Run the database migrations with the command
+diesel migration run --migration-dir=src/diesel_cfg/migrations/
+
+
+Build and run
+
+cargo run
