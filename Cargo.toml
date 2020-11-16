@@ -3,6 +3,9 @@ name = "got-ya-id"
 version = "0.1.0"
 authors = ["mugoh <mugoh.ks@gmail.com>"]
 edition = "2018"
+description = "A Got-ya-Id pack"
+license = "BSD-Protection"
+repository = "https://github.com/mugoh/got-ya-id"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
