@@ -1,6 +1,6 @@
 [package]
 name = "got-ya-id"
-version = "0.1.0"
+version = "0.1.1"
 authors = ["mugoh <mugoh.ks@gmail.com>"]
 edition = "2018"
 description = "A Got-ya-Id pack"
