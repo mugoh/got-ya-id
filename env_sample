@@ -20,6 +20,8 @@ export secret_key='some_secrety_secrety'
 export GOOGLE_PROFILE_URL="https://www.googleapis.com/oauth2/v1/userinfo"
 
 # Link to a User's matched Identification claims page
+# This is sent as a notification to the user's email
+# alerting them to view their matched Idt
 export CLAIM_REDIRECT_LINK='https://homy/goes/here'
 
 # Email Client
