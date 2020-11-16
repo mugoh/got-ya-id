@@ -151,3 +151,9 @@ Implement refresh of tokens
 
 collection
 https://documenter.getpostman.com/view/7030893/TVepA8jy
+
+heroku
+https://got-ya-id.herokuapp.com/
+
+db
+heroku pg:psql postgresql-globular-78638 --app got-ya-id
