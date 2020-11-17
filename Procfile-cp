@@ -1,3 +1,2 @@
-release: diesel setup
-release: diesel migration run --migration-dir=src/diesel_cfg/migrations/
-web ./target/release/got-ya-id
+release: bin/diesel migration run --migration-dir=src/diesel_cfg/migrations/
+web ./target/release/main
