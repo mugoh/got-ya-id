@@ -173,3 +173,6 @@ Instead add fields `location_lat` and location_longitude as nullable floats
 in the Idt table to store the coordinates
 
 then alter the Idt models to match the table
+
+
+- For frontend deployment, checkout Vercel
