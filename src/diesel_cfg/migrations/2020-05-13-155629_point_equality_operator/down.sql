@@ -1,3 +1,5 @@
+
+/*
 drop operator if exists class point_ops using btree;
 
 drop function if exists point_lt cascade;
@@ -7,3 +9,4 @@ drop function if exists point_gteq cascade;
 drop function btpointcmp cascade;
 
 drop operator = (point, point);
+*/
