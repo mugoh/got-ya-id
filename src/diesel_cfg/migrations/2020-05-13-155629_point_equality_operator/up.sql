@@ -1,6 +1,9 @@
 
 --  Class Operator for the Point type
+-- This requires superuser priviledges and can't
+-- run on hosting services, since superusers aren't provided
 
+/*
 create operator = (leftarg = point, rightarg = point, procedure = point_eq, commutator = =);
 
 create function point_lt(point, point)
@@ -52,3 +55,5 @@ create operator class point_ops
         operator 4 >=,
         operator 5 >,
         function 1 btpointcmp(point, point);
+        
+*/

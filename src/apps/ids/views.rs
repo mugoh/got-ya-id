@@ -84,7 +84,7 @@ pub async fn get_idt(pk: web::Path<i32>) -> Result<HttpResponse, Error> {
 /// Stick to /ids/missing if unsure.
 ///
 /// # Url
-/// `/ids/all`
+/// `/ids`
 ///
 /// # Method
 /// `GET`
