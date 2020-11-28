@@ -2,7 +2,7 @@ use actix_web::{middleware, web, App, HttpServer};
 //use env_logger;
 use listenfd::ListenFd;
 use std::{
-    io,
+    env, io,
     sync::{Arc, Mutex},
 };
 
@@ -43,7 +43,10 @@ async fn main() -> io::Result<()> {
     app = if let Some(listener) = listen_fd.take_tcp_listener(0).unwrap() {
         app.listen(listener)?
     } else {
-        app.bind("127.0.0.1:8888")?
+        let port = env::var("PORT").unwrap_or_else(|_| "8888".to_string());
+        let host = env::var("HOST").unwrap_or_else(|_| "127.0.0.1".to_string());
+        let addr = format!("{}:{}", host, port);
+        app.bind(&addr)?
     };
 
     app.run().await
