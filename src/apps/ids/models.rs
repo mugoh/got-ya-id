@@ -68,10 +68,6 @@ pub struct Identification {
     /// Location from which the ID should be picked
     pub location_name: String,
 
-    #[serde(flatten, default, with = "serde_pg_point")]
-    /// Lat, Longitude representation of the ID location point
-    pub location_point: Option<PgPoint>,
-
     pub picture: Option<String>,
     posted_by: Option<i32>,
     is_found: bool,
@@ -89,6 +85,13 @@ pub struct Identification {
 
     /// The user the Identification belongs to
     owner: Option<i32>,
+
+    /// Latitude  representation of the id location point
+    /// To be used together with `location_longitude`
+    pub location_latitude: Option<f32>,
+
+    /// Longitude representation of the id location point
+    pub location_longitude: Option<f32>,
 }
 
 /// The Insertable new Identification record
@@ -120,10 +123,11 @@ pub struct NewIdentification<'a> {
     ))]
     location_name: Cow<'a, str>,
 
-    #[serde(flatten, with = "serde_pg_point")]
-    location_point: Option<PgPoint>,
     pub posted_by: Option<i32>,
     about: Option<Cow<'a, str>>,
+
+    location_latitude: Option<f32>,
+    location_longitude: Option<f32>,
 }
 
 /// Identification model to be used in updating
@@ -157,10 +161,11 @@ pub struct UpdatableIdentification<'a> {
     ))]
     location_name: Option<Cow<'a, str>>,
 
-    #[serde(flatten, with = "serde_pg_point")]
-    location_point: Option<PgPoint>,
     posted_by: Option<i32>,
     about: Option<Cow<'a, str>>,
+
+    location_latitude: Option<f32>,
+    location_longitude: Option<f32>,
 }
 
 /// The queryable model of claimed identifications
@@ -305,7 +310,8 @@ impl PartialEq<Identification> for NewIdentification<'_> {
             self.institution.eq(&idt.institution),
             self.campus.eq(&idt.campus),
             self.location_name.eq(&idt.location_name),
-            self.location_point.eq(&idt.location_point),
+            self.location_latitude.eq(&idt.location_latitude),
+            self.location_longitude.eq(&idt.location_longitude),
             self.posted_by.eq(&idt.posted_by),
         ];
 
@@ -326,7 +332,8 @@ impl PartialEq<NewIdentification<'_>> for Identification {
             self.institution.eq(&idt.institution),
             self.campus.eq(&idt.campus),
             self.location_name.eq(&idt.location_name),
-            self.location_point.eq(&idt.location_point),
+            self.location_latitude.eq(&idt.location_latitude),
+            self.location_longitude.eq(&idt.location_longitude),
             self.posted_by.eq(&idt.posted_by),
         ];
 
@@ -816,7 +823,8 @@ impl std::convert::From<&NewIdentification<'_>> for Identification {
             created_at: NaiveDate::from_ymd(2010, 1, 1).and_hms(0, 00, 00),
             updated_at: NaiveDate::from_ymd(2010, 1, 1).and_hms(0, 00, 00),
             location_name: "".into(),
-            location_point: None,
+            location_latitude: None,
+            location_longitude: None,
             picture: None,
             posted_by: new_idt.posted_by,
             is_found: false,
