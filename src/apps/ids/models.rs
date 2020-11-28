@@ -1,6 +1,6 @@
 //! Identification card models
 
-use super::{utils::serde_pg_point, validators::regexes};
+use super::validators::regexes;
 use crate::{
     apps::user::models::{AccessLevel, User},
     apps::user::utils::from_timestamp,
@@ -18,7 +18,7 @@ use serde::{Deserialize, Serialize};
 use validator::Validate;
 use validator_derive::Validate;
 
-use diesel_geometry::data_types::PgPoint;
+// use diesel_geometry::data_types::PgPoint;
 
 use std::borrow::Cow;
 
@@ -88,10 +88,10 @@ pub struct Identification {
 
     /// Latitude  representation of the id location point
     /// To be used together with `location_longitude`
-    pub location_latitude: Option<f32>,
+    pub location_latitude: Option<f64>,
 
     /// Longitude representation of the id location point
-    pub location_longitude: Option<f32>,
+    pub location_longitude: Option<f64>,
 }
 
 /// The Insertable new Identification record
@@ -126,8 +126,8 @@ pub struct NewIdentification<'a> {
     pub posted_by: Option<i32>,
     about: Option<Cow<'a, str>>,
 
-    location_latitude: Option<f32>,
-    location_longitude: Option<f32>,
+    location_latitude: Option<f64>,
+    location_longitude: Option<f64>,
 }
 
 /// Identification model to be used in updating
@@ -164,8 +164,8 @@ pub struct UpdatableIdentification<'a> {
     posted_by: Option<i32>,
     about: Option<Cow<'a, str>>,
 
-    location_latitude: Option<f32>,
-    location_longitude: Option<f32>,
+    location_latitude: Option<f64>,
+    location_longitude: Option<f64>,
 }
 
 /// The queryable model of claimed identifications
