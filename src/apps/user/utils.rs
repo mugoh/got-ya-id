@@ -244,7 +244,8 @@ pub fn create_oauth_client() -> oauth2::basic::BasicClient {
     .set_redirect_url(RedirectUrl::new(
         // host.join("api/auth/callback")
         //     .expect("Invalid redirect Url"),
-        Url::parse("http://127.0.0.1:8888/api/auth/callback").expect("Invalid RedirectUrl"),
+        Url::parse("https://got-ya-id.herokuapp.com/api/auth/callback")
+            .expect("Invalid RedirectUrl"),
     ))
 }
 

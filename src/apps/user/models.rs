@@ -749,6 +749,8 @@ impl OauthGgUser {
             .select(usocial_id)
             .get_results::<Option<String>>(&connect_to_db())?;
 
+        println!("Present users: {:?}", present_user);
+
         if present_user.is_empty() {
             // New User
 

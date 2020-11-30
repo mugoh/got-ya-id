@@ -71,7 +71,7 @@ pub async fn register_user(
     let host = if let Some(rq) = req_header {
         format!("{:?}", rq)
     } else {
-        "http::/127.0.0.1:8888".into()
+        "https://got-ya-id.herokuapp.com".into()
     };
     let path = get_url(&host, "api/auth/verify", &token);
 
