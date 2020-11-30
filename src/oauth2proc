@@ -1,0 +1,21 @@
+1. call /api/auth/google -> Get an authentication url
+2. Browse the given url -> Will open a page asking the user to sign in/ authenticate their
+   google account / give access
+3. If user accepts, the callback url /api/auth/callback is automatically called in the browser
+   This returns the access token to be used to register the user.
+
+4. Using that access token, call api/auth/register/social
+   This will create a new account if the user doesn't exist, but make no changes if they do
+   So it can also be called for sign ins
+
+Alternatively, this can be done in the frontend: https://developers.google.com/identity/sign-in/web
+
+Resources
+https://stackoverflow.com/questions/62784983/django-google-login-with-react-frontend
+
+Actually, at step 3, add code to redirect the request call step 4 instead of giving a respose
+
+
+Actually no, just listen to the current URL on the frontend, if it matches the callback </one>,
+call it yourself, get the token, ,then call the registration one yourself
+

@@ -738,20 +738,20 @@ impl OauthGgUser {
         use rand::{distributions::Alphanumeric, thread_rng, Rng};
 
         use crate::diesel_cfg::schema::avatars::dsl::url as av_url;
-        use crate::diesel_cfg::schema::emails::dsl::{active, email as e_email, user_id};
+        use crate::diesel_cfg::schema::emails::dsl::{
+            active, email as e_email, emails as e_emails, user_id,
+        };
         use crate::diesel_cfg::schema::oath_users::dsl::*;
         use crate::diesel_cfg::schema::users::dsl::{
             social_id as usocial_id, username as u_username, users,
         };
 
-        let present_user = users
-            .find(Email::u_id(&usr_data.email)?)
-            .select(usocial_id)
-            .get_results::<Option<String>>(&connect_to_db())?;
+        let us_id = e_emails
+            .filter(e_email.eq(&usr_data.email))
+            .select(user_id)
+            .get_result::<i32>(&connect_to_db());
 
-        println!("Present users: {:?}", present_user);
-
-        if present_user.is_empty() {
+        if let Err(e) = us_id {
             // New User
 
             let acc_provider = "google";
@@ -801,38 +801,42 @@ impl OauthGgUser {
                 .get_result::<Avatar>(&connect_to_db())?;
 
             return Ok(Some((user, ord_user)));
-        }
+        } else {
+            let present_user = users
+                .find(us_id?)
+                .select(usocial_id)
+                .get_results::<Option<String>>(&connect_to_db());
+            let s_id = &present_user?[0];
+            match s_id {
+                // Previously used Oauth account
+                //
+                // Updating this account is really unnecessary
+                // as it's never used anywhere (never queried) - The user profile
+                // holds all necessary user data.
+                //
+                // A better alternative would be to save any info deemed important
+                // in the profile at the registration step and forget about
+                // this Oauth additional profile data. If an update is needed,
+                // the user can do so with their own profile.
+                //
+                // In short, the Oauth-users table seems to have unneeded fields,
+                // with the exception of the oauth user id. We can keep the table
+                // as is but updates at each login are unnecessary.
+                Some(s) => {
+                    diesel::update(oath_users.filter(acc_id.eq(s)))
+                        .set((
+                            picture.eq(&usr_data.picture),
+                            name.eq(&usr_data.name),
+                            first_name.eq(&usr_data.given_name),
+                            family_name.eq(&usr_data.family_name),
+                        ))
+                        .execute(&connect_to_db())?;
 
-        let s_id = &present_user[0];
-        match s_id {
-            // Previously used Oauth account
-            //
-            // Updating this account is really unnecessary
-            // as it's never used anywhere (never queried) - The user profile
-            // holds all necessary user data.
-            //
-            // A better alternative would be to save any info deemed important
-            // in the profile at the registration step and forget about
-            // this Oauth additional profile data. If an update is needed,
-            // the user can do so with their own profile.
-            //
-            // In short, the Oauth-users table seems to have unneeded fields,
-            // with the exception of the oauth user id. We can keep the table
-            // as is but updates at each login are unnecessary.
-            Some(s) => {
-                diesel::update(oath_users.filter(acc_id.eq(s)))
-                    .set((
-                        picture.eq(&usr_data.picture),
-                        name.eq(&usr_data.name),
-                        first_name.eq(&usr_data.given_name),
-                        family_name.eq(&usr_data.family_name),
-                    ))
-                    .execute(&connect_to_db())?;
-
-                Ok(None)
+                    Ok(None)
+                }
+                // Existing user email
+                None => Err("You seem to have an account with this email. Try signing in".into()),
             }
-            // Existing user email
-            None => Err("You seem to have an account with this email. Try signing in".into()),
         }
     }
 }
