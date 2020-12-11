@@ -1,4 +1,6 @@
+use actix_cors::Cors;
 use actix_web::{middleware, web, App, HttpServer};
+
 //use env_logger;
 use listenfd::ListenFd;
 use std::{
@@ -19,6 +21,7 @@ use got_ya_id::{
 #[actix_rt::main]
 async fn main() -> io::Result<()> {
     let mut listen_fd = ListenFd::from_env();
+    //let cors_ = Cors::new().supports_credentials().send_wildcard().finish();
 
     // env::set_var("RUST_LOG", "debug");
     env_logger::init();
@@ -33,6 +36,7 @@ async fn main() -> io::Result<()> {
     let mut app = HttpServer::new(move || {
         App::new()
             .configure(api::api)
+            .wrap(Cors::new().supports_credentials().finish())
             .wrap(middleware::NormalizePath)
             .wrap(middleware::Logger::default())
             .data(web::JsonConfig::default().limit(8192))
@@ -44,6 +48,7 @@ async fn main() -> io::Result<()> {
         app.listen(listener)?
     } else {
         let port = env::var("PORT").unwrap_or_else(|_| "8888".to_string());
+
         let host = env::var("HOST").unwrap_or_else(|_| "127.0.0.1".to_string());
         let addr = format!("{}:{}", host, port);
         app.bind(&addr)?
