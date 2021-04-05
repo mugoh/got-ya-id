@@ -19,3 +19,18 @@ Actually, at step 3, add code to redirect the request call step 4 instead of giv
 Actually no, just listen to the current URL on the frontend, if it matches the callback </one>,
 call it yourself, get the token, ,then call the registration one yourself
 
+
+Note
+-- About refresh tokens, no need store them in db
+  This will clutter the db, considering we have to use free (LIMITED) hosting
+  So remove the storage parts. It should be safe, since the refresh token is invalidated
+  after the expirely duration, saved to db or not
+
+  And the auth token checks if the user exists, so unless I'm missing something at time
+  of writing this, it's perfectly safe to remove the refresh storage
+
+  /logout invalidates the refresh token. So would need to do away with this too
+  Or just keep it but never call it (until there's no limit on db rows anyway)
+
+  Actually this logic in refreshing tokens seems good. So if disabled, do it tempoarily
+  until we don't have to worry about storage limit
