@@ -1,7 +1,7 @@
 language: rust
 sudo: required
 rust:
-    - nightly
+    - nightly-2020-06-09
 
 cache:
     cargo: true
@@ -23,6 +23,9 @@ env:
 
 
 install:
+    #- rustup override set nightly-2019-12-20
+    - rustup component add clippy --toolchain nightly-2020-06-09
+    - rustup component add rustfmt --toolchain nightly-2020-06-09
     - cargo install diesel_cli --vers 1.4.0 --no-default-features --features postgres
 
 before_install:
@@ -41,14 +44,12 @@ before_install:
 before_script:
   - export PATH="/usr/lib/postgresql/11/bin:$PATH"
   - diesel database setup --locked-schema --migration-dir=src/diesel_cfg/migrations/
-  - rustup component add --toolchain nightly rustfmt clippy
-    #- rustup component add rustfmt 
-    #- rustup component add clippy 
 
 
 script:
-    - cargo fmt
-    - cargo clippy  --all-targets --all-features --all
+    - cargo +nightly-2020-06-09 fmt -- --check
+    - cargo +nightly-2020-06-09 clippy --all-targets --all-features --all
+    - cargo build
     - cargo test
 
 notifications:

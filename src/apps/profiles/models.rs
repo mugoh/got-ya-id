@@ -38,7 +38,7 @@ impl<'a> Profile<'a> {
     ///  )
     pub fn find_by_key(pk: i32) -> Result<(Vec<Profile<'a>>, value::Value), Box<dyn error::Error>> {
         use schema::avatars::dsl::avatars;
-        use schema::profiles::dsl::profiles;;
+        use schema::profiles::dsl::profiles;
 
         let profile = profiles.find(pk).load(&connect_to_db())?;
         if profile.is_empty() {

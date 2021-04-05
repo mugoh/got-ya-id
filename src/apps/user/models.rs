@@ -751,7 +751,7 @@ impl OauthGgUser {
             .select(user_id)
             .get_result::<i32>(&connect_to_db());
 
-        if let Err(e) = us_id {
+        if let Err(_e) = us_id {
             // New User
 
             let acc_provider = "google";
@@ -800,7 +800,7 @@ impl OauthGgUser {
                 .set(av_url.eq(&user.picture))
                 .get_result::<Avatar>(&connect_to_db())?;
 
-            return Ok(Some((user, ord_user)));
+            Ok(Some((user, ord_user)))
         } else {
             let present_user = users
                 .find(us_id?)

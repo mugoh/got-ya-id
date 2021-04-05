@@ -31,9 +31,7 @@ fn create_user(username: &str, password: &str, email: &str) {
         access_level: Some(2),
     };
 
-    if let Ok(_) = user.save(&email) {
-    } else {
-    }
+    if user.save(&email).is_ok() {}
 }
 
 /// Returns an auth for the encoded with the passed email
@@ -243,9 +241,9 @@ async fn login_invalid_password() {
 
 #[actix_rt::test]
 async fn fetch_registered_user() {
-    let username = Cow::Borrowed("loggy");
+    let username = Cow::Borrowed("loaaiggy");
     let password = Cow::Borrowed("password");
-    let email = Cow::Borrowed("user@f.co");
+    let email = Cow::Borrowed("useaaatr@f.co");
 
     create_user(&username, &password, &email);
     let user_id = User::find_by_email(&email).unwrap()[0].id;
