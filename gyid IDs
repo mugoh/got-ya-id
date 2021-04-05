@@ -176,3 +176,30 @@ then alter the Idt models to match the table
 
 
 - For frontend deployment, checkout Vercel
+
+
+# Moved from src/core/.core ==> The last point seemed quite valuable
+[
+    1. update user access level: admin, moderator, normal_user
+
+    users can flag off ID pictures
+
+## [b] pass reset - unwrapping db result - should return error as response instead
+
+    4-23
+    - Users request to receive notification when an ID matching is found
+    This can be in form of a message [and/or email]
+
+
+    - Mark an ID as found through a text
+    Either send a link they can open, or use question texts - ask
+    them to reply with some number if theirs has been found
+
+
+## ui
+    - Only show ID location to the owner: This is to encourage more users signing up.
+    Think of a friend stumbling upon ID's of people they know and just informing them where they are
+    - Requre users to verify their accounts before they can see found IDs
+
+    - Google maps to show location of IDs to users
+]
