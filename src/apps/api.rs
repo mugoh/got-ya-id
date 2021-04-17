@@ -57,6 +57,7 @@ pub fn api(cfg: &mut web::ServiceConfig) {
                             .route(web::put().to(profiles::update_profile)),
                     )
                     .service(web::resource("/{id}").route(web::get().to(user::get_user)))
+                    .service(web::resource("").route(web::get().to(user::get_current_user)))
                     .service(
                         web::resource("/profile/avatar/{id}")
                             .route(web::put().to(profiles::upload_avatar))

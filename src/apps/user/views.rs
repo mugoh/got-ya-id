@@ -477,6 +477,22 @@ pub async fn get_user(id: web::Path<i32>, req: HttpRequest) -> Result<HttpRespon
     }
 }
 
+/// Fetches the currently logged in user
+/// This is the user sending the request
+///
+/// # Url
+/// ## `/user`
+///
+/// #### Authentication Required
+pub async fn get_current_user(req: HttpRequest) -> Result<HttpResponse, Error> {
+    User::from_token(&req).map(|user| -> Result<HttpResponse, Error> {
+        let data = hashmap!["status" => "200", "message" => "User retrieved"];
+        let user_data = json!({ "user": user });
+
+        Ok(respond(data, Some(user_data), None).unwrap())
+    })?
+}
+
 /// Activates or Deactivates User accounts
 ///
 /// The activation status is updated to !current_activation_status
