@@ -15,8 +15,17 @@
         {% else %}
             You requested a resend of this link to complete your registration.
         {% endif %}
-        Just follow the link below to activate your account.</p>
-        <a id="activate-link" href="{{ link  }}"><p id="act-button">activate</p></a>
+        Just hit on the big beautiful button below to activate your account.</p>
+        <a id="activate-link" href="{{ link  }}">
+        <div id="act-button">Activate</div>
+        </a>
+
+        <p> If the button misbehaves towards you (as beautiful things sometimes do), just copy this link and paste it in your browser.
+        <br>
+        {{ link }}
+        </p>
+        <br>
+
     </div>
     <div class="sign">
         <p class="salutation">Cheers!</p>

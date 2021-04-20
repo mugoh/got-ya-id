@@ -10,8 +10,19 @@
     <div class="main-info">
         <p id="content-message">
             You've added this email address to your GotyaId account, with success.
-        Just click the button below to complete verification</p>
-        <a id="activate-link" href="{{ link  }}"><p id="act-button">verify email</p></a>
+        Just hit on the button below to complete verification.</p>
+
+        <a id="activate-link" href="{{ link  }}">
+        <div id="act-button">Verify my email</div>
+        </a>
+
+        <p> If the button misbehaves (as beautiful things sometimes do), just copy this link and paste it in your browser.
+
+        <br>
+        {{ link }}
+        </p>
+        <br>
+
     </div>
     <div class="sign">
         <p class="salutation">Cheers!</p>
