@@ -371,7 +371,7 @@ pub async fn send_reset_email(
     let user = &user[0];
     let token = User::create_token(&data.email, Some(59), "password_reset".into()).unwrap();
     let host = format!("{:?}", req.headers().get("host").unwrap());
-    let path = get_url(&host, "api/auth", &token);
+    let path = get_url(&host, "api/auth/password/reset", &token);
     let context: Context = get_reset_context(&user, &path);
     match TEMPLATE.render("password_reset.html", &context) {
         Ok(s) => {
@@ -431,14 +431,19 @@ pub fn reset_password(
     ctx.insert("link", &host.as_str());
 
     if let Some(name) = query.get("new password") {
-        ctx.insert("name", &name.to_owned());
         data = ResetPassData {
             password: query.get("new password").unwrap().to_owned(),
             password_conf: query.get("confirm password").unwrap().to_owned(),
         };
         if let Err(err) = data.validate() {
-            let res = response::JsonErrResponse::new("400".to_string(), err);
-            return HttpResponse::build(http::StatusCode::BAD_REQUEST).json(&res);
+            ctx.insert("error", &err);
+            //let res = response::JsonErrResponse::new("400".to_string(), err);
+            let s = tmpl.render("password_reset_form.html", &ctx).unwrap();
+            return HttpResponse::build(http::StatusCode::BAD_REQUEST) //.json(&err);
+                .content_type("text/html")
+                .body(s);
+        } else {
+            ctx.insert("name", &name.to_owned());
         };
     } else {
         let s = tmpl.render("password_reset_form.html", &ctx).unwrap();
@@ -452,12 +457,12 @@ pub fn reset_password(
         Ok(_) => HttpResponse::build(http::StatusCode::OK)
             .content_type("text/html")
             .body(s),
-        Err(e) => {
+        Err(_) => {
             let status = http::StatusCode::UNAUTHORIZED;
-            HttpResponse::build(status).body(format!(
-                "There was a problem resetting your password: {:?}.\n Request a resend of a new password reset link",
-                e
-            ))
+            let expired_msg = tmpl.render("expired_pass_reset_link.html", &ctx).unwrap();
+            HttpResponse::build(status)
+                .content_type("text/html")
+                .body(expired_msg)
         }
     }
 }

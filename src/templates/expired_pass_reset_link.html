@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+{% import "macros.html" as macros %}
+
+{% block title %}Reset Password{% endblock title %}
+{% block head %}
+    {{ super() }}
+{% endblock head %}
+
+{% block content %}
+
+    <div class="main-info">
+        <h3>Gah, this is embarassing.</h3>
+        <p id="content-message">
+        The password reset link you've used is probably expired. Just request a new password reset link.
+        
+        </p>
+
+    </div>
+
+
+{% endblock content %}
