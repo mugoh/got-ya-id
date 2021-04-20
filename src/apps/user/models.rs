@@ -51,7 +51,7 @@ pub struct User {
     pub id: i32,
     #[serde(serialize_with = "serialize_username")]
     pub username: String,
-    #[serde(skip_deserializing)]
+    #[serde(skip_serializing)]
     password: Option<String>,
     #[serde(deserialize_with = "from_timestamp")]
     pub created_at: NaiveDateTime,

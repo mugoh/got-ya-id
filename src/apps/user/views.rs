@@ -343,6 +343,9 @@ pub async fn logout(ref_tkn: web::Path<String>) -> Result<HttpResponse, Error> {
 /// # url
 /// ## `auth/password/request`
 ///
+/// # Data format
+/// {"email": "email@ex.ex"}
+///
 /// # Method
 /// ## POST
 pub async fn send_reset_email(
