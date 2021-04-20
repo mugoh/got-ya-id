@@ -23,8 +23,8 @@ use crate::{
 
 /// Parsed Json Data necessary for changing
 /// a User's institution.
+#[derive(Deserialize, Validate)]
 #[serde(deny_unknown_fields)]
-#[derive(Validate, Deserialize)]
 pub struct ChangeableInst<'a> {
     /// Name of new Institution
     pub name: Cow<'a, str>,
