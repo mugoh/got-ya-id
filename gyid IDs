@@ -203,3 +203,13 @@ then alter the Idt models to match the table
 
     - Google maps to show location of IDs to users
 ]
+
+
+
+# @ 6.5.21  --> To ephasize
+[Discussion]
+- New users looking for their IDs MUST verify their account first
+  
+  - `ID found` notification is only sent to verified user emails
+  - Verifying an account verifies the active email of that account
+

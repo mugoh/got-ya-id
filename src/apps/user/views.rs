@@ -322,7 +322,7 @@ pub async fn refresh_access_token(ref_tkn: web::Path<String>) -> Result<HttpResp
 /// The refresh token is invalidated
 ///
 /// # url
-/// `auth/logout`
+/// `auth/logout/{token}`
 ///
 /// # method
 /// `GET`

@@ -30,7 +30,7 @@ use std::env;
 /// used to POST a new Identification
 ///
 /// # url
-/// ``
+/// `/ids/new`
 /// # method
 /// `POST`
 pub async fn create_new_identification(
