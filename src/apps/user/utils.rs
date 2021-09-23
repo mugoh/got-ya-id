@@ -31,10 +31,12 @@ lazy_static! {
 /// If the validation fails
 pub fn validate_name(name: &str) -> Result<(), ValidationError> {
     lazy_static! {
-        static ref NAME_PATTERN: Regex = Regex::new(r"^[a-zA-Z0-9]+$").unwrap();
+        static ref NAME_PATTERN: Regex = Regex::new(r"^[A-Za-z][A-Za-z0-9_]{4,30}$").unwrap();
     }
     if !NAME_PATTERN.is_match(name) {
-        return Err(ValidationError::new("Name should only contain letters"));
+        return Err(ValidationError::new(
+            "Name should only start with letters, and contain numbers or _",
+        ));
     }
     Ok(())
 }
