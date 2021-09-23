@@ -554,18 +554,14 @@ impl Identification {
     /// true: If a claim match is found for the Identification.
     pub async fn match_claims(&self) -> Result<(bool, Vec<ClaimableIdentification>), ResError> {
         use crate::diesel_cfg::schema::claimed_identifications::dsl::{
-            campus_location, claimed_identifications, institution,
+            claimed_identifications, institution,
         };
 
         let mut has_match = false;
         let mut matched_claims = vec![];
 
         let idt_claims = claimed_identifications
-            .filter(
-                institution
-                    .eq(&self.institution)
-                    .and(campus_location.eq(&self.campus)),
-            )
+            .filter(institution.eq(&self.institution))
             .load::<ClaimableIdentification>(&connect_to_db())?;
 
         for claim in idt_claims.into_iter() {
