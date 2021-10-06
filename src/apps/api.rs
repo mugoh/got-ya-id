@@ -84,7 +84,8 @@ pub fn api(cfg: &mut web::ServiceConfig) {
             .service(
                 web::scope("/ids")
                     .service(
-                        web::resource("/new").route(web::post().to(ids::create_new_identification)),
+                        web::resource("/new/ids")
+                            .route(web::post().to(ids::create_new_identification)),
                     )
                     .service(web::resource("/mine").route(web::get().to(ids::get_user_idts)))
                     .service(web::resource("claim/mine").route(web::post().to(ids::claim_idt)))

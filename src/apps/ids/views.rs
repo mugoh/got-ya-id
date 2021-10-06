@@ -30,17 +30,17 @@ use std::env;
 /// used to POST a new Identification
 ///
 /// # url
-/// `/ids/new`
+/// `/ids/new/ids`
 /// # method
 /// `POST`
 pub async fn create_new_identification(
-    mut new_idt: web::Json<NewIdentification<'_>>,
     req: HttpRequest,
+    mut new_idt: web::Json<NewIdentification<'_>>,
 ) -> Result<HttpResponse, Error> {
-    if let Err(e) = new_idt.0.validate() {
-        //return Ok(respond::<serde_json::Value>(hashmap!["status" => "400"], None, Some(&e.to_string())).unwrap());
-        return Ok(err("400", e.to_string()));
+    if let Err(e) = new_idt.validate() {
+        return err("400", e.to_string()).await;
     }
+
     let this_user = User::from_token(&req)?;
     new_idt.0.posted_by = Some(this_user.id);
 
