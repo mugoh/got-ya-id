@@ -92,6 +92,9 @@ pub struct Identification {
 
     /// Longitude representation of the id location point
     pub location_longitude: Option<f64>,
+
+    /// Registration number for the Idt
+    registration_no: Option<String>,
 }
 
 /// The Insertable new Identification record
@@ -128,6 +131,7 @@ pub struct NewIdentification<'a> {
 
     location_latitude: Option<f64>,
     location_longitude: Option<f64>,
+    registration_no: Option<String>,
 }
 
 /// Identification model to be used in updating
@@ -166,6 +170,7 @@ pub struct UpdatableIdentification<'a> {
 
     location_latitude: Option<f64>,
     location_longitude: Option<f64>,
+    registration_no: Option<String>,
 }
 
 /// The queryable model of claimed identifications
@@ -191,6 +196,8 @@ pub struct ClaimableIdentification {
     created_at: NaiveDateTime,
     #[serde(deserialize_with = "from_timestamp")]
     updated_at: NaiveDateTime,
+
+    registration_no: Option<String>,
 }
 
 /// The Insertable model of Claimable Identifications
@@ -218,6 +225,8 @@ pub struct NewClaimableIdt<'a> {
         message = "should have letters, digits or -_`"
     ))]
     campus_location: Option<Cow<'a, str>>,
+
+    registration_no: Option<Cow<'a, str>>,
 }
 
 /// The Insertable model to be used in updating
@@ -243,6 +252,7 @@ pub struct UpdatableClaimableIdt<'a> {
         message = "should have letters, digits or -_`"
     ))]
     pub campus_location: Option<Cow<'a, str>>,
+    pub registration_no: Option<Cow<'a, str>>,
 }
 
 /// Json Model for an Identification claim request
@@ -313,6 +323,7 @@ impl PartialEq<Identification> for NewIdentification<'_> {
             self.location_latitude.eq(&idt.location_latitude),
             self.location_longitude.eq(&idt.location_longitude),
             self.posted_by.eq(&idt.posted_by),
+            self.registration_no.eq(&idt.registration_no),
         ];
 
         let is_equal = comp_vec.into_iter().all(|v| v);
@@ -335,6 +346,7 @@ impl PartialEq<NewIdentification<'_>> for Identification {
             self.location_latitude.eq(&idt.location_latitude),
             self.location_longitude.eq(&idt.location_longitude),
             self.posted_by.eq(&idt.posted_by),
+            self.registration_no.eq(&idt.registration_no),
         ];
 
         let is_equal = comp_vec.into_iter().all(|v| v);
@@ -345,7 +357,7 @@ impl<'a> NewIdentification<'a> {
     /// Saves a new ID record to the Identifications table
     pub async fn save(&self) -> Result<Identification, ResError> {
         use crate::diesel_cfg::schema::identifications::dsl::{
-            campus, course, identifications as _identifications, institution, name,
+            campus, course, identifications as _identifications, institution, name, registration_no,
         };
 
         let presents = _identifications
@@ -353,7 +365,8 @@ impl<'a> NewIdentification<'a> {
                 name.eq(&self.name)
                     .and(course.eq(&self.course))
                     .and(institution.eq(&self.institution))
-                    .and(campus.eq(&self.campus)),
+                    .and(campus.eq(&self.campus))
+                    .and(registration_no.eq(&self.registration_no)),
             )
             .load::<Identification>(&connect_to_db())?;
         for ident in &presents {
@@ -580,7 +593,10 @@ impl<'a> NewClaimableIdt<'a> {
     /// Saves a new user Identification Claim to db
     pub async fn save(&mut self, this_user: &User) -> Result<ClaimableIdentification, ResError> {
         use crate::diesel_cfg::schema::claimed_identifications::dsl::{
-            claimed_identifications as cl_idt_table, institution as c_institution, name as c_name,
+            claimed_identifications as cl_idt_table,
+            institution as c_institution,
+            name as c_name,
+            //registration_no as c_reg_no,
         };
 
         self.has_claim(&this_user).await?;
@@ -591,6 +607,10 @@ impl<'a> NewClaimableIdt<'a> {
                 c_name
                     .eq(self.name.as_ref())
                     .and(c_institution.eq(self.institution.as_ref())),
+                // .and(c_reg_no.eq(self.registration_no.as_ref())),
+                // Only non-option values are matched here.
+                // If there's need to change how claims work,
+                // then the registration_no field can be added as conflict
             )
             .load::<ClaimableIdentification>(&connect_to_db())?;
         self.is_unique(&existing_claims)?;
@@ -753,6 +773,10 @@ impl ClaimableIdentification {
         let nm_sig: f64 = 0.6; // Cosine of 1 contributes .60
         let crse_sig: f64 = 0.25; // Cosine of 1 contributes .25
         let tm_sig: f64 = 0.15; // Valid from, Valid till each contribute tm_sig/2
+        let regno_sig: f64 = 0.54; // This places the similarity above 1
+                                   // Was added later. But if registration
+                                   // number matches, it makes sense
+                                   // to assume a full match.
 
         let name_s = cosine_similarity(claim.name.as_ref(), &idt.name);
 
@@ -774,6 +798,17 @@ impl ClaimableIdentification {
             && claim.graduation_year.unwrap().eq(&idt.valid_till.unwrap())
         {
             overall_significance += tm_sig / 2.;
+        }
+
+        if idt.registration_no.is_some()
+            && claim.registration_no.is_some()
+            && claim
+                .registration_no
+                .as_ref()
+                .unwrap()
+                .eq(idt.registration_no.as_ref().unwrap())
+        {
+            overall_significance += regno_sig;
         }
         overall_significance >= min_threshold
     }
@@ -804,7 +839,8 @@ impl std::convert::From<&NewIdentification<'_>> for Identification {
     /// ans ClaimableIdentifications.
     ///
     /// Usable fields are only:
-    /// name, course, campus, valid_from, valid_till, institution
+    /// name, course, campus, valid_from, valid_till, institution,
+    /// registration_no
     fn from(new_idt: &NewIdentification<'_>) -> Self {
         Identification {
             name: new_idt.name.as_ref().into(),
@@ -813,6 +849,7 @@ impl std::convert::From<&NewIdentification<'_>> for Identification {
             valid_from: new_idt.valid_from,
             valid_till: new_idt.valid_till,
             institution: new_idt.institution.as_ref().into(),
+            registration_no: new_idt.registration_no.clone(),
 
             // Below fields should NOT be used on an Idt converted from a NewIdt
             id: 0,
