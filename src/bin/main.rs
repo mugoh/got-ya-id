@@ -21,7 +21,6 @@ use got_ya_id::{
 #[actix_rt::main]
 async fn main() -> io::Result<()> {
     let mut listen_fd = ListenFd::from_env();
-    //let cors_ = Cors::new().supports_credentials().send_wildcard().finish();
 
     // env::set_var("RUST_LOG", "debug");
     env_logger::init();
