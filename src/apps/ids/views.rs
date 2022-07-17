@@ -96,6 +96,24 @@ pub async fn get_all_idts() -> Result<HttpResponse, Error> {
     respond(msg, Some(data), None).unwrap().await
 }
 
+/// Retrieves all existings Identifications belonging to a
+/// given institution.
+///
+/// # Url
+/// `/ids/institution/{institution_name}`
+///
+/// # Method
+/// `GET`
+pub async fn get_ids_by_institution_name(
+    institution_name: web::Path<String>,
+) -> Result<HttpResponse, Error> {
+    let data = Identification::retrieve_by_institution_name(&institution_name.into_inner())?;
+    let msg = hashmap!["status" => "200",
+            "message" => "Success. All identifications retrieved"];
+
+    respond(msg, Some(data), None).unwrap().await
+}
+
 /// Retrieves missing Identifications. These are identifications
 /// which have not been marked `is_found` as True yet.
 ///

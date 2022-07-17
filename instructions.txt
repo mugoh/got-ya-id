@@ -17,3 +17,5 @@ diesel migration run --migration-dir=src/diesel_cfg/migrations/
 Build and run
 
 cargo run
+
+https://webewizard.com/2019/09/17/Using-Lettre-With-Gmail/

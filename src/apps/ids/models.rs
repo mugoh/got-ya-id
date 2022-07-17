@@ -435,6 +435,29 @@ impl Identification {
         Ok(idts)
     }
 
+    /// Retrieves all Identifications matching a given
+    /// institution name.
+    ///
+    /// # Arguments
+    /// ## institution: &str
+    /// The name of the institution to search for.
+    ///
+    /// # Returns
+    /// Resulting vector of Identifications.
+    pub fn retrieve_by_institution_name(
+        institution: &str,
+    ) -> Result<Vec<Identification>, ResError> {
+        use crate::diesel_cfg::schema::identifications::dsl::{
+            identifications, institution as _institution,
+        };
+        // Filter where id.institution.ilike(institution)
+        let idts = identifications
+            .filter(_institution.ilike(institution))
+            .load::<Identification>(&connect_to_db())?;
+
+        Ok(idts)
+    }
+
     /// Marks the identification matching the given key as found
     pub fn mark_found(pk: i32) -> Result<Identification, ResError> {
         let mut idt = Self::find_by_id(pk)?;
