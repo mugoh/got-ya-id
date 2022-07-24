@@ -41,17 +41,16 @@ pub fn remove_py_mod(file_path: &str) -> Result<String, ()> {
 /// Makes a call to the script executing the delete
 fn delete_static<'a>(py: Python, file_id: &'a str) -> PyResult<String> {
     //
-    use pyo3::prelude::PyModule;
+    use pyo3::prelude::{Py, PyAny, PyModule};
     use std::fs;
 
     let script = fs::read_to_string("src/core/upload")?;
 
-    let loaded_mod = PyModule::from_code(py, &script, "upload", "upload")?;
+    let loaded_mod: Py<PyAny> = PyModule::from_code(py, &script, "", "")?
+        .getattr("destroy")?
+        .into();
 
-    Ok(loaded_mod
-        .call("destroy", (file_id,), None)?
-        .as_ref()
-        .to_string())
+    Ok(loaded_mod.call(py, (file_id,), None)?.to_string())
 }
 
 /// Perfoms the foreign call to the script that should
@@ -62,16 +61,15 @@ fn delete_static<'a>(py: Python, file_id: &'a str) -> PyResult<String> {
 ///     - The url path of the file to upload
 ///
 fn upload_static<'a>(py: Python, file_: &'a str, dir_: &'a str) -> PyResult<String> {
-    use pyo3::prelude::PyModule;
+    use pyo3::prelude::{Py, PyAny, PyModule};
     use std::fs;
 
     let script = fs::read_to_string("src/core/upload")?;
 
-    let loaded_mod = PyModule::from_code(py, &script, "upload", "upload")?;
-    let res = loaded_mod
-        .call("upload", (file_, dir_), None)?
-        .as_ref()
-        .to_string();
+    let loaded_mod: Py<PyAny> = PyModule::from_code(py, &script, "", "")?
+        .getattr("upload")?
+        .into();
+    let res = loaded_mod.call(py, (file_, dir_), None)?.to_string();
 
     let res = res.replace("{", "").replace("'", "\"").replace("}", "");
     let res = res.split(',').collect::<Vec<&str>>();
