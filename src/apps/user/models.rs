@@ -39,7 +39,7 @@ use chrono::{prelude::*, Duration, NaiveDateTime};
 use diesel::{self, prelude::*};
 
 use jsonwebtoken as jwt;
-use jwt::{encode, Header};
+use jwt::{encode, EncodingKey, Header};
 
 use url::Url;
 
@@ -344,7 +344,11 @@ impl User {
 
         let header = Header::default();
 
-        Ok(encode(&header, &payload, key.as_ref())?)
+        Ok(encode(
+            &header,
+            &payload,
+            &EncodingKey::from_secret(key.as_ref()),
+        )?)
     }
 
     /// Decodes the auth token representing a user

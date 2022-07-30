@@ -6,7 +6,7 @@ use crate::config::configs as config;
 
 use chrono::{Duration, Utc};
 use jsonwebtoken as jwt;
-use jwt::{decode, encode, Header, Validation};
+use jwt::{decode, encode, Algorithm, DecodingKey, EncodingKey, Header, Validation};
 use serde_derive::{Deserialize, Serialize};
 
 /// JWT Auth Identity Claims
@@ -36,7 +36,7 @@ pub fn encode_jwt_token(email: String, issuer: String) -> Result<String, Box<dyn
 
     let header = Header::default();
 
-    match encode(&header, &payload, key.as_ref()) {
+    match encode(&header, &payload, &EncodingKey::from_secret(key.as_ref())) {
         Ok(t) => Ok(t),
         Err(e) => Result::Err(Box::new(e)),
     }
@@ -76,10 +76,11 @@ pub fn decode_auth_token(
         eprintln!("Error: Missing required ENV Variable `secret_key`\n");
         process::exit(0);
     });
-    let validation = Validation {
-        iss: issuer,
-        ..Default::default()
-    };
-    let decoded_token = decode::<Claims>(token, key.as_ref(), &validation)?;
+    let mut validation = Validation::new(Algorithm::HS256);
+    if let Some(issuer) = issuer {
+        validation.set_issuer(&[issuer]);
+    }
+    let decoded_token =
+        decode::<Claims>(token, &DecodingKey::from_secret(key.as_ref()), &validation)?;
     Ok(decoded_token.claims)
 }
