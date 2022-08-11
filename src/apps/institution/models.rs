@@ -1,11 +1,13 @@
-use diesel::prelude::*;
+use diesel::{self, prelude::*};
 
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 
 use validator::Validate;
 use validator_derive::Validate;
 
 use regex::Regex;
+
+use chrono::NaiveDateTime;
 
 use std::borrow::Cow;
 
@@ -15,11 +17,43 @@ use crate::{
         ids::models::{ClaimableIdentification, UpdatableClaimableIdt},
         profiles::models::Profile,
         user::models::User,
+        user::utils::from_timestamp,
     },
-    diesel_cfg::config::connect_to_db,
+    diesel_cfg::{config::connect_to_db, schema::institutions},
     errors::error::ResError,
     similarity::cosine::cosine_similarity,
 };
+
+/// Insertable institution model
+#[derive(Validate, Deserialize, Insertable)]
+#[table_name = "institutions"]
+#[serde(deny_unknown_fields)]
+pub struct NewInstitution<'a> {
+    #[validate(length(min = 5, max = 255))]
+    pub name: Cow<'a, str>,
+    #[validate(length(min = 3, max = 255))]
+    pub town: Cow<'a, str>,
+    #[validate(length(min = 3, max = 255))]
+    pub country: Cow<'a, str>,
+    pub description: Option<Cow<'a, str>>,
+    postal_address: Option<Cow<'a, str>>,
+}
+
+/// Queryable Institution model
+#[derive(Queryable, Identifiable, AsChangeset, Serialize, Deserialize)]
+#[table_name = "institutions"]
+pub struct Institution {
+    id: i32,
+    name: String,
+    town: String,
+    country: String,
+    description: Option<String>,
+    postal_address: Option<String>,
+    #[serde(deserialize_with = "from_timestamp")]
+    created_at: NaiveDateTime,
+    #[serde(deserialize_with = "from_timestamp")]
+    updated_at: NaiveDateTime,
+}
 
 /// Parsed Json Data necessary for changing
 /// a User's institution.
@@ -31,6 +65,49 @@ pub struct ChangeableInst<'a> {
 
     /// Institution email
     pub email: Cow<'a, str>,
+}
+
+impl<'a> NewInstitution<'a> {
+    /// Saves new Institution to the insitutions table.
+    pub async fn save(&self) -> Result<Institution, ResError> {
+        use crate::diesel_cfg::schema::institutions::dsl::{
+            country, institutions as _institutions, name, town,
+        };
+        let is_present = _institutions
+            .filter(
+                name.eq(&self.name)
+                    .and(town.eq(&self.town))
+                    .and(country.eq(&self.country)),
+            )
+            .load::<Institution>(&connect_to_db())?;
+
+        if is_present.len() > 0 {
+            return Err(ResError::new("Institution already exists".into(), 409));
+        }
+
+        let created_institution = diesel::insert_into(institutions::table)
+            .values(self)
+            .get_result::<Institution>(&connect_to_db())?;
+        Ok(created_institution)
+    }
+}
+
+impl Institution {
+    /// Retrives all Insitutions the database.
+    pub fn get_all() -> Result<Vec<Institution>, ResError> {
+        use crate::diesel_cfg::schema::institutions::dsl::institutions as _institutions;
+        let all_insitutions = _institutions.load::<Institution>(&connect_to_db())?;
+        Ok(all_insitutions)
+    }
+
+    /// Finds an Institution by id.
+    pub fn find_by_pk(id: i32) -> Result<Institution, ResError> {
+        use crate::diesel_cfg::schema::institutions::dsl::institutions;
+        let found_institution = institutions
+            .find(id)
+            .first::<Institution>(&connect_to_db())?;
+        Ok(found_institution)
+    }
 }
 
 impl<'a> ChangeableInst<'a> {

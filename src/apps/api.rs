@@ -71,6 +71,18 @@ pub fn api(cfg: &mut web::ServiceConfig) {
                 web::resource("/change").route(web::post().to(institution::change_institution)),
             ))
             .service(
+                web::scope("/institutions")
+                    .service(
+                        web::resource("")
+                            .route(web::post().to(institution::create_institution))
+                            .route(web::get().to(institution::get_all_institutions)),
+                    )
+                    .service(
+                        web::resource("/{id}")
+                            .route(web::get().to(institution::get_institution_detail)),
+                    ),
+            )
+            .service(
                 web::scope("/emails")
                     .service(web::resource("/new").route(web::post().to(email::add_email)))
                     .service(

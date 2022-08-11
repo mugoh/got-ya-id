@@ -155,7 +155,7 @@ table! {
 }
 
 table! {
-        use diesel_geometry::sql_types::Point;
+        // use diesel_geometry::sql_types::Point;
         use diesel::sql_types::*;
     /// Representation of the `identifications` table.
     ///
