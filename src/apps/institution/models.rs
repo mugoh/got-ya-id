@@ -15,6 +15,7 @@ use crate::{
     apps::{
         email::models::Email,
         ids::models::{ClaimableIdentification, UpdatableClaimableIdt},
+        ids::validators::validate_str_len,
         profiles::models::Profile,
         user::models::User,
         user::utils::from_timestamp,
@@ -29,11 +30,19 @@ use crate::{
 #[table_name = "institutions"]
 #[serde(deny_unknown_fields)]
 pub struct NewInstitution<'a> {
-    #[validate(length(min = 5, max = 255))]
+    #[validate(length(min = 5, max = 255, message = "Try making the name at least 5 letters"))]
     pub name: Cow<'a, str>,
-    #[validate(length(min = 3, max = 255))]
+    #[validate(length(
+        min = 3,
+        max = 255,
+        message = "Try to make the town at least 3 letters long"
+    ))]
     pub town: Cow<'a, str>,
-    #[validate(length(min = 3, max = 255))]
+    #[validate(length(
+        min = 3,
+        max = 255,
+        message = "Try to make country at least 3 letters long"
+    ))]
     pub country: Cow<'a, str>,
     pub description: Option<Cow<'a, str>>,
     postal_address: Option<Cow<'a, str>>,
@@ -55,8 +64,28 @@ pub struct Institution {
     updated_at: NaiveDateTime,
 }
 
-/// Parsed Json Data necessary for changing
+/// Institution object for updating
+/// changes to the Institution model.
+#[derive(Validate, Deserialize, AsChangeset)]
+#[table_name = "institutions"]
+pub struct UpdatableInstitution<'a> {
+    #[validate(custom(function = "validate_str_len"))]
+    pub name: Option<Cow<'a, str>>,
+    #[validate(custom(function = "validate_str_len"))]
+    pub town: Option<Cow<'a, str>>,
+    #[validate(custom(function = "validate_str_len"))]
+    pub country: Option<Cow<'a, str>>,
+    pub description: Option<Cow<'a, str>>,
+    pub postal_address: Option<Cow<'a, str>>,
+}
+
+/// Comparison object for changing
 /// a User's institution.
+///
+/// The name and email fields are used
+/// by the function match_institution to
+/// verify if the User's email is a close
+/// match to the institution they wish to change to.
 #[derive(Deserialize, Validate)]
 #[serde(deny_unknown_fields)]
 pub struct ChangeableInst<'a> {
@@ -65,6 +94,16 @@ pub struct ChangeableInst<'a> {
 
     /// Institution email
     pub email: Cow<'a, str>,
+}
+
+/// Parsable JSON object for changing
+/// the User's institution's requests.
+#[derive(Deserialize, Validate)]
+#[serde(deny_unknown_fields)]
+pub struct UpdatableJsonUserInsitution {
+    /// Id of the insitution the User wishes to change to.
+    pub institution_id: i32,
+    pub user_id: i32,
 }
 
 impl<'a> NewInstitution<'a> {
@@ -101,12 +140,54 @@ impl Institution {
     }
 
     /// Finds an Institution by id.
-    pub fn find_by_pk(id: i32) -> Result<Institution, ResError> {
+    pub async fn find_by_pk(id: i32) -> Result<Institution, ResError> {
         use crate::diesel_cfg::schema::institutions::dsl::institutions;
         let found_institution = institutions
             .find(id)
             .first::<Institution>(&connect_to_db())?;
         Ok(found_institution)
+    }
+
+    pub async fn update(&self, data: &UpdatableInstitution<'_>) -> Result<Institution, ResError> {
+        Ok(diesel::update(&*self)
+            .set(data)
+            .get_result::<Institution>(&connect_to_db())?)
+    }
+
+    /// Changes the insitution of a User whose Id
+    /// is passed in.
+    pub async fn change_user_insitution(
+        updatable_inst: &UpdatableJsonUserInsitution,
+    ) -> Result<Institution, ResError> {
+        let (user, user_profile) = User::find_by_pk(updatable_inst.user_id, Some(1))?;
+        let all_user_emails: Vec<String> = User::all_emails(user.id).await?;
+
+        let new_insitution: Institution = Self::find_by_pk(updatable_inst.institution_id).await?;
+
+        let mut matched_institution = false;
+        for email in all_user_emails {
+            let changeable_inst: ChangeableInst<'_> = ChangeableInst {
+                name: Cow::from(&new_insitution.name),
+                email: Cow::from(&email),
+            };
+            if changeable_inst.is_match().await? {
+                matched_institution = true;
+                break;
+            }
+        }
+
+        if !matched_institution {
+            return Err(ResError::new(
+                format!(
+                    "User {} does not have an email matching institution {}",
+                    user.username, new_insitution.name
+                ),
+                400,
+            ));
+        }
+        // Alter db institution refs then:
+        // Update user profile, claims, and Ids
+        Ok(new_insitution)
     }
 }
 

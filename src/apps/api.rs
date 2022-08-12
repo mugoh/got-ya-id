@@ -79,7 +79,8 @@ pub fn api(cfg: &mut web::ServiceConfig) {
                     )
                     .service(
                         web::resource("/{id}")
-                            .route(web::get().to(institution::get_institution_detail)),
+                            .route(web::get().to(institution::get_institution_detail))
+                            .route(web::put().to(institution::update_institution)),
                     ),
             )
             .service(

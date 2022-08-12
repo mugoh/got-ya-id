@@ -4,9 +4,9 @@ use crate::{
     hashmap,
 };
 
-use super::models::{ChangeableInst, Institution, NewInstitution};
+use super::models::{ChangeableInst, Institution, NewInstitution, UpdatableInstitution};
 
-use actix_web::{web, Error, HttpRequest, HttpResponse, Result};
+use actix_web::{http, web, Error, HttpRequest, HttpResponse, Result};
 
 use validator::Validate;
 
@@ -70,9 +70,10 @@ pub async fn create_institution(
     req: HttpRequest,
     new_insitution: web::Json<NewInstitution<'_>>,
 ) -> Result<HttpResponse, Error> {
-    match new_insitution.validate() {
-        Ok(_) => {}
-        Err(e) => return err("400", e.to_string()).await,
+    if let Err(e) = new_insitution.validate() {
+        return HttpResponse::build(http::StatusCode::BAD_REQUEST)
+            .json(e)
+            .await;
     }
     User::from_token(&req)?;
     let insititution: Institution = new_insitution.save().await?;
@@ -110,7 +111,44 @@ pub async fn get_institution_detail(
     id: web::Path<i32>,
 ) -> Result<HttpResponse, Error> {
     User::from_token(&req)?;
-    let institution = Institution::find_by_pk(id.into_inner())?;
+    let institution = Institution::find_by_pk(id.into_inner()).await?;
     let msg = hashmap!["status" => "200", "message" => "Success. Institution retrieved"];
     respond(msg, Some(institution)).await
+}
+
+/// Update Insitution detail.
+///
+/// # url:
+/// `/institutions/{id}`
+///
+/// # Method
+/// `PUT`
+///
+/// #### Authorization Required
+/// ## Request Data Example
+/// ```json
+/// {
+///   name: "name of new institution",
+///   town: "town of new institution",
+///   country: "country of new institution",
+///   description: "Some fancy stuff about the institution",
+///   postal_address: "postal address of new institution"
+///   }
+/// ```
+pub async fn update_institution(
+    pk: web::Path<i32>,
+    new_data: web::Json<UpdatableInstitution<'_>>,
+    req: HttpRequest,
+) -> Result<HttpResponse, Error> {
+    if let Err(e) = new_data.validate() {
+        return HttpResponse::build(http::StatusCode::BAD_REQUEST)
+            .json(e)
+            .await;
+    }
+    User::from_token(&req)?;
+
+    let mut insitution = Institution::find_by_pk(pk.into_inner()).await?;
+    insitution = insitution.update(&new_data).await?;
+    let msg = hashmap!["status" => "200", "message" => "Success. Institution updated"];
+    respond(msg, Some(insitution)).await
 }

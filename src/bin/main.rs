@@ -1,5 +1,5 @@
 use actix_cors::Cors;
-use actix_web::{middleware, web, App, HttpServer};
+use actix_web::{error, middleware, web, App, HttpResponse, HttpServer};
 
 //use env_logger;
 use listenfd::ListenFd;
@@ -21,6 +21,7 @@ use got_ya_id::{
 #[actix_rt::main]
 async fn main() -> io::Result<()> {
     let mut listen_fd = ListenFd::from_env();
+    //let cors_ = Cors::new().supports_credentials().send_wildcard().finish();
 
     // env::set_var("RUST_LOG", "debug");
     env_logger::init();
@@ -41,6 +42,15 @@ async fn main() -> io::Result<()> {
             .data(web::JsonConfig::default().limit(8192))
             .data(data.clone())
             .data(tera.clone())
+            .app_data(web::JsonConfig::default().error_handler(|err, _req| {
+                error::InternalError::from_response(
+                    "",
+                    HttpResponse::BadRequest()
+                        .content_type("application/json")
+                        .body(format!(r#"{{"error":"{}"}}"#, err)),
+                )
+                .into()
+            }))
     });
 
     app = if let Some(listener) = listen_fd.take_tcp_listener(0).unwrap() {
