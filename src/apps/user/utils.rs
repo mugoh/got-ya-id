@@ -5,7 +5,7 @@ use validator::ValidationError;
 use super::models::User;
 
 use crate::{
-    apps::{core::response, ids::models::Identification},
+    apps::{core::response, ids::models::Identification, institution::models::Institution},
     errors::error::ResError,
 };
 
@@ -111,6 +111,23 @@ pub async fn get_notif_context(
 
     // Handle Oauth Google Users
     // The username is derived from the `name` +  a random substring
+    struct InstitutionInfo {
+        name: String,
+        location: String,
+    }
+
+    let institution_info = if let Some(institution_id) = idt.institution_id {
+        let institution: Institution = Institution::find_by_pk(institution_id).await?;
+        InstitutionInfo {
+            name: institution.name.clone(),
+            location: format!("{}, {}", institution.town, institution.country),
+        }
+    } else {
+        InstitutionInfo {
+            name: "Institution name missing".to_string(),
+            location: "Location missing".to_string(),
+        }
+    };
 
     let username = if username.contains("-google") {
         username.split('-').collect::<Vec<&str>>()[0]
@@ -121,8 +138,8 @@ pub async fn get_notif_context(
     context.insert("link", path);
 
     context.insert("id_name", &idt.name);
-    context.insert("id_institution", &idt.institution);
-    context.insert("id_inst_location", &idt.campus);
+    context.insert("id_institution", &institution_info.name);
+    context.insert("id_inst_location", &institution_info.location);
     context.insert("id_course", &idt.course);
 
     Ok(context)

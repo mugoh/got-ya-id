@@ -18,6 +18,7 @@
 -- ```
 CREATE OR REPLACE FUNCTION diesel_manage_updated_at(_tbl regclass) RETURNS VOID AS $$
 BEGIN
+    EXECUTE format('DROP TRIGGER IF EXISTS set_updated_at ON %s', _tbl);
     EXECUTE format('CREATE TRIGGER set_updated_at BEFORE UPDATE ON %s
                     FOR EACH ROW EXECUTE PROCEDURE diesel_set_updated_at()', _tbl);
 END;

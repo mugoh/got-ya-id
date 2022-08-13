@@ -168,7 +168,7 @@ where
 }
 /// Gives a HttpResponse holding an error status
 /// and the cause of request error
-pub fn err<T: serde::de::DeserializeOwned + Serialize>(status: &'_ str, err: T) -> HttpResponse //serde_json::value::Value
+pub fn err<T: Serialize>(status: &'_ str, err: T) -> HttpResponse //serde_json::value::Value
 {
     let status = StatusCode::from_u16(status.parse::<u16>().unwrap()).unwrap();
 

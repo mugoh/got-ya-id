@@ -4,16 +4,18 @@ use crate::{
     hashmap,
 };
 
-use super::models::{ChangeableInst, Institution, NewInstitution, UpdatableInstitution};
+use super::models::{
+    Institution, NewInstitution, UpdatableInstitution, UpdatableJsonUserInsitution,
+};
 
-use actix_web::{http, web, Error, HttpRequest, HttpResponse, Result};
+use actix_web::{web, Error, HttpRequest, HttpResponse, Result};
 
 use validator::Validate;
 
 /// Changes a User's institution to the name given.
 ///
 /// # url:
-/// `/institution/change`
+/// `/institutions/user/change`
 ///
 /// # Method
 /// `POST`
@@ -22,22 +24,26 @@ use validator::Validate;
 ///
 /// ## Request Data Example
 /// ```json
-///     name: "name of new institution",
-///     email: "email@thisinstituion.su.se"
+///     user_id: "Id of the user",
+///     institution_id: "Id of the new institution"
 /// ```
-/// The email used should be an institutional email
-/// for use in identification and verification of
-/// user membership.
+///
+/// To verify if a user belongs to the institution,
+/// we verify if any of the user's emails belong to the institution.
+///
+/// So a user making this request should have a verirified
+/// institutional email for use in identification and
+/// verification of institution membership.
 pub async fn change_institution(
     req: HttpRequest,
-    data: web::Json<ChangeableInst<'_>>,
+    data: web::Json<UpdatableJsonUserInsitution>,
 ) -> Result<HttpResponse, Error> {
     if let Err(e) = data.validate() {
-        return err("400", e.to_string()).await;
+        return err("400", e).await;
     }
 
     let user = User::from_token(&req)?;
-    data.update(&user).await?;
+    Institution::change_user_institution(&user, &data).await?;
 
     let res = hashmap!["status" => "200", "message" => "Success. Institution changed"];
 
@@ -71,9 +77,7 @@ pub async fn create_institution(
     new_insitution: web::Json<NewInstitution<'_>>,
 ) -> Result<HttpResponse, Error> {
     if let Err(e) = new_insitution.validate() {
-        return HttpResponse::build(http::StatusCode::BAD_REQUEST)
-            .json(e)
-            .await;
+        return err("400", e).await;
     }
     User::from_token(&req)?;
     let insititution: Institution = new_insitution.save().await?;
@@ -141,9 +145,7 @@ pub async fn update_institution(
     req: HttpRequest,
 ) -> Result<HttpResponse, Error> {
     if let Err(e) = new_data.validate() {
-        return HttpResponse::build(http::StatusCode::BAD_REQUEST)
-            .json(e)
-            .await;
+        return err("400", e).await;
     }
     User::from_token(&req)?;
 

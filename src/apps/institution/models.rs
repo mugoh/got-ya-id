@@ -13,12 +13,8 @@ use std::borrow::Cow;
 
 use crate::{
     apps::{
-        email::models::Email,
-        ids::models::{ClaimableIdentification, UpdatableClaimableIdt},
-        ids::validators::validate_str_len,
-        profiles::models::Profile,
-        user::models::User,
-        user::utils::from_timestamp,
+        ids::models::ClaimableIdentification, ids::validators::validate_str_len,
+        profiles::models::Profile, user::models::User, user::utils::from_timestamp,
     },
     diesel_cfg::{config::connect_to_db, schema::institutions},
     errors::error::ResError,
@@ -53,9 +49,9 @@ pub struct NewInstitution<'a> {
 #[table_name = "institutions"]
 pub struct Institution {
     id: i32,
-    name: String,
-    town: String,
-    country: String,
+    pub name: String,
+    pub town: String,
+    pub country: String,
     description: Option<String>,
     postal_address: Option<String>,
     #[serde(deserialize_with = "from_timestamp")]
@@ -156,10 +152,30 @@ impl Institution {
 
     /// Changes the insitution of a User whose Id
     /// is passed in.
-    pub async fn change_user_insitution(
+    pub async fn change_user_institution(
+        requesting_user: &User,
         updatable_inst: &UpdatableJsonUserInsitution,
     ) -> Result<Institution, ResError> {
-        let (user, user_profile) = User::find_by_pk(updatable_inst.user_id, Some(1))?;
+        let user_with_profile = User::find_by_pk(updatable_inst.user_id, Some(1))?;
+        let user = user_with_profile.0;
+        let mut user_profile = user_with_profile.1.unwrap();
+
+        if user.id != requesting_user.id {
+            return Err(ResError::new(
+                "You are not authorized to change this user's institution".into(),
+                401,
+            ));
+        }
+
+        if let Some(current_user_institution_id) = user_profile.institution_id {
+            if current_user_institution_id == updatable_inst.institution_id {
+                return Err(ResError::new(
+                    "User already belongs to this institution".into(),
+                    409,
+                ));
+            }
+        }
+
         let all_user_emails: Vec<String> = User::all_emails(user.id).await?;
 
         let new_insitution: Institution = Self::find_by_pk(updatable_inst.institution_id).await?;
@@ -185,41 +201,28 @@ impl Institution {
                 400,
             ));
         }
-        // Alter db institution refs then:
-        // Update user profile, claims, and Ids
-        Ok(new_insitution)
+
+        match ClaimableIdentification::belonging_to_me(&user) {
+            Err(_) => Err(ResError::new(
+                "User has no identification claim. Create claim first to change institution".into(),
+                400,
+            )),
+
+            Ok(mut claim) => {
+                // Alter db institution refs then:
+                // Update user profile, claims, and Ids
+                user_profile.institution_id = Some(updatable_inst.institution_id);
+                user_profile.save_changes::<Profile>(&connect_to_db())?;
+
+                claim.institution_id = Some(updatable_inst.institution_id);
+                claim.save_changes::<ClaimableIdentification>(&connect_to_db())?;
+                Ok(new_insitution)
+            }
+        }
     }
 }
 
 impl<'a> ChangeableInst<'a> {
-    /// Updates the institution name identifying a User.
-    ///
-    /// The institution is in the records `Profile` and `Claims`
-    pub async fn update(&self, user: &User) -> Result<(), ResError> {
-        let u_id = Email::u_id(&self.email)?;
-
-        if u_id != user.id {
-            return Err(ResError::unauthorized());
-        }
-
-        self.is_match().await?;
-
-        let mut prf = Profile::belonging_to(user).get_result::<Profile>(&connect_to_db())?;
-        prf.institution = Some(self.name.as_ref().into());
-        prf.save_changes::<Profile>(&connect_to_db())?;
-
-        let claim = ClaimableIdentification::belonging_to(user)
-            .get_result::<ClaimableIdentification>(&connect_to_db())?;
-        let upt_claim = UpdatableClaimableIdt {
-            institution: Some(Cow::Borrowed(&self.name)),
-            ..Default::default()
-        };
-
-        claim.update(user, upt_claim).await?;
-
-        Ok(())
-    }
-
     /// Attempts to acertain whether the email belongs to the
     /// institution.
     ///
