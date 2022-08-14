@@ -1,28 +1,87 @@
-use diesel::prelude::*;
+use diesel::{self, prelude::*};
 
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 
 use validator::Validate;
 use validator_derive::Validate;
 
 use regex::Regex;
 
+use chrono::NaiveDateTime;
+
 use std::borrow::Cow;
 
 use crate::{
     apps::{
-        email::models::Email,
-        ids::models::{ClaimableIdentification, UpdatableClaimableIdt},
-        profiles::models::Profile,
-        user::models::User,
+        ids::models::ClaimableIdentification, ids::validators::validate_str_len,
+        profiles::models::Profile, user::models::User, user::utils::from_timestamp,
     },
-    diesel_cfg::config::connect_to_db,
+    diesel_cfg::{config::connect_to_db, schema::institutions},
     errors::error::ResError,
     similarity::cosine::cosine_similarity,
 };
 
-/// Parsed Json Data necessary for changing
+/// Insertable institution model
+#[derive(Validate, Deserialize, Insertable)]
+#[table_name = "institutions"]
+#[serde(deny_unknown_fields)]
+pub struct NewInstitution<'a> {
+    #[validate(length(min = 5, max = 255, message = "Try making the name at least 5 letters"))]
+    pub name: Cow<'a, str>,
+    #[validate(length(
+        min = 3,
+        max = 255,
+        message = "Try to make the town at least 3 letters long"
+    ))]
+    pub town: Cow<'a, str>,
+    #[validate(length(
+        min = 3,
+        max = 255,
+        message = "Try to make country at least 3 letters long"
+    ))]
+    pub country: Cow<'a, str>,
+    pub description: Option<Cow<'a, str>>,
+    postal_address: Option<Cow<'a, str>>,
+}
+
+/// Queryable Institution model
+#[derive(Queryable, Identifiable, AsChangeset, Serialize, Deserialize)]
+#[table_name = "institutions"]
+pub struct Institution {
+    id: i32,
+    pub name: String,
+    pub town: String,
+    pub country: String,
+    description: Option<String>,
+    postal_address: Option<String>,
+    #[serde(deserialize_with = "from_timestamp")]
+    created_at: NaiveDateTime,
+    #[serde(deserialize_with = "from_timestamp")]
+    updated_at: NaiveDateTime,
+}
+
+/// Institution object for updating
+/// changes to the Institution model.
+#[derive(Validate, Deserialize, AsChangeset)]
+#[table_name = "institutions"]
+pub struct UpdatableInstitution<'a> {
+    #[validate(custom(function = "validate_str_len"))]
+    pub name: Option<Cow<'a, str>>,
+    #[validate(custom(function = "validate_str_len"))]
+    pub town: Option<Cow<'a, str>>,
+    #[validate(custom(function = "validate_str_len"))]
+    pub country: Option<Cow<'a, str>>,
+    pub description: Option<Cow<'a, str>>,
+    pub postal_address: Option<Cow<'a, str>>,
+}
+
+/// Comparison object for changing
 /// a User's institution.
+///
+/// The name and email fields are used
+/// by the function match_institution to
+/// verify if the User's email is a close
+/// match to the institution they wish to change to.
 #[derive(Deserialize, Validate)]
 #[serde(deny_unknown_fields)]
 pub struct ChangeableInst<'a> {
@@ -33,35 +92,137 @@ pub struct ChangeableInst<'a> {
     pub email: Cow<'a, str>,
 }
 
-impl<'a> ChangeableInst<'a> {
-    /// Updates the institution name identifying a User.
-    ///
-    /// The institution is in the records `Profile` and `Claims`
-    pub async fn update(&self, user: &User) -> Result<(), ResError> {
-        let u_id = Email::u_id(&self.email)?;
+/// Parsable JSON object for changing
+/// the User's institution's requests.
+#[derive(Deserialize, Validate)]
+#[serde(deny_unknown_fields)]
+pub struct UpdatableJsonUserInsitution {
+    /// Id of the insitution the User wishes to change to.
+    pub institution_id: i32,
+    pub user_id: i32,
+}
 
-        if u_id != user.id {
-            return Err(ResError::unauthorized());
+impl<'a> NewInstitution<'a> {
+    /// Saves new Institution to the insitutions table.
+    pub async fn save(&self) -> Result<Institution, ResError> {
+        use crate::diesel_cfg::schema::institutions::dsl::{
+            country, institutions as _institutions, name, town,
+        };
+        let is_present = _institutions
+            .filter(
+                name.eq(&self.name)
+                    .and(town.eq(&self.town))
+                    .and(country.eq(&self.country)),
+            )
+            .load::<Institution>(&connect_to_db())?;
+
+        if is_present.len() > 0 {
+            return Err(ResError::new("Institution already exists".into(), 409));
         }
 
-        self.is_match().await?;
+        let created_institution = diesel::insert_into(institutions::table)
+            .values(self)
+            .get_result::<Institution>(&connect_to_db())?;
+        Ok(created_institution)
+    }
+}
 
-        let mut prf = Profile::belonging_to(user).get_result::<Profile>(&connect_to_db())?;
-        prf.institution = Some(self.name.as_ref().into());
-        prf.save_changes::<Profile>(&connect_to_db())?;
-
-        let claim = ClaimableIdentification::belonging_to(user)
-            .get_result::<ClaimableIdentification>(&connect_to_db())?;
-        let upt_claim = UpdatableClaimableIdt {
-            institution: Some(Cow::Borrowed(&self.name)),
-            ..Default::default()
-        };
-
-        claim.update(user, upt_claim).await?;
-
-        Ok(())
+impl Institution {
+    /// Retrives all Insitutions the database.
+    pub fn get_all() -> Result<Vec<Institution>, ResError> {
+        use crate::diesel_cfg::schema::institutions::dsl::institutions as _institutions;
+        let all_insitutions = _institutions.load::<Institution>(&connect_to_db())?;
+        Ok(all_insitutions)
     }
 
+    /// Finds an Institution by id.
+    pub async fn find_by_pk(id: i32) -> Result<Institution, ResError> {
+        use crate::diesel_cfg::schema::institutions::dsl::institutions;
+        let found_institution = institutions
+            .find(id)
+            .first::<Institution>(&connect_to_db())?;
+        Ok(found_institution)
+    }
+
+    pub async fn update(&self, data: &UpdatableInstitution<'_>) -> Result<Institution, ResError> {
+        Ok(diesel::update(&*self)
+            .set(data)
+            .get_result::<Institution>(&connect_to_db())?)
+    }
+
+    /// Changes the insitution of a User whose Id
+    /// is passed in.
+    pub async fn change_user_institution(
+        requesting_user: &User,
+        updatable_inst: &UpdatableJsonUserInsitution,
+    ) -> Result<Institution, ResError> {
+        let user_with_profile = User::find_by_pk(updatable_inst.user_id, Some(1))?;
+        let user = user_with_profile.0;
+        let mut user_profile = user_with_profile.1.unwrap();
+
+        if user.id != requesting_user.id {
+            return Err(ResError::new(
+                "You are not authorized to change this user's institution".into(),
+                401,
+            ));
+        }
+
+        if let Some(current_user_institution_id) = user_profile.institution_id {
+            if current_user_institution_id == updatable_inst.institution_id {
+                return Err(ResError::new(
+                    "User already belongs to this institution".into(),
+                    409,
+                ));
+            }
+        }
+
+        let all_user_emails: Vec<String> = User::all_emails(user.id).await?;
+
+        let new_insitution: Institution = Self::find_by_pk(updatable_inst.institution_id).await?;
+
+        let mut matched_institution = false;
+        for email in all_user_emails {
+            let changeable_inst: ChangeableInst<'_> = ChangeableInst {
+                name: Cow::from(&new_insitution.name),
+                email: Cow::from(&email),
+            };
+            if changeable_inst.is_match().await? {
+                matched_institution = true;
+                break;
+            }
+        }
+
+        if !matched_institution {
+            return Err(ResError::new(
+                format!(
+                    "User {} does not have an email matching institution {}",
+                    user.username, new_insitution.name
+                ),
+                400,
+            ));
+        }
+
+        match ClaimableIdentification::belonging_to_me(&user) {
+            Err(_) => Err(ResError::new(
+                "User has no identification claim. Create claim first to change institution".into(),
+                400,
+            )),
+
+            Ok(mut claim) => {
+                // Alter db institution refs then:
+                // Update user profile, claims, and Ids
+                user_profile.institution_id = Some(updatable_inst.institution_id);
+                user_profile.save_changes::<Profile>(&connect_to_db())?;
+
+                claim.institution_id = Some(updatable_inst.institution_id);
+                claim.save_changes::<ClaimableIdentification>(&connect_to_db())?;
+                Ok(new_insitution)
+            }
+        }
+    }
+}
+
+impl<'a> ChangeableInst<'a> {
     /// Attempts to acertain whether the email belongs to the
     /// institution.
     ///

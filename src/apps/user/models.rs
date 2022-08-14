@@ -675,7 +675,7 @@ impl<'a> SignInUser<'a> {
 }
 
 /// User Profile data from google Oauth
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Deserialize, Serialize)]
 pub struct GoogleUser {
     /// Full name
     name: String,

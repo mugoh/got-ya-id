@@ -38,3 +38,14 @@ pub fn validate_alpha_regex(name: &str) -> Result<(), ValidationError> {
     }
     Ok(())
 }
+
+pub fn validate_str_len(name: &str) -> Result<(), ValidationError> {
+    let min: usize = 3;
+    let max: usize = 255;
+    if name.len() < min || name.len() > max {
+        return Err(ValidationError::new(
+            "should be between 3 and 255 characters",
+        ));
+    }
+    Ok(())
+}

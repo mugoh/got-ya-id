@@ -8,6 +8,8 @@ use diesel::{self, prelude::*};
 use serde::{Deserialize, Serialize};
 use serde_json::{json, value};
 
+use chrono::NaiveDateTime;
+
 use std::{
     env,
     {borrow::Cow, error},
@@ -22,9 +24,11 @@ pub struct Profile<'a> {
     phone: Option<String>,
     /// Full name
     name: Option<String>,
-    pub institution: Option<String>,
     about: Option<String>,
     found_ids: Option<Cow<'a, i32>>,
+    pub institution_id: Option<i32>,
+    created_at: NaiveDateTime,
+    updated_at: NaiveDateTime,
 }
 
 impl<'a> Profile<'a> {
@@ -80,7 +84,7 @@ pub struct NewProfile<'a> {
     user_id: i32,
     phone: Option<Cow<'a, str>>,
     name: Option<Cow<'a, str>>,
-    institution: Option<Cow<'a, str>>,
+    institution_id: Option<i32>,
     about: Option<Cow<'a, str>>,
 }
 
@@ -124,7 +128,7 @@ impl<'a> NewProfile<'a> {
 pub struct UpdtProfile<'a> {
     phone: Option<Cow<'a, str>>,
     name: Option<Cow<'a, str>>,
-    institution: Option<Cow<'a, str>>,
+    institution_id: Option<i32>,
     about: Option<Cow<'a, str>>,
 }
 

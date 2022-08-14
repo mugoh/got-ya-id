@@ -100,14 +100,14 @@ pub async fn get_all_idts() -> Result<HttpResponse, Error> {
 /// given institution.
 ///
 /// # Url
-/// `/ids/institution/{institution_name}`
+/// `/ids/institution/{institution_id}`
 ///
 /// # Method
 /// `GET`
-pub async fn get_ids_by_institution_name(
-    institution_name: web::Path<String>,
+pub async fn get_ids_by_institution_pk(
+    institution_id: web::Path<i32>,
 ) -> Result<HttpResponse, Error> {
-    let data = Identification::retrieve_by_institution_name(&institution_name.into_inner())?;
+    let data = Identification::retrieve_by_institution_id(*institution_id)?;
     let msg = hashmap!["status" => "200",
             "message" => "Success. All identifications retrieved"];
 

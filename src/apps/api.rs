@@ -67,9 +67,23 @@ pub fn api(cfg: &mut web::ServiceConfig) {
             .service(web::scope("/users").service(
                 web::resource("/profiles").route(web::get().to(profiles::get_all_profiles)),
             ))
-            .service(web::scope("/institution").service(
-                web::resource("/change").route(web::post().to(institution::change_institution)),
-            ))
+            .service(
+                web::scope("/institutions")
+                    .service(
+                        web::resource("")
+                            .route(web::post().to(institution::create_institution))
+                            .route(web::get().to(institution::get_all_institutions)),
+                    )
+                    .service(
+                        web::resource("/{id}")
+                            .route(web::get().to(institution::get_institution_detail))
+                            .route(web::put().to(institution::update_institution)),
+                    )
+                    .service(
+                        web::resource("/user/change")
+                            .route(web::post().to(institution::change_institution)),
+                    ),
+            )
             .service(
                 web::scope("/emails")
                     .service(web::resource("/new").route(web::post().to(email::add_email)))
@@ -88,8 +102,8 @@ pub fn api(cfg: &mut web::ServiceConfig) {
                             .route(web::post().to(ids::create_new_identification)),
                     )
                     .service(
-                        web::resource("/institution/{institution_name}")
-                            .route(web::get().to(ids::get_ids_by_institution_name)),
+                        web::resource("/institution/{institution_id}")
+                            .route(web::get().to(ids::get_ids_by_institution_pk)),
                     )
                     .service(web::resource("/mine").route(web::get().to(ids::get_user_idts)))
                     .service(web::resource("claim/mine").route(web::post().to(ids::claim_idt)))

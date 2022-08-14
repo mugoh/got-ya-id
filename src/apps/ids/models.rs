@@ -56,15 +56,6 @@ pub struct Identification {
     /// Date (y-m-d)
     pub valid_till: Option<NaiveDate>,
 
-    /// The name of the institution the Identification belongs to.
-    /// It ought to be its title only  without inclusion of its location
-    pub institution: String,
-
-    /// Location/Subtitle defining the exact location
-    /// of the institution
-    /// e.g `Main, B`
-    pub campus: String,
-
     /// Location from which the ID should be picked
     pub location_name: String,
 
@@ -95,6 +86,9 @@ pub struct Identification {
 
     /// Registration number for the Idt
     registration_no: Option<String>,
+
+    /// The Foreign key of the institution the Identification belongs to.
+    pub institution_id: Option<i32>,
 }
 
 /// The Insertable new Identification record
@@ -111,14 +105,7 @@ pub struct NewIdentification<'a> {
     pub valid_from: Option<NaiveDate>,
     pub valid_till: Option<NaiveDate>,
 
-    #[validate(regex(path = "regexes::ALPHA_REGEX", message = "should just have letters"))]
-    institution: Cow<'a, str>,
-
-    #[validate(regex(
-        path = "regexes::LOCATION_REGEX",
-        message = "should have letters, digits or -_`"
-    ))]
-    campus: Cow<'a, str>,
+    institution_id: Option<i32>,
 
     #[validate(regex(
         path = "regexes::LOCATION_REGEX",
@@ -150,14 +137,7 @@ pub struct UpdatableIdentification<'a> {
     pub valid_from: Option<NaiveDate>,
     pub valid_till: Option<NaiveDate>,
 
-    #[validate(regex(path = "regexes::ALPHA_REGEX", message = "should just have letters"))]
-    institution: Option<Cow<'a, str>>,
-
-    #[validate(regex(
-        path = "regexes::LOCATION_REGEX",
-        message = "should have letters, digits or -_`"
-    ))]
-    campus: Option<Cow<'a, str>>,
+    institution_id: Option<i32>,
 
     #[validate(regex(
         path = "regexes::LOCATION_REGEX",
@@ -189,8 +169,6 @@ pub struct ClaimableIdentification {
     pub course: String,
     entry_year: Option<NaiveDate>,
     graduation_year: Option<NaiveDate>,
-    institution: String,
-    campus_location: String,
 
     #[serde(deserialize_with = "from_timestamp")]
     created_at: NaiveDateTime,
@@ -198,6 +176,8 @@ pub struct ClaimableIdentification {
     updated_at: NaiveDateTime,
 
     registration_no: Option<String>,
+
+    pub institution_id: Option<i32>,
 }
 
 /// The Insertable model of Claimable Identifications
@@ -217,14 +197,7 @@ pub struct NewClaimableIdt<'a> {
     entry_year: Option<NaiveDate>,
     graduation_year: Option<NaiveDate>,
 
-    #[validate(regex(path = "regexes::ALPHA_REGEX", message = "should just have letters"))]
-    institution: Cow<'a, str>,
-
-    #[validate(regex(
-        path = "regexes::LOCATION_REGEX",
-        message = "should have letters, digits or -_`"
-    ))]
-    campus_location: Option<Cow<'a, str>>,
+    institution_id: Option<i32>,
 
     registration_no: Option<Cow<'a, str>>,
 }
@@ -244,14 +217,8 @@ pub struct UpdatableClaimableIdt<'a> {
     pub entry_year: Option<NaiveDate>,
     pub graduation_year: Option<NaiveDate>,
 
-    #[validate(regex(path = "regexes::ALPHA_REGEX", message = "should just have letters"))]
-    pub institution: Option<Cow<'a, str>>,
+    pub institution_id: Option<i32>,
 
-    #[validate(regex(
-        path = "regexes::LOCATION_REGEX",
-        message = "should have letters, digits or -_`"
-    ))]
-    pub campus_location: Option<Cow<'a, str>>,
     pub registration_no: Option<Cow<'a, str>>,
 }
 
@@ -274,12 +241,7 @@ impl PartialEq<NewClaimableIdt<'_>> for ClaimableIdentification {
             } else {
                 false
             },
-            if let Some(ref loc) = claim.campus_location {
-                self.campus_location.eq(loc)
-            } else {
-                false
-            },
-            self.institution.eq(&claim.institution),
+            self.institution_id.eq(&claim.institution_id),
             self.name.eq(&claim.name),
         ];
 
@@ -291,16 +253,11 @@ impl PartialEq<ClaimableIdentification> for NewClaimableIdt<'_> {
     fn eq(&self, claim: &ClaimableIdentification) -> bool {
         let match_fields = [
             self.entry_year.eq(&claim.entry_year),
-            self.institution.eq(&claim.institution),
+            self.institution_id.eq(&claim.institution_id),
             self.name.eq(&claim.name),
             self.graduation_year.eq(&claim.graduation_year),
             if self.course.is_some() {
                 self.course.as_ref().unwrap().eq(&claim.course)
-            } else {
-                false
-            },
-            if let Some(loc) = &self.campus_location {
-                claim.campus_location.eq(loc)
             } else {
                 false
             },
@@ -317,8 +274,7 @@ impl PartialEq<Identification> for NewIdentification<'_> {
             self.course.eq(&idt.course),
             self.valid_from.eq(&idt.valid_from),
             self.valid_till.eq(&idt.valid_till),
-            self.institution.eq(&idt.institution),
-            self.campus.eq(&idt.campus),
+            self.institution_id.eq(&idt.institution_id),
             self.location_name.eq(&idt.location_name),
             self.location_latitude.eq(&idt.location_latitude),
             self.location_longitude.eq(&idt.location_longitude),
@@ -340,8 +296,7 @@ impl PartialEq<NewIdentification<'_>> for Identification {
             self.course.eq(&idt.course),
             self.valid_from.eq(&idt.valid_from),
             self.valid_till.eq(&idt.valid_till),
-            self.institution.eq(&idt.institution),
-            self.campus.eq(&idt.campus),
+            self.institution_id.eq(&idt.institution_id),
             self.location_name.eq(&idt.location_name),
             self.location_latitude.eq(&idt.location_latitude),
             self.location_longitude.eq(&idt.location_longitude),
@@ -357,15 +312,14 @@ impl<'a> NewIdentification<'a> {
     /// Saves a new ID record to the Identifications table
     pub async fn save(&self) -> Result<Identification, ResError> {
         use crate::diesel_cfg::schema::identifications::dsl::{
-            campus, course, identifications as _identifications, institution, name, registration_no,
+            course, identifications as _identifications, institution_id, name, registration_no,
         };
 
         let presents = _identifications
             .filter(
                 name.eq(&self.name)
                     .and(course.eq(&self.course))
-                    .and(institution.eq(&self.institution))
-                    .and(campus.eq(&self.campus))
+                    .and(institution_id.eq(&self.institution_id))
                     .and(registration_no.eq(&self.registration_no)),
             )
             .load::<Identification>(&connect_to_db())?;
@@ -444,15 +398,14 @@ impl Identification {
     ///
     /// # Returns
     /// Resulting vector of Identifications.
-    pub fn retrieve_by_institution_name(
-        institution: &str,
+    pub fn retrieve_by_institution_id(
+        institution_pk: i32,
     ) -> Result<Vec<Identification>, ResError> {
         use crate::diesel_cfg::schema::identifications::dsl::{
-            identifications, institution as _institution,
+            identifications, institution_id as _institution,
         };
-        // Filter where id.institution.ilike(institution)
         let idts = identifications
-            .filter(_institution.ilike(institution))
+            .filter(_institution.eq(institution_pk))
             .load::<Identification>(&connect_to_db())?;
 
         Ok(idts)
@@ -590,14 +543,14 @@ impl Identification {
     /// true: If a claim match is found for the Identification.
     pub async fn match_claims(&self) -> Result<(bool, Vec<ClaimableIdentification>), ResError> {
         use crate::diesel_cfg::schema::claimed_identifications::dsl::{
-            claimed_identifications, institution,
+            claimed_identifications, institution_id,
         };
 
         let mut has_match = false;
         let mut matched_claims = vec![];
 
         let idt_claims = claimed_identifications
-            .filter(institution.eq(&self.institution))
+            .filter(institution_id.eq(&self.institution_id))
             .load::<ClaimableIdentification>(&connect_to_db())?;
 
         for claim in idt_claims.into_iter() {
@@ -617,7 +570,7 @@ impl<'a> NewClaimableIdt<'a> {
     pub async fn save(&mut self, this_user: &User) -> Result<ClaimableIdentification, ResError> {
         use crate::diesel_cfg::schema::claimed_identifications::dsl::{
             claimed_identifications as cl_idt_table,
-            institution as c_institution,
+            institution_id as c_institution,
             name as c_name,
             //registration_no as c_reg_no,
         };
@@ -629,7 +582,7 @@ impl<'a> NewClaimableIdt<'a> {
             .filter(
                 c_name
                     .eq(self.name.as_ref())
-                    .and(c_institution.eq(self.institution.as_ref())),
+                    .and(c_institution.eq(self.institution_id.as_ref())),
                 // .and(c_reg_no.eq(self.registration_no.as_ref())),
                 // Only non-option values are matched here.
                 // If there's need to change how claims work,
@@ -733,24 +686,16 @@ impl ClaimableIdentification {
     /// bool: If a match of the claim is found, otherwise false.
     pub async fn match_idt(&self) -> Result<(bool, Vec<Identification>), ResError> {
         use crate::diesel_cfg::schema::identifications::dsl::{
-            campus, identifications, institution, is_found,
+            identifications, institution_id, is_found,
         };
 
-        let idts = if !self.campus_location.is_empty() {
-            let campus_loc = &self.campus_location;
-            identifications
-                .filter(
-                    institution
-                        .eq(&self.institution)
-                        .and(campus.eq(campus_loc))
-                        .and(is_found.eq(false)),
-                )
-                .load::<Identification>(&connect_to_db())?
-        } else {
-            identifications
-                .filter(institution.eq(&self.institution).and(is_found.eq(false)))
-                .load::<Identification>(&connect_to_db())?
-        };
+        let idts = identifications
+            .filter(
+                institution_id
+                    .eq(&self.institution_id)
+                    .and(is_found.eq(false)),
+            )
+            .load::<Identification>(&connect_to_db())?;
 
         Ok(self.find_similarity(idts).await?)
     }
@@ -868,10 +813,9 @@ impl std::convert::From<&NewIdentification<'_>> for Identification {
         Identification {
             name: new_idt.name.as_ref().into(),
             course: new_idt.course.as_ref().into(),
-            campus: new_idt.campus.as_ref().into(),
             valid_from: new_idt.valid_from,
             valid_till: new_idt.valid_till,
-            institution: new_idt.institution.as_ref().into(),
+            institution_id: new_idt.institution_id,
             registration_no: new_idt.registration_no.clone(),
 
             // Below fields should NOT be used on an Idt converted from a NewIdt
